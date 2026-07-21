@@ -1,0 +1,7 @@
+-- Flyway/Liquibase 风格迁移说明
+-- 如果项目采用迁移工具，请将 database/mysql/01_rental_schema.sql 的内容复制为正式迁移脚本。
+-- 为避免当前阶段维护两份重复 DDL，本文件仅记录迁移编号和执行顺序。
+-- 实际初始化请执行：
+--   1. database/mysql/00_create_database.sql
+--   2. database/mysql/01_rental_schema.sql
+--   3. database/seed/01_rental_dict_seed.sql
