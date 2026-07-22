@@ -1,0 +1,191 @@
+services:
+  ruoyi-mysql:
+    image: ${MYSQL_IMAGE}
+    container_name: qianruo-mysql
+    command:
+      - --innodb-buffer-pool-size=256M
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+8:00
+      - --lower-case-table-names=1
+    environment:
+      MYSQL_DATABASE: ry-cloud
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - qianruo-mysql-data:/var/lib/mysql
+    networks:
+      - qianruo
+
+  ruoyi-redis:
+    image: ${REDIS_IMAGE}
+    container_name: qianruo-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - qianruo-redis-data:/data
+    networks:
+      - qianruo
+
+  ruoyi-nacos:
+    image: ${NACOS_IMAGE}
+    container_name: qianruo-nacos
+    depends_on:
+      - ruoyi-mysql
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: ruoyi-mysql
+      MYSQL_SERVICE_PORT: "3306"
+      MYSQL_SERVICE_DB_NAME: ry-config
+      MYSQL_SERVICE_USER: root
+      MYSQL_SERVICE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE}
+    ports:
+      - "8848:8848"
+      - "18080:8080"
+      - "9848:9848"
+      - "9849:9849"
+    networks:
+      - qianruo
+
+  ruoyi-gateway:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-gateway:${IMAGE_TAG}
+    container_name: qianruo-gateway
+    depends_on:
+      - ruoyi-nacos
+      - ruoyi-redis
+    environment: &ruoyi-common-env
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: ruoyi-nacos:8848
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: ruoyi-nacos:8848
+      SPRING_DATA_REDIS_HOST: ruoyi-redis
+      JAVA_OPTS: ${JAVA_OPTS}
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"
+    networks:
+      - qianruo
+
+  ruoyi-auth:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-auth:${IMAGE_TAG}
+    container_name: qianruo-auth
+    depends_on:
+      - ruoyi-nacos
+      - ruoyi-redis
+    environment:
+      <<: *ruoyi-common-env
+    ports:
+      - "9200:9200"
+    networks:
+      - qianruo
+
+  ruoyi-system:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-system:${IMAGE_TAG}
+    container_name: qianruo-system
+    depends_on:
+      - ruoyi-nacos
+      - ruoyi-mysql
+      - ruoyi-redis
+    environment:
+      <<: *ruoyi-common-env
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: root
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "9201:9201"
+    networks:
+      - qianruo
+
+  ruoyi-gen:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-gen:${IMAGE_TAG}
+    container_name: qianruo-gen
+    depends_on:
+      - ruoyi-nacos
+      - ruoyi-mysql
+    environment:
+      <<: *ruoyi-common-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "9202:9202"
+    networks:
+      - qianruo
+
+  ruoyi-job:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-job:${IMAGE_TAG}
+    container_name: qianruo-job
+    depends_on:
+      - ruoyi-nacos
+      - ruoyi-mysql
+    environment:
+      <<: *ruoyi-common-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "9203:9203"
+    networks:
+      - qianruo
+
+  ruoyi-file:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-file:${IMAGE_TAG}
+    container_name: qianruo-file
+    depends_on:
+      - ruoyi-nacos
+    environment:
+      <<: *ruoyi-common-env
+    ports:
+      - "9300:9300"
+    volumes:
+      - qianruo-file-data:/home/ruoyi/uploadPath
+    networks:
+      - qianruo
+
+  ruoyi-monitor:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-visual-monitor:${IMAGE_TAG}
+    container_name: qianruo-monitor
+    depends_on:
+      - ruoyi-nacos
+    environment:
+      <<: *ruoyi-common-env
+    ports:
+      - "9100:9100"
+    networks:
+      - qianruo
+
+  rental-admin-web:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-admin-web:${IMAGE_TAG}
+    container_name: qianruo-admin-web
+    depends_on:
+      - ruoyi-gateway
+    ports:
+      - "8088:80"
+    networks:
+      - qianruo
+
+  rental-merchant-web:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-merchant-web:${IMAGE_TAG}
+    container_name: qianruo-merchant-web
+    depends_on:
+      - ruoyi-gateway
+    ports:
+      - "8089:80"
+    networks:
+      - qianruo
+
+networks:
+  qianruo:
+    name: qianruo-local
+
+volumes:
+  qianruo-mysql-data:
+  qianruo-redis-data:
+  qianruo-file-data:

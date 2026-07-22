@@ -20,6 +20,8 @@ coverage/
 # Local environment overrides
 .env.local
 .env.*.local
+deploy/.env
+deploy/.generated/
 
 # IDE/editor
 .idea/
@@ -27,5 +29,8 @@ coverage/
 *.iml
 
 # OS temporary files
+.DS_Store
 *.tmp
 *.swp
+__pycache__/
+*.pyc

@@ -171,6 +171,23 @@ npm run dev
 
 默认开发端口：`81`。
 
+## 云端一键部署
+
+项目已提供面向 Kubernetes/云容器服务的一键部署脚本，可用于火山引擎容器服务等环境：
+
+```bash
+cp deploy/.env.example deploy/.env
+./scripts/deploy.sh all
+```
+
+部署前请先在 `deploy/.env` 中配置镜像仓库、Kubernetes 命名空间、域名和密钥。详细说明见 `deploy/README.md`。
+
+本地 Mac Docker Desktop 可直接启动整套服务：
+
+```bash
+./scripts/deploy.sh local
+```
+
 ## 安全与数据基线
 
 - 所有业务表应包含 `tenant_id` / `member_id` 等隔离字段。

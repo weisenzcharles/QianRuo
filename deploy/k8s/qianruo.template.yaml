@@ -1,0 +1,668 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${K8S_NAMESPACE}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qianruo-secret
+  namespace: ${K8S_NAMESPACE}
+type: Opaque
+stringData:
+  mysql-root-password: "${MYSQL_ROOT_PASSWORD}"
+  nacos-auth-token: "${NACOS_AUTH_TOKEN}"
+  nacos-auth-identity-key: "${NACOS_AUTH_IDENTITY_KEY}"
+  nacos-auth-identity-value: "${NACOS_AUTH_IDENTITY_VALUE}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qianruo-config
+  namespace: ${K8S_NAMESPACE}
+data:
+  TZ: Asia/Shanghai
+  SPRING_PROFILES_ACTIVE: dev
+  NACOS_ADDR: ruoyi-nacos:8848
+  MYSQL_HOST: ruoyi-mysql
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: ry-cloud
+  REDIS_HOST: ruoyi-redis
+  REDIS_PORT: "6379"
+  JAVA_OPTS: "${JAVA_OPTS}"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: ${K8S_NAMESPACE}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: ${K8S_NAMESPACE}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: file-data
+  namespace: ${K8S_NAMESPACE}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-mysql
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-mysql
+  template:
+    metadata:
+      labels:
+        app: ruoyi-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: ${MYSQL_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_DATABASE
+              value: ry-cloud
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: mysql-root-password
+            - name: TZ
+              valueFrom:
+                configMapKeyRef:
+                  name: qianruo-config
+                  key: TZ
+          args:
+            - --innodb-buffer-pool-size=256M
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+            - --default-time-zone=+8:00
+            - --lower-case-table-names=1
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-mysql
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-redis
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-redis
+  template:
+    metadata:
+      labels:
+        app: ruoyi-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+          args:
+            - redis-server
+            - --appendonly
+            - "yes"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-redis
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-nacos
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-nacos
+  template:
+    metadata:
+      labels:
+        app: ruoyi-nacos
+    spec:
+      containers:
+        - name: nacos
+          image: nacos/nacos-server:v3.0.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8848
+            - containerPort: 9848
+            - containerPort: 9849
+          env:
+            - name: MODE
+              value: standalone
+            - name: NACOS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: nacos-auth-token
+            - name: NACOS_AUTH_IDENTITY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: nacos-auth-identity-key
+            - name: NACOS_AUTH_IDENTITY_VALUE
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: nacos-auth-identity-value
+            - name: SPRING_DATASOURCE_PLATFORM
+              value: mysql
+            - name: MYSQL_SERVICE_HOST
+              value: ruoyi-mysql
+            - name: MYSQL_SERVICE_PORT
+              value: "3306"
+            - name: MYSQL_SERVICE_DB_NAME
+              value: ry-config
+            - name: MYSQL_SERVICE_USER
+              value: root
+            - name: MYSQL_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: mysql-root-password
+            - name: MYSQL_SERVICE_DB_PARAM
+              value: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-nacos
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-nacos
+  ports:
+    - name: http
+      port: 8848
+      targetPort: 8848
+    - name: client-rpc
+      port: 9848
+      targetPort: 9848
+    - name: raft-rpc
+      port: 9849
+      targetPort: 9849
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-gateway
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-gateway
+  template:
+    metadata:
+      labels:
+        app: ruoyi-gateway
+    spec:
+      containers:
+        - name: ruoyi-gateway
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-gateway:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_DATA_REDIS_HOST
+              value: ruoyi-redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-gateway
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-auth
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-auth
+  template:
+    metadata:
+      labels:
+        app: ruoyi-auth
+    spec:
+      containers:
+        - name: ruoyi-auth
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-auth:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9200
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_DATA_REDIS_HOST
+              value: ruoyi-redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-auth
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-auth
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-system
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-system
+  template:
+    metadata:
+      labels:
+        app: ruoyi-system
+    spec:
+      containers:
+        - name: ruoyi-system
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-system:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9201
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_DATA_REDIS_HOST
+              value: ruoyi-redis
+            - name: SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL
+              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+            - name: SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: mysql-root-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-system
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-system
+  ports:
+    - name: http
+      port: 9201
+      targetPort: 9201
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-gen
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-gen
+  template:
+    metadata:
+      labels:
+        app: ruoyi-gen
+    spec:
+      containers:
+        - name: ruoyi-gen
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-gen:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9202
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_DATA_REDIS_HOST
+              value: ruoyi-redis
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: mysql-root-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-gen
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-gen
+  ports:
+    - name: http
+      port: 9202
+      targetPort: 9202
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-job
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-job
+  template:
+    metadata:
+      labels:
+        app: ruoyi-job
+    spec:
+      containers:
+        - name: ruoyi-job
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-job:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9203
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_DATA_REDIS_HOST
+              value: ruoyi-redis
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: mysql-root-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-job
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-job
+  ports:
+    - name: http
+      port: 9203
+      targetPort: 9203
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-file
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-file
+  template:
+    metadata:
+      labels:
+        app: ruoyi-file
+    spec:
+      containers:
+        - name: ruoyi-file
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-file:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9300
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+          volumeMounts:
+            - name: file-data
+              mountPath: /home/ruoyi/uploadPath
+      volumes:
+        - name: file-data
+          persistentVolumeClaim:
+            claimName: file-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-file
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-file
+  ports:
+    - name: http
+      port: 9300
+      targetPort: 9300
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ruoyi-monitor
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ruoyi-monitor
+  template:
+    metadata:
+      labels:
+        app: ruoyi-monitor
+    spec:
+      containers:
+        - name: ruoyi-monitor
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-visual-monitor:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9100
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ruoyi-monitor
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: ruoyi-monitor
+  ports:
+    - name: http
+      port: 9100
+      targetPort: 9100
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rental-admin-web
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rental-admin-web
+  template:
+    metadata:
+      labels:
+        app: rental-admin-web
+    spec:
+      containers:
+        - name: rental-admin-web
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-admin-web:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rental-admin-web
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: rental-admin-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rental-merchant-web
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rental-merchant-web
+  template:
+    metadata:
+      labels:
+        app: rental-merchant-web
+    spec:
+      containers:
+        - name: rental-merchant-web
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-merchant-web:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rental-merchant-web
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: rental-merchant-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

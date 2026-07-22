@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qianruo-web
+  namespace: ${K8S_NAMESPACE}
+spec:
+  rules:
+    - host: ${ADMIN_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rental-admin-web
+                port:
+                  number: 80
+    - host: ${MERCHANT_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rental-merchant-web
+                port:
+                  number: 80
