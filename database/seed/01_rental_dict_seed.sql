@@ -19,6 +19,54 @@ INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time,
 SELECT '周转市场帖子状态', 'rental_market_post_status', '0', 'system', NOW(), '库存周转市场帖子状态'
 WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 'rental_market_post_status');
 
+INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
+SELECT '租赁商户类型', 'rental_member_type', '0', 'system', NOW(), '租赁商户主体类型'
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 'rental_member_type');
+
+INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
+SELECT '租赁商户认证状态', 'rental_member_auth_status', '0', 'system', NOW(), '租赁商户认证审核状态'
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 'rental_member_auth_status');
+
+INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
+SELECT '租赁会员等级', 'rental_vip_level', '0', 'system', NOW(), '租赁商户会员套餐等级'
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 'rental_vip_level');
+
+-- 商户类型
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 1, '个人', 'personal', 'rental_member_type', '', 'default', 'Y', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_member_type' AND dict_value='personal');
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 2, '企业', 'enterprise', 'rental_member_type', '', 'success', 'N', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_member_type' AND dict_value='enterprise');
+
+-- 商户认证状态
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 1, '未认证', 'unverified', 'rental_member_auth_status', '', 'info', 'Y', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_member_auth_status' AND dict_value='unverified');
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 2, '待审核', 'pending', 'rental_member_auth_status', '', 'warning', 'N', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_member_auth_status' AND dict_value='pending');
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 3, '已认证', 'verified', 'rental_member_auth_status', '', 'success', 'N', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_member_auth_status' AND dict_value='verified');
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 4, '已驳回', 'rejected', 'rental_member_auth_status', '', 'danger', 'N', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_member_auth_status' AND dict_value='rejected');
+
+-- 会员等级
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 1, '免费版', 'free', 'rental_vip_level', '', 'info', 'Y', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_vip_level' AND dict_value='free');
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 2, '标准版', 'standard', 'rental_vip_level', '', 'default', 'N', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_vip_level' AND dict_value='standard');
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 3, '专业版', 'pro', 'rental_vip_level', '', 'success', 'N', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_vip_level' AND dict_value='pro');
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+SELECT 4, '旗舰版', 'enterprise', 'rental_vip_level', '', 'warning', 'N', '0', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_vip_level' AND dict_value='enterprise');
+
 -- 订单状态
 INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
 SELECT 1, '待发货', 'pending_ship', 'rental_order_status', '', 'default', 'Y', '0', 'system', NOW(), ''
@@ -98,3 +146,32 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_market_pos
 INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
 SELECT 5, '违规下架', 'violation_offline', 'rental_market_post_status', '', 'danger', 'N', '0', 'system', NOW(), ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_dict_data WHERE dict_type='rental_market_post_status' AND dict_value='violation_offline');
+
+-- 平台后台商户管理菜单
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2000, '商户后台', 0, 4, 'rental', NULL, '', '', 1, 0, 'M', '0', '0', '', 'peoples', 'system', NOW(), '', NULL, '租赁商户后台管理目录'
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2000);
+
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2001, '商户管理', 2000, 1, 'member', 'rental/member/index', '', '', 1, 0, 'C', '0', '0', 'rental:member:list', 'user', 'system', NOW(), '', NULL, '租赁商户主体管理'
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2001);
+
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2002, '商户查询', 2001, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'rental:member:query', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2002);
+
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2003, '商户新增', 2001, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'rental:member:add', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2003);
+
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2004, '商户修改', 2001, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'rental:member:edit', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2004);
+
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2005, '商户删除', 2001, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'rental:member:remove', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2005);
+
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2006, '商户导出', 2001, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'rental:member:export', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2006);

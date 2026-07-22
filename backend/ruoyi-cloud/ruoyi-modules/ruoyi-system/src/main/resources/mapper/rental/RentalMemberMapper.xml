@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalMemberMapper">
+
+    <resultMap type="com.ruoyi.system.domain.rental.RentalMember" id="RentalMemberResult">
+        <id     property="memberId"              column="member_id"               />
+        <result property="tenantId"              column="tenant_id"               />
+        <result property="memberCode"            column="member_code"             />
+        <result property="memberType"            column="member_type"             />
+        <result property="authStatus"            column="auth_status"             />
+        <result property="legalSubjectName"      column="legal_subject_name"      />
+        <result property="licenseNo"             column="license_no"              />
+        <result property="nickname"              column="nickname"                />
+        <result property="contactName"           column="contact_name"            />
+        <result property="contactPhone"          column="contact_phone"           />
+        <result property="wechatQrFileId"        column="wechat_qr_file_id"       />
+        <result property="vipLevel"              column="vip_level"               />
+        <result property="storageQuotaMb"        column="storage_quota_mb"        />
+        <result property="externalAcceptEnabled" column="external_accept_enabled" />
+        <result property="status"                column="status"                  />
+        <result property="createBy"              column="create_by"               />
+        <result property="createTime"            column="create_time"             />
+        <result property="updateBy"              column="update_by"               />
+        <result property="updateTime"            column="update_time"             />
+        <result property="remark"                column="remark"                  />
+        <result property="delFlag"               column="del_flag"                />
+    </resultMap>
+
+    <sql id="selectRentalMemberVo">
+        select member_id, tenant_id, member_code, member_type, auth_status,
+               legal_subject_name, license_no, nickname, contact_name, contact_phone,
+               wechat_qr_file_id, vip_level, storage_quota_mb, external_accept_enabled,
+               status, create_by, create_time, update_by, update_time, remark, del_flag
+        from `ry_rental`.`ry_rental_member`
+    </sql>
+
+    <select id="selectRentalMemberList" parameterType="com.ruoyi.system.domain.rental.RentalMember" resultMap="RentalMemberResult">
+        <include refid="selectRentalMemberVo"/>
+        <where>
+            del_flag = '0'
+            <if test="tenantId != null">
+                AND tenant_id = #{tenantId}
+            </if>
+            <if test="memberCode != null and memberCode != ''">
+                AND member_code like concat('%', #{memberCode}, '%')
+            </if>
+            <if test="memberType != null and memberType != ''">
+                AND member_type = #{memberType}
+            </if>
+            <if test="authStatus != null and authStatus != ''">
+                AND auth_status = #{authStatus}
+            </if>
+            <if test="legalSubjectName != null and legalSubjectName != ''">
+                AND legal_subject_name like concat('%', #{legalSubjectName}, '%')
+            </if>
+            <if test="nickname != null and nickname != ''">
+                AND nickname like concat('%', #{nickname}, '%')
+            </if>
+            <if test="contactName != null and contactName != ''">
+                AND contact_name like concat('%', #{contactName}, '%')
+            </if>
+            <if test="contactPhone != null and contactPhone != ''">
+                AND contact_phone like concat('%', #{contactPhone}, '%')
+            </if>
+            <if test="vipLevel != null and vipLevel != ''">
+                AND vip_level = #{vipLevel}
+            </if>
+            <if test="externalAcceptEnabled != null">
+                AND external_accept_enabled = #{externalAcceptEnabled}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        order by create_time desc, member_id desc
+    </select>
+
+    <select id="selectRentalMemberById" parameterType="Long" resultMap="RentalMemberResult">
+        <include refid="selectRentalMemberVo"/>
+        where member_id = #{memberId} and del_flag = '0'
+    </select>
+
+    <select id="checkMemberCodeUnique" parameterType="String" resultMap="RentalMemberResult">
+        <include refid="selectRentalMemberVo"/>
+        where member_code = #{memberCode} and del_flag = '0' limit 1
+    </select>
+
+    <insert id="insertRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember" useGeneratedKeys="true" keyProperty="memberId">
+        insert into `ry_rental`.`ry_rental_member`(
+            tenant_id, member_code, member_type, auth_status,
+            <if test="legalSubjectName != null and legalSubjectName != ''">legal_subject_name,</if>
+            <if test="licenseNo != null and licenseNo != ''">license_no,</if>
+            <if test="nickname != null and nickname != ''">nickname,</if>
+            <if test="contactName != null and contactName != ''">contact_name,</if>
+            <if test="contactPhone != null and contactPhone != ''">contact_phone,</if>
+            <if test="wechatQrFileId != null">wechat_qr_file_id,</if>
+            vip_level, storage_quota_mb, external_accept_enabled, status,
+            <if test="remark != null and remark != ''">remark,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time
+        ) values (
+            #{tenantId}, #{memberCode}, #{memberType}, #{authStatus},
+            <if test="legalSubjectName != null and legalSubjectName != ''">#{legalSubjectName},</if>
+            <if test="licenseNo != null and licenseNo != ''">#{licenseNo},</if>
+            <if test="nickname != null and nickname != ''">#{nickname},</if>
+            <if test="contactName != null and contactName != ''">#{contactName},</if>
+            <if test="contactPhone != null and contactPhone != ''">#{contactPhone},</if>
+            <if test="wechatQrFileId != null">#{wechatQrFileId},</if>
+            #{vipLevel}, #{storageQuotaMb}, #{externalAcceptEnabled}, #{status},
+            <if test="remark != null and remark != ''">#{remark},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            sysdate()
+        )
+    </insert>
+
+    <update id="updateRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember">
+        update `ry_rental`.`ry_rental_member`
+        <set>
+            <if test="tenantId != null">tenant_id = #{tenantId},</if>
+            <if test="memberCode != null and memberCode != ''">member_code = #{memberCode},</if>
+            <if test="memberType != null and memberType != ''">member_type = #{memberType},</if>
+            <if test="authStatus != null and authStatus != ''">auth_status = #{authStatus},</if>
+            <if test="legalSubjectName != null">legal_subject_name = #{legalSubjectName},</if>
+            <if test="licenseNo != null">license_no = #{licenseNo},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="contactName != null">contact_name = #{contactName},</if>
+            <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
+            <if test="wechatQrFileId != null">wechat_qr_file_id = #{wechatQrFileId},</if>
+            <if test="vipLevel != null and vipLevel != ''">vip_level = #{vipLevel},</if>
+            <if test="storageQuotaMb != null">storage_quota_mb = #{storageQuotaMb},</if>
+            <if test="externalAcceptEnabled != null">external_accept_enabled = #{externalAcceptEnabled},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where member_id = #{memberId} and del_flag = '0'
+    </update>
+
+    <update id="deleteRentalMemberByIds" parameterType="Long">
+        update `ry_rental`.`ry_rental_member`
+        set del_flag = '2', update_time = sysdate()
+        where member_id in
+        <foreach collection="array" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </update>
+
+</mapper>
