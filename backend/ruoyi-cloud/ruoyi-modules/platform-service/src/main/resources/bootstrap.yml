@@ -1,0 +1,39 @@
+# Tomcat
+server:
+  port: 9201
+
+# Spring
+spring:
+  application:
+    # 应用名称
+    name: platform-service
+  profiles:
+    # 环境配置
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: 127.0.0.1:8848
+      config:
+        # 配置中心地址
+        server-addr: 127.0.0.1:8848
+  config:
+    # 配置文件格式
+    file-extension: yml
+    import:
+      - nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: ${PLATFORM_DB_URL:jdbc:mysql://localhost:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai}
+          username: ${PLATFORM_DB_USERNAME:qianruo_platform}
+          password: ${PLATFORM_DB_PASSWORD:CHANGE_ME_PLATFORM_DB_PASSWORD}
+
+# Keep mapper discovery local so an empty Nacos service config cannot disable persistence.
+mybatis:
+  typeAliasesPackage: com.ruoyi.system
+  mapperLocations: classpath:mapper/**/*.xml

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalMerchantUserMenuMapper">
+
+    <select id="selectMenuIdsByUserId" resultType="Long">
+        select m.menu_id
+        from `ry_rental`.`ry_rental_merchant_menu` m
+            inner join `ry_rental`.`ry_rental_merchant_user_menu` um
+                on m.menu_id = um.menu_id
+        where um.tenant_id = #{tenantId}
+          and um.member_id = #{memberId}
+          and um.merchant_user_id = #{merchantUserId}
+          and m.tenant_id = 0
+          and m.member_id = 0
+          and m.del_flag = '0'
+          <if test="menuCheckStrictly">
+              and m.menu_id not in (
+                  select cm.parent_id
+                  from `ry_rental`.`ry_rental_merchant_menu` cm
+                      inner join `ry_rental`.`ry_rental_merchant_user_menu` cum
+                          on cm.menu_id = cum.menu_id
+                  where cum.tenant_id = #{tenantId}
+                    and cum.member_id = #{memberId}
+                    and cum.merchant_user_id = #{merchantUserId}
+                    and cm.tenant_id = 0
+                    and cm.member_id = 0
+                    and cm.del_flag = '0'
+              )
+          </if>
+        order by m.parent_id, m.order_num
+    </select>
+
+    <delete id="deleteUserMenuByUserIds">
+        delete from `ry_rental`.`ry_rental_merchant_user_menu`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and merchant_user_id in
+        <foreach collection="merchantUserIds" item="merchantUserId" open="(" separator="," close=")">
+            #{merchantUserId}
+        </foreach>
+    </delete>
+
+    <insert id="batchUserMenu">
+        insert ignore into `ry_rental`.`ry_rental_merchant_user_menu`(tenant_id, member_id, merchant_user_id, menu_id) values
+        <foreach item="item" collection="list" separator=",">
+            (#{tenantId}, #{memberId}, #{merchantUserId}, #{item.menuId})
+        </foreach>
+    </insert>
+
+</mapper>

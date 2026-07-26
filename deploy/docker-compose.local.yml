@@ -1,6 +1,7 @@
 services:
   ruoyi-mysql:
     image: ${MYSQL_IMAGE}
+    pull_policy: missing
     container_name: qianruo-mysql
     command:
       - --innodb-buffer-pool-size=256M
@@ -11,30 +12,51 @@ services:
     environment:
       MYSQL_DATABASE: ry-cloud
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_HOST: 127.0.0.1
+      PLATFORM_DB_USERNAME: ${PLATFORM_DB_USERNAME}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD}
+      MERCHANT_DB_USERNAME: ${MERCHANT_DB_USERNAME}
+      MERCHANT_DB_PASSWORD: ${MERCHANT_DB_PASSWORD}
       TZ: Asia/Shanghai
     ports:
       - "3306:3306"
     volumes:
       - qianruo-mysql-data:/var/lib/mysql
+      - ./scripts/provision-service-db-users.sh:/usr/local/bin/provision-service-db-users.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
     networks:
       - qianruo
 
   ruoyi-redis:
     image: ${REDIS_IMAGE}
+    pull_policy: missing
     container_name: qianruo-redis
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - qianruo-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
     networks:
       - qianruo
 
   ruoyi-nacos:
     image: ${NACOS_IMAGE}
+    pull_policy: missing
     container_name: qianruo-nacos
     depends_on:
-      - ruoyi-mysql
+      ruoyi-mysql:
+        condition: service_healthy
     environment:
       MODE: standalone
       SPRING_DATASOURCE_PLATFORM: mysql
@@ -43,7 +65,7 @@ services:
       MYSQL_SERVICE_DB_NAME: ry-config
       MYSQL_SERVICE_USER: root
       MYSQL_SERVICE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
       NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
       NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY}
       NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE}
@@ -57,10 +79,13 @@ services:
 
   ruoyi-gateway:
     image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-gateway:${IMAGE_TAG}
+    pull_policy: missing
     container_name: qianruo-gateway
     depends_on:
-      - ruoyi-nacos
-      - ruoyi-redis
+      ruoyi-nacos:
+        condition: service_started
+      ruoyi-redis:
+        condition: service_healthy
     environment: &ruoyi-common-env
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: ruoyi-nacos:8848
@@ -75,10 +100,13 @@ services:
 
   ruoyi-auth:
     image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-auth:${IMAGE_TAG}
+    pull_policy: missing
     container_name: qianruo-auth
     depends_on:
-      - ruoyi-nacos
-      - ruoyi-redis
+      ruoyi-nacos:
+        condition: service_started
+      ruoyi-redis:
+        condition: service_healthy
     environment:
       <<: *ruoyi-common-env
     ports:
@@ -86,32 +114,60 @@ services:
     networks:
       - qianruo
 
-  ruoyi-system:
-    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-system:${IMAGE_TAG}
-    container_name: qianruo-system
+  platform-service:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/platform-service:${IMAGE_TAG}
+    pull_policy: missing
+    container_name: qianruo-platform-service
     depends_on:
-      - ruoyi-nacos
-      - ruoyi-mysql
-      - ruoyi-redis
+      ruoyi-nacos:
+        condition: service_started
+      ruoyi-mysql:
+        condition: service_healthy
+      ruoyi-redis:
+        condition: service_healthy
     environment:
       <<: *ruoyi-common-env
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: root
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${PLATFORM_DB_USERNAME}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${PLATFORM_DB_PASSWORD}
     ports:
       - "9201:9201"
     networks:
       - qianruo
 
-  ruoyi-gen:
-    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-gen:${IMAGE_TAG}
-    container_name: qianruo-gen
+  merchant-service:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/merchant-service:${IMAGE_TAG}
+    pull_policy: missing
+    container_name: qianruo-merchant-service
     depends_on:
-      - ruoyi-nacos
-      - ruoyi-mysql
+      ruoyi-nacos:
+        condition: service_started
+      ruoyi-mysql:
+        condition: service_healthy
+      ruoyi-redis:
+        condition: service_healthy
     environment:
       <<: *ruoyi-common-env
-      SPRING_DATASOURCE_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      MERCHANT_DB_URL: jdbc:mysql://ruoyi-mysql:3306/ry_rental?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
+      MERCHANT_DB_USERNAME: ${MERCHANT_DB_USERNAME}
+      MERCHANT_DB_PASSWORD: ${MERCHANT_DB_PASSWORD}
+    ports:
+      - "9210:9210"
+    networks:
+      - qianruo
+
+  ruoyi-gen:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-gen:${IMAGE_TAG}
+    pull_policy: missing
+    container_name: qianruo-gen
+    depends_on:
+      ruoyi-nacos:
+        condition: service_started
+      ruoyi-mysql:
+        condition: service_healthy
+    environment:
+      <<: *ruoyi-common-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
@@ -121,13 +177,16 @@ services:
 
   ruoyi-job:
     image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-job:${IMAGE_TAG}
+    pull_policy: missing
     container_name: qianruo-job
     depends_on:
-      - ruoyi-nacos
-      - ruoyi-mysql
+      ruoyi-nacos:
+        condition: service_started
+      ruoyi-mysql:
+        condition: service_healthy
     environment:
       <<: *ruoyi-common-env
-      SPRING_DATASOURCE_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      SPRING_DATASOURCE_URL: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
@@ -137,6 +196,7 @@ services:
 
   ruoyi-file:
     image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-file:${IMAGE_TAG}
+    pull_policy: missing
     container_name: qianruo-file
     depends_on:
       - ruoyi-nacos
@@ -151,6 +211,7 @@ services:
 
   ruoyi-monitor:
     image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-visual-monitor:${IMAGE_TAG}
+    pull_policy: missing
     container_name: qianruo-monitor
     depends_on:
       - ruoyi-nacos
@@ -163,6 +224,7 @@ services:
 
   rental-admin-web:
     image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-admin-web:${IMAGE_TAG}
+    pull_policy: missing
     container_name: qianruo-admin-web
     depends_on:
       - ruoyi-gateway
@@ -173,6 +235,7 @@ services:
 
   rental-merchant-web:
     image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-merchant-web:${IMAGE_TAG}
+    pull_policy: missing
     container_name: qianruo-merchant-web
     depends_on:
       - ruoyi-gateway

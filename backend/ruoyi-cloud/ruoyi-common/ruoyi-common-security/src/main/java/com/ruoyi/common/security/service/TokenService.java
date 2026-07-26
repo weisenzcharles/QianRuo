@@ -1,7 +1,9 @@
 package com.ruoyi.common.security.service;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.ruoyi.common.core.constant.CacheConstants;
+import com.ruoyi.common.core.constant.Constants;
 import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.utils.JwtUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
@@ -38,8 +41,6 @@ public class TokenService
 
     private final static long TOKEN_EXPIRE_TIME = CacheConstants.EXPIRATION;
 
-    private final static String ACCESS_TOKEN = CacheConstants.LOGIN_TOKEN_KEY;
-
     private final static Long TOKEN_REFRESH_THRESHOLD_MINUTES = CacheConstants.REFRESH_TIME * MILLIS_MINUTE;
 
     /**
@@ -55,12 +56,14 @@ public class TokenService
         loginUser.setUsername(userName);
         loginUser.setIpaddr(IpUtils.getIpAddr());
         refreshToken(loginUser);
+        bindUserToken(loginUser);
 
         // Jwt存储信息
         Map<String, Object> claimsMap = new HashMap<String, Object>();
         claimsMap.put(SecurityConstants.USER_KEY, token);
         claimsMap.put(SecurityConstants.DETAILS_USER_ID, userId);
         claimsMap.put(SecurityConstants.DETAILS_USERNAME, userName);
+        claimsMap.put(SecurityConstants.LOGIN_CLIENT_TYPE, loginUser.getClientType());
 
         // 接口返回信息
         Map<String, Object> rspMap = new HashMap<String, Object>();
@@ -104,7 +107,8 @@ public class TokenService
             if (StringUtils.isNotEmpty(token))
             {
                 String userkey = JwtUtils.getUserKey(token);
-                user = redisService.getCacheObject(getTokenKey(userkey));
+                String clientType = JwtUtils.getClientType(token);
+                user = redisService.getCacheObject(getTokenKey(clientType, userkey));
                 return user;
             }
         }
@@ -134,8 +138,43 @@ public class TokenService
         if (StringUtils.isNotEmpty(token))
         {
             String userkey = JwtUtils.getUserKey(token);
-            redisService.deleteObject(getTokenKey(userkey));
+            String clientType = JwtUtils.getClientType(token);
+            if (!StringUtils.equalsAny(clientType, Constants.CLIENT_TYPE_PLATFORM, Constants.CLIENT_TYPE_MERCHANT))
+            {
+                // 兼容本次升级前的令牌注销；旧令牌不能再访问业务接口。
+                redisService.deleteObject(CacheConstants.LOGIN_TOKEN_KEY + userkey);
+                return;
+            }
+            String tokenKey = getTokenKey(clientType, userkey);
+            LoginUser loginUser = redisService.getCacheObject(tokenKey);
+            redisService.deleteObject(tokenKey);
+            if (StringUtils.isNotNull(loginUser))
+            {
+                redisService.removeCacheSetValue(getUserTokenKey(loginUser.getClientType(), loginUser.getUserid()),
+                        userkey);
+            }
         }
+    }
+
+    /**
+     * 失效指定用户全部登录会话，权限范围变化后必须重新登录。
+     */
+    public void delLoginUsers(String clientType, Long userId)
+    {
+        if (StringUtils.isEmpty(clientType) || userId == null)
+        {
+            return;
+        }
+        String indexKey = getUserTokenKey(clientType, userId);
+        Set<String> tokens = redisService.getCacheSet(indexKey);
+        if (tokens != null && !tokens.isEmpty())
+        {
+            for (String token : tokens)
+            {
+                redisService.deleteObject(getTokenKey(clientType, token));
+            }
+        }
+        redisService.deleteObject(indexKey);
     }
 
     /**
@@ -163,12 +202,29 @@ public class TokenService
         loginUser.setLoginTime(System.currentTimeMillis());
         loginUser.setExpireTime(loginUser.getLoginTime() + TOKEN_EXPIRE_TIME * MILLIS_MINUTE);
         // 根据uuid将loginUser缓存
-        String userKey = getTokenKey(loginUser.getToken());
+        String userKey = getTokenKey(loginUser.getClientType(), loginUser.getToken());
         redisService.setCacheObject(userKey, loginUser, TOKEN_EXPIRE_TIME, TimeUnit.MINUTES);
+        if (StringUtils.isNotEmpty(loginUser.getClientType()) && loginUser.getUserid() != null)
+        {
+            redisService.expire(getUserTokenKey(loginUser.getClientType(), loginUser.getUserid()),
+                    TOKEN_EXPIRE_TIME, TimeUnit.MINUTES);
+        }
     }
 
-    private String getTokenKey(String token)
+    private void bindUserToken(LoginUser loginUser)
     {
-        return ACCESS_TOKEN + token;
+        String indexKey = getUserTokenKey(loginUser.getClientType(), loginUser.getUserid());
+        redisService.setCacheSet(indexKey, Collections.singleton(loginUser.getToken()));
+        redisService.expire(indexKey, TOKEN_EXPIRE_TIME, TimeUnit.MINUTES);
+    }
+
+    private String getTokenKey(String clientType, String token)
+    {
+        return CacheConstants.loginTokenKey(clientType, token);
+    }
+
+    private String getUserTokenKey(String clientType, Long userId)
+    {
+        return CacheConstants.LOGIN_USER_TOKEN_KEY + clientType + ":" + userId;
     }
 }

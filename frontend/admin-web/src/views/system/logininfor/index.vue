@@ -59,7 +59,7 @@
                icon="Delete"
                :disabled="multiple"
                @click="handleDelete"
-               v-hasPermi="['system:logininfor:remove']"
+               v-hasPermi="['admin:logininfor:remove']"
             >删除</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -68,7 +68,7 @@
                plain
                icon="Delete"
                @click="handleClean"
-               v-hasPermi="['system:logininfor:remove']"
+               v-hasPermi="['admin:logininfor:remove']"
             >清空</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -78,7 +78,7 @@
                icon="Unlock"
                :disabled="single"
                @click="handleUnlock"
-               v-hasPermi="['system:logininfor:unlock']"
+               v-hasPermi="['admin:logininfor:unlock']"
             >解锁</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -87,7 +87,7 @@
                plain
                icon="Download"
                @click="handleExport"
-               v-hasPermi="['system:logininfor:export']"
+               v-hasPermi="['admin:logininfor:export']"
             >导出</el-button>
          </el-col>
          <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>

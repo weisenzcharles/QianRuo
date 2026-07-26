@@ -101,6 +101,14 @@
 
 商家端只允许访问本商户主体下的数据。后端必须按商户、租户、仓库权限做服务端隔离，不能只依赖前端菜单隐藏。
 
+商户业务接口统一通过 `MerchantContextUtils` 读取服务端登录态中的租户、商户和仓库范围。查询必须追加 `tenantId + memberId` 条件，涉及具体仓库的操作必须调用 `checkWarehouseAccess(warehouseId)`；不得信任前端提交的租户或商户 ID。
+
+商家端操作日志由 `merchant-service` 独立写入 `ry_rental_merchant_oper_log`。商户管理员默认拥有查看与导出权限，其他商户用户需通过角色权限分配；日志查询始终限制在当前登录态的 `tenantId + memberId` 范围内。
+
+平台商户资料统一维护店铺、企业资质、法人身份、签约合同、认证审核和冻结状态。店铺主账号从商户用户绑定关系实时读取，不在商户主体表重复保存；审核时间、冻结时间及解冻清理由后端状态规则统一处理。
+
+平台系统接口统一使用 `/admin/user/**` 等平台命名空间并由 `platform-service` 提供；商户系统接口必须统一使用 `/merchant/**`。商户用户信息接口为 `/merchant/user/getInfo`，禁止两个终端回退调用旧 `/system/**` 路径。
+
 ## 本地启动
 
 ### 1. 基础环境
@@ -132,6 +140,15 @@ mysql -uroot -p ry_rental < database/seed/01_rental_dict_seed.sql
 database/migrations/V20260721_001__rental_base_schema.sql
 ```
 
+已有数据库升级到当前版本时执行幂等迁移：
+
+```bash
+./scripts/deploy.sh migrate-db
+# 本地 Docker 环境使用：./scripts/deploy.sh local-migrate-db
+```
+
+部署脚本会按 `scripts/deploy.sh` 中 `DATABASE_MIGRATIONS` 的登记顺序执行全部幂等迁移，包括账号隔离、双端路由、仓库权限、商户日志和完整商户资料字段。
+
 ### 3. 启动后端
 
 进入后端工程：
@@ -146,7 +163,7 @@ mvn clean install
 1. 启动 Nacos、Redis、MySQL。
 2. 启动 `ruoyi-gateway`。
 3. 启动 `ruoyi-auth`。
-4. 启动 `ruoyi-modules/ruoyi-system`。
+4. 启动 `ruoyi-modules/platform-service`。
 5. 按需启动 `ruoyi-file`、`ruoyi-job`、`ruoyi-gen`、`ruoyi-visual/ruoyi-monitor`。
 
 具体端口与注册配置以各模块 `bootstrap.yml` 和 Nacos 配置为准。
@@ -203,7 +220,31 @@ cp deploy/.env.example deploy/.env
 - `docs/design/租赁项目设计文档.md`：项目总体定位与核心模块。
 - `docs/design/租赁项目详细功能规格书.md`：业务规则、字段、权限、安全、状态机和验收基线。
 - `docs/design/租赁系统RuoYi-Cloud开发计划.md`：工程拆分、开发阶段和模块任务清单。
+- `docs/design/第1阶段完成状态.md`：双前端与权限骨架的当前完成情况。
 - `docs/design/租赁项目原始文档抽取汇总.md`：原始需求资料抽取结果。
+- `docs/项目路由清单.md`：网关、后端 API、平台端和商户端页面路由总表。
+
+## 商户账号开通
+
+平台后台新增商户时，系统会使用商户的 `联系电话` 自动创建并绑定商家管理员账号。商户账号写入 `ry_rental.ry_rental_merchant_user`，不混用平台内部用户表 `sys_user`；商户与账号关系通过 `ry_rental_user_member.merchant_user_id` 维护。
+
+该账号首次进入商家端时可选择 `手机号验证码` 登录；当前开发阶段未接入短信服务，允许输入任意四位数字验证码。登录成功后进入后台独立的“设置初始密码”页面，完成 5 到 20 位登录密码设置前不能访问其他业务页面，但可以退出登录。初始密码页面不在登录页弹窗，也不与个人中心的“修改密码”页面混用。
+
+平台用户和商户用户分别使用 `sys_user.must_change_password` 与 `ry_rental.ry_rental_merchant_user.must_change_password` 持久化初始化状态。`pwd_update_date` 仅记录密码更新时间和处理密码过期策略，不再用于推断用户是否设置过初始密码。平台和商户使用独立初始化接口，管理员重置密码后会重新要求对应用户设置密码。
+
+## 商户权限隔离
+
+商户端用户、角色、菜单和授权关系均拆分到租赁业务库，不再复用平台后台的 `sys_user`、`sys_role`、`sys_menu`、`sys_user_role`、`sys_role_menu`。
+
+- 商户用户表：`ry_rental.ry_rental_merchant_user`
+- 商户与用户绑定表：`ry_rental.ry_rental_user_member`
+- 商户菜单模板表：`ry_rental.ry_rental_merchant_menu`
+- 商户角色表：`ry_rental.ry_rental_merchant_role`
+- 商户角色菜单表：`ry_rental.ry_rental_merchant_role_menu`
+- 商户用户角色表：`ry_rental.ry_rental_merchant_user_role`
+- 商户用户菜单表：`ry_rental.ry_rental_merchant_user_menu`
+
+商户菜单使用全局模板记录维护，商户角色和授权关系按 `tenant_id + member_id` 隔离。商户管理员可在商家端 `角色权限` 页面新增、修改、启停、删除本商户角色，并为角色勾选可访问菜单；平台后台可在 `商户用户` 页面为单个商户用户配置最终菜单权限。商家端实际加载菜单以商户用户菜单表为准，平台后台的菜单和角色不会透出到商家端。
 
 ## 开发阶段建议
 

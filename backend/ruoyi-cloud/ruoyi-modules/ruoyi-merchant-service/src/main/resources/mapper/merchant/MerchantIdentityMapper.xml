@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantIdentityMapper">
+    <resultMap id="account" type="MerchantAccount">
+        <id property="userId" column="merchant_user_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="merchantId" column="member_id" />
+        <result property="username" column="user_name" />
+        <result property="nickname" column="nick_name" />
+        <result property="phone" column="phone" />
+        <result property="email" column="email" />
+        <result property="avatar" column="avatar" />
+        <result property="password" column="password" />
+        <result property="status" column="status" />
+        <result property="delFlag" column="del_flag" />
+        <result property="loginIp" column="login_ip" />
+        <result property="loginDate" column="login_date" />
+        <result property="passwordUpdateDate" column="pwd_update_date" />
+        <result property="mustChangePassword" column="must_change_password" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+    <resultMap id="binding" type="MerchantBinding">
+        <result property="tenantId" column="tenant_id" />
+        <result property="merchantId" column="member_id" />
+        <result property="userId" column="merchant_user_id" />
+        <result property="memberRole" column="member_role" />
+        <result property="warehouseScopeType" column="warehouse_scope_type" />
+    </resultMap>
+    <resultMap id="warehouse" type="MerchantWarehouse">
+        <id property="warehouseId" column="warehouse_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+    </resultMap>
+
+    <sql id="accountColumns">
+        merchant_user_id, tenant_id, member_id, user_name, nick_name, phone, email, avatar, password,
+        status, del_flag, login_ip, login_date, pwd_update_date, must_change_password, create_time
+    </sql>
+    <select id="selectByUsername" resultMap="account">
+        select <include refid="accountColumns" /> from `ry_rental`.`ry_rental_merchant_user`
+        where user_name = #{username} and del_flag = '0'
+    </select>
+    <select id="selectByPhone" resultMap="account">
+        select <include refid="accountColumns" /> from `ry_rental`.`ry_rental_merchant_user`
+        where phone = #{phone} and del_flag = '0'
+    </select>
+    <select id="selectById" resultMap="account">
+        select <include refid="accountColumns" /> from `ry_rental`.`ry_rental_merchant_user`
+        where merchant_user_id = #{userId} and del_flag = '0'
+    </select>
+    <select id="selectByEmail" resultMap="account">
+        select <include refid="accountColumns" /> from `ry_rental`.`ry_rental_merchant_user`
+        where email = #{email} and del_flag = '0'
+    </select>
+    <select id="selectMemberAuthStatusByPhone" resultType="String">
+        select auth_status from `ry_rental`.`ry_rental_member`
+        where contact_phone = #{phone} and del_flag = '0'
+        order by member_id desc limit 1
+    </select>
+    <select id="selectActiveBinding" resultMap="binding">
+        select um.tenant_id, um.member_id, um.merchant_user_id, um.member_role, um.warehouse_scope_type
+        from `ry_rental`.`ry_rental_user_member` um
+        inner join `ry_rental`.`ry_rental_member` m
+            on m.tenant_id = um.tenant_id and m.member_id = um.member_id
+        where um.merchant_user_id = #{userId} and um.status = '0' and um.del_flag = '0'
+          and m.auth_status = 'verified' and m.status = '0' and m.del_flag = '0'
+        order by um.id limit 1
+    </select>
+    <select id="countActiveBindings" resultType="Integer">
+        select count(1) from `ry_rental`.`ry_rental_user_member` um
+        inner join `ry_rental`.`ry_rental_member` m
+            on m.tenant_id = um.tenant_id and m.member_id = um.member_id
+        where um.merchant_user_id = #{userId} and um.status = '0' and um.del_flag = '0'
+          and m.auth_status = 'verified' and m.status = '0' and m.del_flag = '0'
+    </select>
+    <select id="selectWarehouseIds" resultType="Long">
+        select warehouse_id from `ry_rental`.`ry_rental_user_warehouse_scope`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and merchant_user_id = #{userId}
+        order by warehouse_id
+    </select>
+    <select id="selectRoleKeys" resultType="String">
+        select distinct r.role_key from `ry_rental`.`ry_rental_merchant_role` r
+        inner join `ry_rental`.`ry_rental_merchant_user_role` ur
+            on ur.tenant_id = r.tenant_id and ur.member_id = r.member_id and ur.role_id = r.role_id
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
+          and ur.merchant_user_id = #{userId} and r.status = '0' and r.del_flag = '0'
+    </select>
+    <select id="selectPermissions" resultType="String">
+        select distinct m.perms from `ry_rental`.`ry_rental_merchant_menu` m
+        where m.tenant_id = 0 and m.member_id = 0 and m.status = '0' and m.del_flag = '0'
+          and m.perms is not null and m.perms != '' and (
+            exists (select 1 from `ry_rental`.`ry_rental_merchant_user_menu` um
+                where um.tenant_id = #{tenantId} and um.member_id = #{merchantId}
+                  and um.merchant_user_id = #{userId} and um.menu_id = m.menu_id)
+            or exists (select 1 from `ry_rental`.`ry_rental_merchant_user_role` ur
+                inner join `ry_rental`.`ry_rental_merchant_role` r
+                    on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id and r.role_id = ur.role_id
+                inner join `ry_rental`.`ry_rental_merchant_role_menu` rm
+                    on rm.tenant_id = ur.tenant_id and rm.member_id = ur.member_id and rm.role_id = ur.role_id
+                where ur.tenant_id = #{tenantId} and ur.member_id = #{merchantId}
+                  and ur.merchant_user_id = #{userId} and rm.menu_id = m.menu_id
+                  and r.status = '0' and r.del_flag = '0')
+          )
+    </select>
+    <select id="selectWarehouses" resultMap="warehouse">
+        select warehouse_id, warehouse_code, warehouse_name from `ry_rental`.`ry_rental_warehouse`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and status = '0' and del_flag = '0'
+        order by warehouse_name, warehouse_id
+    </select>
+    <update id="updateLogin">
+        update `ry_rental`.`ry_rental_merchant_user` set login_ip = #{loginIp}, login_date = #{loginDate}
+        where merchant_user_id = #{userId} and del_flag = '0'
+    </update>
+    <update id="updateProfile">
+        update `ry_rental`.`ry_rental_merchant_user`
+        set nick_name = #{nickname}, phone = #{phone}, email = #{email}, update_by = #{updatedBy}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and merchant_user_id = #{userId} and del_flag = '0'
+    </update>
+    <update id="updateAvatar">
+        update `ry_rental`.`ry_rental_merchant_user`
+        set avatar = #{avatar}, update_by = #{updatedBy}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and merchant_user_id = #{userId} and del_flag = '0'
+    </update>
+    <update id="updatePassword">
+        update `ry_rental`.`ry_rental_merchant_user`
+        set password = #{password}, pwd_update_date = sysdate(), must_change_password = 0, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and merchant_user_id = #{userId} and del_flag = '0'
+        <if test="initialOnly">and must_change_password = 1</if>
+    </update>
+    <insert id="insertAccount" useGeneratedKeys="true" keyProperty="account.userId" keyColumn="merchant_user_id">
+        insert into `ry_rental`.`ry_rental_merchant_user`
+        (tenant_id, member_id, user_name, nick_name, phone, email, password, status, del_flag,
+         must_change_password, create_by, create_time, remark)
+        values
+        (#{account.tenantId}, #{account.merchantId}, #{account.username}, #{account.nickname},
+         #{account.phone}, #{account.email}, null, '0', '0', 1, #{operator}, sysdate(),
+         '商户审核通过后自动开通的管理员账号，首次登录需设置密码')
+    </insert>
+    <update id="activateOwnerAccount">
+        update `ry_rental`.`ry_rental_merchant_user`
+        set tenant_id = #{account.tenantId}, member_id = #{account.merchantId},
+            nick_name = #{account.nickname}, email = #{account.email}, status = '0', del_flag = '0',
+            must_change_password = case when password is null or password = '' then 1 else must_change_password end,
+            update_by = #{operator}, update_time = sysdate()
+        where merchant_user_id = #{account.userId}
+    </update>
+    <select id="countOwnerBinding" resultType="Integer">
+        select count(1) from `ry_rental`.`ry_rental_user_member`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and merchant_user_id = #{userId}
+          and member_role = 'owner' and del_flag = '0'
+    </select>
+    <insert id="insertOwnerBinding">
+        insert into `ry_rental`.`ry_rental_user_member`
+        (tenant_id, member_id, merchant_user_id, member_role, warehouse_scope_type,
+         sensitive_scope, status, create_by, create_time, del_flag)
+        values (#{tenantId}, #{merchantId}, #{userId}, 'owner', 'all', 'detail', '0',
+                #{operator}, sysdate(), '0')
+    </insert>
+    <select id="selectAdminRoleId" resultType="Long">
+        select role_id from `ry_rental`.`ry_rental_merchant_role`
+        where tenant_id = #{tenantId} and member_id = #{merchantId}
+          and role_key = 'merchant_admin' and del_flag = '0'
+        order by role_id limit 1
+    </select>
+    <insert id="insertAdminRole" useGeneratedKeys="true" keyProperty="roleId" keyColumn="role_id">
+        insert into `ry_rental`.`ry_rental_merchant_role`
+        (tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly,
+         status, create_by, create_time, remark, del_flag)
+        values (#{tenantId}, #{merchantId}, '商户管理员', 'merchant_admin', 1, 1,
+                '0', #{operator}, sysdate(), '商户审核通过后自动创建的管理员角色', '0')
+    </insert>
+    <insert id="insertAdminRoleMenus">
+        insert into `ry_rental`.`ry_rental_merchant_role_menu` (tenant_id, member_id, role_id, menu_id)
+        select #{tenantId}, #{merchantId}, #{roleId}, m.menu_id
+        from `ry_rental`.`ry_rental_merchant_menu` m
+        where m.tenant_id = 0 and m.member_id = 0 and m.status = '0' and m.del_flag = '0'
+          and not exists (
+            select 1 from `ry_rental`.`ry_rental_merchant_role_menu` rm
+            where rm.tenant_id = #{tenantId} and rm.member_id = #{merchantId}
+              and rm.role_id = #{roleId} and rm.menu_id = m.menu_id
+          )
+    </insert>
+    <insert id="insertAdminUserRole">
+        insert into `ry_rental`.`ry_rental_merchant_user_role`
+        (tenant_id, member_id, merchant_user_id, role_id)
+        select #{tenantId}, #{merchantId}, #{userId}, #{roleId}
+        where not exists (
+            select 1 from `ry_rental`.`ry_rental_merchant_user_role`
+            where tenant_id = #{tenantId} and member_id = #{merchantId}
+              and merchant_user_id = #{userId} and role_id = #{roleId}
+        )
+    </insert>
+</mapper>

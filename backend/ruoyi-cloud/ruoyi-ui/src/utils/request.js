@@ -22,6 +22,14 @@ const service = axios.create({
 
 // request拦截器
 service.interceptors.request.use(config => {
+  config.headers = config.headers || {}
+  config.headers['X-Client-Type'] = 'platform'
+  config.headers['X-App-Code'] = 'ruoyi-ui'
+  const requestUrl = config.url || ''
+  if (requestUrl === '/system' || requestUrl.startsWith('/system/')
+      || requestUrl === '/merchant' || requestUrl.startsWith('/merchant/')) {
+    return Promise.reject(new Error('平台端禁止访问旧系统接口或商户接口'))
+  }
   // 是否需要设置 token
   const isToken = (config.headers || {}).isToken === false
   // 是否需要防止数据重复提交

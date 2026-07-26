@@ -3,6 +3,7 @@ package com.ruoyi.common.security.feign;
 import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
+import com.ruoyi.common.core.constant.Constants;
 import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.StringUtils;
@@ -45,6 +46,16 @@ public class FeignRequestInterceptor implements RequestInterceptor
             if (StringUtils.isNotEmpty(authentication))
             {
                 requestTemplate.header(SecurityConstants.AUTHORIZATION_HEADER, authentication);
+            }
+            String clientType = httpServletRequest.getHeader(Constants.CLIENT_TYPE_HEADER);
+            if (StringUtils.isNotEmpty(clientType))
+            {
+                requestTemplate.header(Constants.CLIENT_TYPE_HEADER, clientType);
+            }
+            String appCode = httpServletRequest.getHeader(Constants.APP_CODE_HEADER);
+            if (StringUtils.isNotEmpty(appCode))
+            {
+                requestTemplate.header(Constants.APP_CODE_HEADER, appCode);
             }
 
             // 配置客户端IP

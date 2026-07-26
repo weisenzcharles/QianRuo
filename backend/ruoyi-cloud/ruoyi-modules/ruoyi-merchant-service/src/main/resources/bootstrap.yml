@@ -1,0 +1,35 @@
+server:
+  port: 9210
+
+spring:
+  application:
+    name: merchant-service
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+      config:
+        server-addr: 127.0.0.1:8848
+  config:
+    file-extension: yml
+    import:
+      - nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: ${MERCHANT_DB_URL:jdbc:mysql://localhost:3306/ry_rental?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai}
+          username: ${MERCHANT_DB_USERNAME:qianruo_merchant}
+          password: ${MERCHANT_DB_PASSWORD:CHANGE_ME_MERCHANT_DB_PASSWORD}
+
+mybatis:
+  typeAliasesPackage: com.ruoyi.merchant.domain
+  mapperLocations: classpath:mapper/**/*.xml
+
+merchant:
+  account:
+    passwordValidateDays: ${MERCHANT_PASSWORD_VALIDATE_DAYS:0}

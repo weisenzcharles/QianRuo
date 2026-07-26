@@ -13,15 +13,16 @@ export function login(username, password, code, uuid) {
   })
 }
 
-// 注册方法
-export function register(data) {
+// 手机号验证码登录
+export function smsLogin(phone, code) {
   return request({
-    url: '/auth/register',
+    url: '/auth/smsLogin',
     headers: {
-      isToken: false
+      isToken: false,
+      repeatSubmit: false
     },
     method: 'post',
-    data: data
+    data: { phone, code }
   })
 }
 
@@ -36,7 +37,7 @@ export function refreshToken() {
 // 获取用户详细信息
 export function getInfo() {
   return request({
-    url: '/system/user/getInfo',
+    url: '/merchant/user/getInfo',
     method: 'get'
   })
 }

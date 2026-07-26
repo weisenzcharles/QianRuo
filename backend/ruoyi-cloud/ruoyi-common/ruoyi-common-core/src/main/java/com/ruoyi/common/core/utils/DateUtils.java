@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Date;
+import java.util.TimeZone;
 import org.apache.commons.lang3.time.DateFormatUtils;
 
 /**
@@ -19,6 +20,12 @@ import org.apache.commons.lang3.time.DateFormatUtils;
 @SuppressWarnings("deprecation")
 public class DateUtils extends org.apache.commons.lang3.time.DateUtils
 {
+    public static final String DEFAULT_TIME_ZONE_ID = "Asia/Shanghai";
+
+    public static final ZoneId DEFAULT_ZONE_ID = ZoneId.of(DEFAULT_TIME_ZONE_ID);
+
+    public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone(DEFAULT_ZONE_ID);
+
     public static String YYYY = "yyyy";
 
     public static String YYYY_MM = "yyyy-MM";
@@ -33,6 +40,19 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
             "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM",
             "yyyy/MM/dd", "yyyy/MM/dd HH:mm:ss", "yyyy/MM/dd HH:mm", "yyyy/MM",
             "yyyy.MM.dd", "yyyy.MM.dd HH:mm:ss", "yyyy.MM.dd HH:mm", "yyyy.MM"};
+
+    static
+    {
+        useDefaultTimeZone();
+    }
+
+    /**
+     * 统一服务默认时区，避免容器或宿主机默认 UTC 导致后台时间偏移。
+     */
+    public static void useDefaultTimeZone()
+    {
+        TimeZone.setDefault(DEFAULT_TIME_ZONE);
+    }
 
     /**
      * 获取当前Date型日期
@@ -76,14 +96,18 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
 
     public static final String parseDateToStr(final String format, final Date date)
     {
-        return new SimpleDateFormat(format).format(date);
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        dateFormat.setTimeZone(DEFAULT_TIME_ZONE);
+        return dateFormat.format(date);
     }
 
     public static final Date dateTime(final String format, final String ts)
     {
         try
         {
-            return new SimpleDateFormat(format).parse(ts);
+            SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+            dateFormat.setTimeZone(DEFAULT_TIME_ZONE);
+            return dateFormat.parse(ts);
         }
         catch (ParseException e)
         {
@@ -97,7 +121,7 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
     public static final String datePath()
     {
         Date now = new Date();
-        return DateFormatUtils.format(now, "yyyy/MM/dd");
+        return DateFormatUtils.format(now, "yyyy/MM/dd", DEFAULT_TIME_ZONE);
     }
 
     /**
@@ -106,7 +130,7 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
     public static final String dateTime()
     {
         Date now = new Date();
-        return DateFormatUtils.format(now, "yyyyMMdd");
+        return DateFormatUtils.format(now, "yyyyMMdd", DEFAULT_TIME_ZONE);
     }
 
     /**
@@ -176,7 +200,7 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
      */
     public static Date toDate(LocalDateTime temporalAccessor)
     {
-        ZonedDateTime zdt = temporalAccessor.atZone(ZoneId.systemDefault());
+        ZonedDateTime zdt = temporalAccessor.atZone(DEFAULT_ZONE_ID);
         return Date.from(zdt.toInstant());
     }
 
@@ -186,7 +210,7 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
     public static Date toDate(LocalDate temporalAccessor)
     {
         LocalDateTime localDateTime = LocalDateTime.of(temporalAccessor, LocalTime.of(0, 0, 0));
-        ZonedDateTime zdt = localDateTime.atZone(ZoneId.systemDefault());
+        ZonedDateTime zdt = localDateTime.atZone(DEFAULT_ZONE_ID);
         return Date.from(zdt.toInstant());
     }
 }

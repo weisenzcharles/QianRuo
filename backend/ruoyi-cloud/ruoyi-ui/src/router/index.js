@@ -102,7 +102,7 @@ export const dynamicRoutes = [
     path: '/system/user-auth',
     component: Layout,
     hidden: true,
-    permissions: ['system:user:edit'],
+    permissions: ['admin:user:edit'],
     children: [
       {
         path: 'role/:userId(\\d+)',
@@ -116,7 +116,7 @@ export const dynamicRoutes = [
     path: '/system/role-auth',
     component: Layout,
     hidden: true,
-    permissions: ['system:role:edit'],
+    permissions: ['admin:role:edit'],
     children: [
       {
         path: 'user/:roleId(\\d+)',
@@ -130,7 +130,7 @@ export const dynamicRoutes = [
     path: '/system/dict-data',
     component: Layout,
     hidden: true,
-    permissions: ['system:dict:list'],
+    permissions: ['admin:dict:list'],
     children: [
       {
         path: 'index/:dictId(\\d+)',

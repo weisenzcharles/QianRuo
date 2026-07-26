@@ -33,7 +33,7 @@
                plain
                icon="Plus"
                @click="handleAdd"
-               v-hasPermi="['system:menu:add']"
+               v-hasPermi="['admin:menu:add']"
             >新增</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -42,7 +42,7 @@
                plain
                icon="Check"
                @click="handleSaveSort"
-               v-hasPermi="['system:menu:edit']"
+               v-hasPermi="['admin:menu:edit']"
             >保存排序</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -93,9 +93,9 @@
          </el-table-column>
          <el-table-column label="操作" align="center" width="210" class-name="small-padding fixed-width">
             <template #default="scope">
-               <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:menu:edit']">修改</el-button>
-               <el-button link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['system:menu:add']">新增</el-button>
-               <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:menu:remove']">删除</el-button>
+               <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['admin:menu:edit']">修改</el-button>
+               <el-button link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['admin:menu:add']">新增</el-button>
+               <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['admin:menu:remove']">删除</el-button>
             </template>
          </el-table-column>
       </el-table>
@@ -218,7 +218,7 @@
                      <el-input v-model="form.perms" placeholder="请输入权限标识" maxlength="100" />
                      <template #label>
                         <span>
-                           <el-tooltip content="控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasPermi('system:user:list')`)" placement="top">
+                           <el-tooltip content="控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasPermi('admin:user:list')`)" placement="top">
                               <el-icon><question-filled /></el-icon>
                            </el-tooltip>
                            权限字符

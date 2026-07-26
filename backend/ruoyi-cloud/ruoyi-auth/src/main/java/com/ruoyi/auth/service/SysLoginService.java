@@ -1,11 +1,13 @@
 package com.ruoyi.auth.service;
 
+import java.util.Date;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.ruoyi.common.core.constant.CacheConstants;
 import com.ruoyi.common.core.constant.Constants;
 import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.constant.UserConstants;
+import com.ruoyi.common.core.context.ClientContextHolder;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.core.enums.UserStatus;
 import com.ruoyi.common.core.exception.ServiceException;
@@ -15,6 +17,9 @@ import com.ruoyi.common.core.utils.StringUtils;
 import com.ruoyi.common.core.utils.ip.IpUtils;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.security.utils.SecurityUtils;
+import com.ruoyi.merchant.api.RemoteMerchantUserService;
+import com.ruoyi.merchant.api.model.MerchantLoginIdentity;
+import com.ruoyi.merchant.api.model.MerchantLoginRecordCommand;
 import com.ruoyi.system.api.RemoteUserService;
 import com.ruoyi.system.api.domain.SysUser;
 import com.ruoyi.system.api.model.LoginUser;
@@ -29,6 +34,9 @@ public class SysLoginService
 {
     @Autowired
     private RemoteUserService remoteUserService;
+
+    @Autowired
+    private RemoteMerchantUserService remoteMerchantUserService;
 
     @Autowired
     private SysPasswordService passwordService;
@@ -71,8 +79,15 @@ public class SysLoginService
             recordLogService.recordLogininfor(username, Constants.LOGIN_FAIL, "很遗憾，访问IP已被列入系统黑名单");
             throw new ServiceException("很遗憾，访问IP已被列入系统黑名单");
         }
+        String clientType = ClientContextHolder.getClientType();
+        if (!StringUtils.equalsAny(clientType, Constants.CLIENT_TYPE_PLATFORM, Constants.CLIENT_TYPE_MERCHANT))
+        {
+            throw new ServiceException("无效的终端类型");
+        }
         // 查询用户信息
-        R<LoginUser> userResult = remoteUserService.getUserInfo(username, SecurityConstants.INNER);
+        R<LoginUser> userResult = Constants.CLIENT_TYPE_MERCHANT.equals(clientType)
+                ? getMerchantLoginUser(username)
+                : remoteUserService.getAdminUserInfo(username, SecurityConstants.INNER);
 
         if (R.FAIL == userResult.getCode())
         {
@@ -92,7 +107,61 @@ public class SysLoginService
             throw new ServiceException("对不起，您的账号：" + username + " 已停用");
         }
         passwordService.validate(user, password);
+        userInfo.setClientType(clientType);
         recordLogService.recordLogininfor(username, Constants.LOGIN_SUCCESS, "登录成功");
+        recordLoginInfo(user.getUserId());
+        return userInfo;
+    }
+
+    /**
+     * 手机验证码登录。
+     * 当前未接入短信服务，开发阶段允许任意四位数字验证码通过。
+     */
+    public LoginUser smsLogin(String phone, String code)
+    {
+        if (!ClientContextHolder.isMerchantClient())
+        {
+            throw new ServiceException("手机号验证码登录仅支持商家端");
+        }
+        if (StringUtils.isBlank(phone))
+        {
+            recordLogService.recordLogininfor(phone, Constants.LOGIN_FAIL, "手机号必须填写");
+            throw new ServiceException("手机号必须填写");
+        }
+        if (StringUtils.isBlank(code) || !code.matches("\\d{4}"))
+        {
+            recordLogService.recordLogininfor(phone, Constants.LOGIN_FAIL, "请输入四位验证码");
+            throw new ServiceException("请输入四位验证码");
+        }
+        String blackStr = Convert.toStr(redisService.getCacheObject(CacheConstants.SYS_LOGIN_BLACKIPLIST));
+        if (IpUtils.isMatchedIp(blackStr, IpUtils.getIpAddr()))
+        {
+            recordLogService.recordLogininfor(phone, Constants.LOGIN_FAIL, "很遗憾，访问IP已被列入系统黑名单");
+            throw new ServiceException("很遗憾，访问IP已被列入系统黑名单");
+        }
+
+        R<MerchantLoginIdentity> identityResult = remoteMerchantUserService.getByPhone(phone,
+                SecurityConstants.INNER, Constants.CLIENT_TYPE_MERCHANT);
+        R<LoginUser> userResult = adaptMerchantResult(identityResult);
+        if (R.FAIL == userResult.getCode())
+        {
+            throw new ServiceException(userResult.getMsg());
+        }
+
+        LoginUser userInfo = userResult.getData();
+        SysUser user = userInfo.getSysUser();
+        if (UserStatus.DELETED.getCode().equals(user.getDelFlag()))
+        {
+            recordLogService.recordLogininfor(phone, Constants.LOGIN_FAIL, "对不起，您的账号已被删除");
+            throw new ServiceException("对不起，您的账号已被删除");
+        }
+        if (UserStatus.DISABLE.getCode().equals(user.getStatus()))
+        {
+            recordLogService.recordLogininfor(phone, Constants.LOGIN_FAIL, "用户已停用，请联系管理员");
+            throw new ServiceException("对不起，您的账号已停用");
+        }
+        userInfo.setClientType(Constants.CLIENT_TYPE_MERCHANT);
+        recordLogService.recordLogininfor(phone, Constants.LOGIN_SUCCESS, "手机号验证码登录成功");
         recordLoginInfo(user.getUserId());
         return userInfo;
     }
@@ -110,7 +179,19 @@ public class SysLoginService
         sysUser.setLoginIp(IpUtils.getIpAddr());
         // 更新用户登录时间
         sysUser.setLoginDate(DateUtils.getNowDate());
-        remoteUserService.recordUserLogin(sysUser, SecurityConstants.INNER);
+        if (ClientContextHolder.isMerchantClient())
+        {
+            MerchantLoginRecordCommand command = new MerchantLoginRecordCommand();
+            command.setUserId(userId);
+            command.setLoginIp(sysUser.getLoginIp());
+            command.setLoginAt(sysUser.getLoginDate().getTime());
+            remoteMerchantUserService.recordLogin(command, SecurityConstants.INNER,
+                    Constants.CLIENT_TYPE_MERCHANT);
+        }
+        else
+        {
+            remoteUserService.recordAdminLogin(sysUser, SecurityConstants.INNER);
+        }
     }
 
     /**
@@ -133,7 +214,9 @@ public class SysLoginService
             throw new ServiceException("密码不能为空");
         }
         // 查询用户信息
-        R<LoginUser> userResult = remoteUserService.getUserInfo(username, SecurityConstants.INNER);
+        R<LoginUser> userResult = ClientContextHolder.isMerchantClient()
+                ? getMerchantLoginUser(username)
+                : remoteUserService.getAdminUserInfo(username, SecurityConstants.INNER);
 
         if (R.FAIL == userResult.getCode())
         {
@@ -181,5 +264,45 @@ public class SysLoginService
             throw new ServiceException(registerResult.getMsg());
         }
         recordLogService.recordLogininfor(username, Constants.REGISTER, "注册成功");
+    }
+
+    private R<LoginUser> getMerchantLoginUser(String username)
+    {
+        return adaptMerchantResult(remoteMerchantUserService.getByUsername(username, SecurityConstants.INNER,
+                Constants.CLIENT_TYPE_MERCHANT));
+    }
+
+    private R<LoginUser> adaptMerchantResult(R<MerchantLoginIdentity> result)
+    {
+        if (result == null || R.FAIL == result.getCode() || result.getData() == null)
+        {
+            return R.fail(result == null ? "商户身份服务无响应" : result.getMsg());
+        }
+        MerchantLoginIdentity identity = result.getData();
+        SysUser user = new SysUser();
+        user.setUserId(identity.getUserId());
+        user.setUserName(identity.getUsername());
+        user.setNickName(identity.getNickname());
+        user.setPhonenumber(identity.getPhone());
+        user.setEmail(identity.getEmail());
+        user.setAvatar(identity.getAvatar());
+        user.setPassword(identity.getPassword());
+        user.setStatus(identity.getStatus());
+        user.setDelFlag(identity.getDelFlag());
+        user.setPwdUpdateDate(identity.getPasswordUpdatedAt() == null
+                ? null : new Date(identity.getPasswordUpdatedAt()));
+        user.setMustChangePassword(identity.getMustChangePassword());
+
+        LoginUser loginUser = new LoginUser();
+        loginUser.setClientType(Constants.CLIENT_TYPE_MERCHANT);
+        loginUser.setTenantId(identity.getTenantId());
+        loginUser.setMemberId(identity.getMerchantId());
+        loginUser.setMemberRole(identity.getMemberRole());
+        loginUser.setWarehouseScopeType(identity.getWarehouseScopeType());
+        loginUser.setWarehouseIds(identity.getWarehouseIds());
+        loginUser.setRoles(identity.getRoles());
+        loginUser.setPermissions(identity.getPermissions());
+        loginUser.setSysUser(user);
+        return R.ok(loginUser);
     }
 }

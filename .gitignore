@@ -34,3 +34,8 @@ deploy/.generated/
 *.swp
 __pycache__/
 *.pyc
+
+# The global Git ignore on some development machines ignores directories named
+# "log". This package contains Java source code and must always be versioned.
+!backend/ruoyi-cloud/ruoyi-common/ruoyi-common-log/src/main/java/com/ruoyi/common/log/
+!backend/ruoyi-cloud/ruoyi-common/ruoyi-common-log/src/main/java/com/ruoyi/common/log/**

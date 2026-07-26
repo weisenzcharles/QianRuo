@@ -92,7 +92,11 @@ const emit = defineEmits()
 const number = ref(0)
 const uploadList = ref([])
 const uploadFileUrl = ref(import.meta.env.VITE_APP_BASE_API + props.action) // 上传文件服务器地址
-const headers = ref({ Authorization: "Bearer " + getToken() })
+const headers = ref({
+  Authorization: "Bearer " + getToken(),
+  "X-Client-Type": import.meta.env.VITE_APP_CLIENT_TYPE || "merchant",
+  "X-App-Code": import.meta.env.VITE_APP_CODE || "rental-merchant-web"
+})
 const fileList = ref([])
 const showTip = computed(
   () => props.isShowTip && (props.fileType || props.fileSize)

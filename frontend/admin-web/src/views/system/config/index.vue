@@ -52,7 +52,7 @@
                plain
                icon="Plus"
                @click="handleAdd"
-               v-hasPermi="['system:config:add']"
+               v-hasPermi="['admin:config:add']"
             >新增</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -62,7 +62,7 @@
                icon="Edit"
                :disabled="single"
                @click="handleUpdate"
-               v-hasPermi="['system:config:edit']"
+               v-hasPermi="['admin:config:edit']"
             >修改</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -72,7 +72,7 @@
                icon="Delete"
                :disabled="multiple"
                @click="handleDelete"
-               v-hasPermi="['system:config:remove']"
+               v-hasPermi="['admin:config:remove']"
             >删除</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -81,7 +81,7 @@
                plain
                icon="Download"
                @click="handleExport"
-               v-hasPermi="['system:config:export']"
+               v-hasPermi="['admin:config:export']"
             >导出</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -90,7 +90,7 @@
                plain
                icon="Refresh"
                @click="handleRefreshCache"
-               v-hasPermi="['system:config:remove']"
+               v-hasPermi="['admin:config:remove']"
             >刷新缓存</el-button>
          </el-col>
          <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
@@ -115,8 +115,8 @@
          </el-table-column>
          <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
             <template #default="scope">
-               <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:config:edit']" >修改</el-button>
-               <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:config:remove']">删除</el-button>
+               <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['admin:config:edit']" >修改</el-button>
+               <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['admin:config:remove']">删除</el-button>
             </template>
          </el-table-column>
       </el-table>

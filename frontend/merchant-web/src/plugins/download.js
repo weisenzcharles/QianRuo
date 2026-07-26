@@ -1,29 +1,25 @@
-﻿import axios from 'axios'
+﻿import request from '@/utils/request'
 import { ElLoading, ElMessage } from 'element-plus'
 import { saveAs } from 'file-saver'
-import { getToken } from '@/utils/auth'
 import errorCode from '@/utils/errorCode'
 import { blobValidate } from '@/utils/ruoyi'
 
-const baseURL = import.meta.env.VITE_APP_BASE_API
 let downloadLoadingInstance
 
 export default {
   zip(url, name) {
-    var url = baseURL + url
     downloadLoadingInstance = ElLoading.service({ text: "正在下载数据，请稍候", background: "rgba(0, 0, 0, 0.7)", })
-    axios({
+    request({
       method: 'get',
       url: url,
-      responseType: 'blob',
-      headers: { 'Authorization': 'Bearer ' + getToken() }
-    }).then((res) => {
-      const isBlob = blobValidate(res.data)
+      responseType: 'blob'
+    }).then((data) => {
+      const isBlob = blobValidate(data)
       if (isBlob) {
-        const blob = new Blob([res.data], { type: 'application/zip' })
+        const blob = new Blob([data], { type: 'application/zip' })
         this.saveAs(blob, name)
       } else {
-        this.printErrMsg(res.data)
+        this.printErrMsg(data)
       }
       downloadLoadingInstance.close()
     }).catch((r) => {

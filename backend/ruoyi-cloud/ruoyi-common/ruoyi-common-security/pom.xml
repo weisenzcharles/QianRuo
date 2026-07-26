@@ -25,7 +25,7 @@
         <!-- RuoYi Api System -->
         <dependency>
             <groupId>com.ruoyi</groupId>
-            <artifactId>ruoyi-api-system</artifactId>
+            <artifactId>ruoyi-api-platform</artifactId>
         </dependency>
 
         <!-- RuoYi Common Redis-->

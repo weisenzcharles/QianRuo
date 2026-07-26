@@ -11,6 +11,10 @@ metadata:
 type: Opaque
 stringData:
   mysql-root-password: "${MYSQL_ROOT_PASSWORD}"
+  platform-db-username: "${PLATFORM_DB_USERNAME}"
+  platform-db-password: "${PLATFORM_DB_PASSWORD}"
+  merchant-db-username: "${MERCHANT_DB_USERNAME}"
+  merchant-db-password: "${MERCHANT_DB_PASSWORD}"
   nacos-auth-token: "${NACOS_AUTH_TOKEN}"
   nacos-auth-identity-key: "${NACOS_AUTH_IDENTITY_KEY}"
   nacos-auth-identity-value: "${NACOS_AUTH_IDENTITY_VALUE}"
@@ -128,6 +132,62 @@ spec:
       port: 3306
       targetPort: 3306
 ---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qianruo-db-access
+  namespace: ${K8S_NAMESPACE}
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: qianruo-db-access
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: provision
+          image: ${MYSQL_IMAGE}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/opt/qianruo/provision-service-db-users.sh"]
+          env:
+            - name: MYSQL_HOST
+              value: ruoyi-mysql
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: mysql-root-password
+            - name: PLATFORM_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: platform-db-username
+            - name: PLATFORM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: platform-db-password
+            - name: MERCHANT_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: merchant-db-username
+            - name: MERCHANT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: merchant-db-password
+          volumeMounts:
+            - name: provision-script
+              mountPath: /opt/qianruo
+              readOnly: true
+      volumes:
+        - name: provision-script
+          configMap:
+            name: qianruo-db-access-script
+            defaultMode: 0555
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -145,7 +205,7 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis:7-alpine
+          image: ${REDIS_IMAGE}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 6379
@@ -231,7 +291,7 @@ spec:
                   name: qianruo-secret
                   key: mysql-root-password
             - name: MYSQL_SERVICE_DB_PARAM
-              value: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true
+              value: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
 ---
 apiVersion: v1
 kind: Service
@@ -270,7 +330,7 @@ spec:
       containers:
         - name: ruoyi-gateway
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-gateway:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           envFrom:
@@ -315,7 +375,7 @@ spec:
       containers:
         - name: ruoyi-auth
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-auth:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9200
           envFrom:
@@ -345,22 +405,22 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ruoyi-system
+  name: platform-service
   namespace: ${K8S_NAMESPACE}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ruoyi-system
+      app: platform-service
   template:
     metadata:
       labels:
-        app: ruoyi-system
+        app: platform-service
     spec:
       containers:
-        - name: ruoyi-system
-          image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-system:${IMAGE_TAG}
-          imagePullPolicy: Always
+        - name: platform-service
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/platform-service:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9201
           envFrom:
@@ -374,27 +434,87 @@ spec:
             - name: SPRING_DATA_REDIS_HOST
               value: ruoyi-redis
             - name: SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL
-              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
             - name: SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME
-              value: root
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: platform-db-username
             - name: SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: qianruo-secret
-                  key: mysql-root-password
+                  key: platform-db-password
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ruoyi-system
+  name: platform-service
   namespace: ${K8S_NAMESPACE}
 spec:
   selector:
-    app: ruoyi-system
+    app: platform-service
   ports:
     - name: http
       port: 9201
       targetPort: 9201
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: merchant-service
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: merchant-service
+  template:
+    metadata:
+      labels:
+        app: merchant-service
+    spec:
+      containers:
+        - name: merchant-service
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/merchant-service:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9210
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_DATA_REDIS_HOST
+              value: ruoyi-redis
+            - name: MERCHANT_DB_URL
+              value: jdbc:mysql://ruoyi-mysql:3306/ry_rental?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
+            - name: MERCHANT_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: merchant-db-username
+            - name: MERCHANT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: merchant-db-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: merchant-service
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: merchant-service
+  ports:
+    - name: http
+      port: 9210
+      targetPort: 9210
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -414,7 +534,7 @@ spec:
       containers:
         - name: ruoyi-gen
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-gen:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9202
           envFrom:
@@ -428,7 +548,7 @@ spec:
             - name: SPRING_DATA_REDIS_HOST
               value: ruoyi-redis
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
             - name: SPRING_DATASOURCE_USERNAME
               value: root
             - name: SPRING_DATASOURCE_PASSWORD
@@ -468,7 +588,7 @@ spec:
       containers:
         - name: ruoyi-job
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-job:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9203
           envFrom:
@@ -482,7 +602,7 @@ spec:
             - name: SPRING_DATA_REDIS_HOST
               value: ruoyi-redis
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+              value: jdbc:mysql://ruoyi-mysql:3306/ry-cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
             - name: SPRING_DATASOURCE_USERNAME
               value: root
             - name: SPRING_DATASOURCE_PASSWORD
@@ -522,7 +642,7 @@ spec:
       containers:
         - name: ruoyi-file
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-modules-file:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9300
           envFrom:
@@ -572,7 +692,7 @@ spec:
       containers:
         - name: ruoyi-monitor
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/ruoyi-visual-monitor:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9100
           envFrom:
@@ -615,7 +735,7 @@ spec:
       containers:
         - name: rental-admin-web
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-admin-web:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
 ---
@@ -650,7 +770,7 @@ spec:
       containers:
         - name: rental-merchant-web
           image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-merchant-web:${IMAGE_TAG}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
 ---

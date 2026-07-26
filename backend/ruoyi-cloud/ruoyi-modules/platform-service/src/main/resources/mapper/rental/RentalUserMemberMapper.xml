@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalUserMemberMapper">
+
+    <resultMap type="RentalUserMember" id="RentalUserMemberResult">
+        <id property="id" column="id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="merchantUserId" column="merchant_user_id" />
+        <result property="memberRole" column="member_role" />
+        <result property="warehouseScopeType" column="warehouse_scope_type" />
+        <result property="sensitiveScope" column="sensitive_scope" />
+        <result property="status" column="status" />
+        <result property="delFlag" column="del_flag" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <select id="selectActiveByUserId" parameterType="Long" resultMap="RentalUserMemberResult">
+        select um.id, um.tenant_id, um.member_id, um.merchant_user_id, um.member_role,
+               um.warehouse_scope_type, um.sensitive_scope,
+               um.status, um.del_flag, um.create_by, um.create_time, um.update_by, um.update_time, um.remark
+        from `ry_rental`.`ry_rental_user_member` um
+            inner join `ry_rental`.`ry_rental_member` m on um.member_id = m.member_id
+        where um.merchant_user_id = #{merchantUserId}
+          and um.status = '0'
+          and um.del_flag = '0'
+          and m.status = '0'
+          and m.del_flag = '0'
+        order by um.id
+    </select>
+
+    <select id="countActiveByUserId" parameterType="Long" resultType="Integer">
+        select count(1)
+        from `ry_rental`.`ry_rental_user_member` um
+            inner join `ry_rental`.`ry_rental_member` m on um.member_id = m.member_id
+        where um.merchant_user_id = #{merchantUserId}
+          and um.status = '0'
+          and um.del_flag = '0'
+          and m.status = '0'
+          and m.del_flag = '0'
+    </select>
+
+    <select id="countByMemberIdAndUserId" resultType="Integer">
+        select count(1)
+        from `ry_rental`.`ry_rental_user_member`
+        where member_id = #{memberId}
+          and merchant_user_id = #{merchantUserId}
+          and del_flag = '0'
+    </select>
+
+    <insert id="insertOwnerBinding">
+        insert into `ry_rental`.`ry_rental_user_member`(
+            tenant_id, member_id, merchant_user_id, member_role, warehouse_scope_type,
+            sensitive_scope, status, create_by, create_time, remark
+        ) values (
+            #{tenantId}, #{memberId}, #{merchantUserId}, 'owner', 'all',
+            'detail', '0', #{createBy}, sysdate(), '新增商户时自动开通商户管理员'
+        )
+    </insert>
+
+    <insert id="insertBinding">
+        insert into `ry_rental`.`ry_rental_user_member`(
+            tenant_id, member_id, merchant_user_id, member_role, warehouse_scope_type,
+            sensitive_scope, status, create_by, create_time, remark
+        ) values (
+            #{tenantId}, #{memberId}, #{merchantUserId}, #{memberRole}, #{warehouseScopeType},
+            'detail', '0', #{createBy}, sysdate(), '平台后台新增商户用户'
+        )
+    </insert>
+
+    <update id="updateWarehouseScope">
+        update `ry_rental`.`ry_rental_user_member`
+        set member_role = #{memberRole},
+            warehouse_scope_type = #{warehouseScopeType},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and merchant_user_id = #{merchantUserId}
+          and del_flag = '0'
+    </update>
+
+</mapper>

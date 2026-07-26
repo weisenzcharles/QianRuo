@@ -2,6 +2,11 @@
   <div class="login">
     <el-form ref="loginRef" :model="loginForm" :rules="loginRules" class="login-form">
       <h3 class="title">{{ title }}</h3>
+      <el-tabs v-model="loginForm.loginType" class="login-tabs" stretch @tab-change="handleLoginTypeChange">
+        <el-tab-pane label="账号密码" name="password" />
+        <el-tab-pane label="手机号验证码" name="sms" />
+      </el-tabs>
+      <template v-if="loginForm.loginType === 'password'">
       <el-form-item prop="username">
         <el-input
           v-model="loginForm.username"
@@ -41,6 +46,33 @@
         </div>
       </el-form-item>
       <el-checkbox v-model="loginForm.rememberMe" style="margin:0px 0px 25px 0px;">记住密码</el-checkbox>
+      </template>
+      <template v-else>
+      <el-form-item prop="phone">
+        <el-input
+          v-model="loginForm.phone"
+          type="text"
+          size="large"
+          auto-complete="off"
+          placeholder="手机号"
+        >
+          <template #prefix><svg-icon icon-class="phone" class="el-input__icon input-icon" /></template>
+        </el-input>
+      </el-form-item>
+      <el-form-item prop="smsCode">
+        <el-input
+          v-model="loginForm.smsCode"
+          size="large"
+          maxlength="4"
+          auto-complete="off"
+          placeholder="四位验证码"
+          @keyup.enter="handleLogin"
+        >
+          <template #prefix><svg-icon icon-class="validCode" class="el-input__icon input-icon" /></template>
+        </el-input>
+      </el-form-item>
+      <div class="sms-login-tip">当前未接入短信，输入任意四位数字验证码</div>
+      </template>
       <el-form-item style="width:100%;">
         <el-button
           :loading="loading"
@@ -52,10 +84,11 @@
           <span v-if="!loading">登 录</span>
           <span v-else>登 录 中...</span>
         </el-button>
-        <div style="float: right;" v-if="register">
-          <router-link class="link-type" :to="'/register'">立即注册</router-link>
-        </div>
       </el-form-item>
+      <div class="register-entry">
+        <el-button link type="primary" @click="router.push('/register')">申请商户入驻</el-button>
+        <el-button link type="primary" @click="router.push({ path: '/register', query: { mode: 'lookup' } })">查询入驻进度</el-button>
+      </div>
     </el-form>
     <!--  底部  -->
     <div class="el-login-footer">
@@ -82,25 +115,37 @@ const router = useRouter()
 const { proxy } = getCurrentInstance()
 
 const loginForm = ref({
+  loginType: "password",
   username: "",
   password: "",
   rememberMe: false,
   code: "",
-  uuid: ""
+  uuid: "",
+  phone: "",
+  smsCode: ""
 })
 
-const loginRules = {
+const passwordLoginRules = {
   username: [{ required: true, trigger: "blur", message: "请输入您的账号" }],
   password: [{ required: true, trigger: "blur", message: "请输入您的密码" }],
   code: [{ required: true, trigger: "change", message: "请输入验证码" }]
 }
+const smsLoginRules = {
+  phone: [
+    { required: true, trigger: "blur", message: "请输入手机号" },
+    { pattern: /^1[3-9]\d{9}$/, trigger: "blur", message: "请输入正确的手机号" }
+  ],
+  smsCode: [
+    { required: true, trigger: "change", message: "请输入验证码" },
+    { pattern: /^\d{4}$/, trigger: "change", message: "请输入四位数字验证码" }
+  ]
+}
+const loginRules = computed(() => loginForm.value.loginType === "sms" ? smsLoginRules : passwordLoginRules)
 
 const codeUrl = ref("")
 const loading = ref(false)
 // 验证码开关
 const captchaEnabled = ref(true)
-// 注册开关
-const register = ref(false)
 const redirect = ref(undefined)
 
 watch(route, (newRoute) => {
@@ -112,7 +157,7 @@ function handleLogin() {
     if (valid) {
       loading.value = true
       // 勾选了需要记住密码设置在 cookie 中设置记住用户名和密码
-      if (loginForm.value.rememberMe) {
+      if (loginForm.value.loginType === "password" && loginForm.value.rememberMe) {
         Cookies.set(usernameKey, loginForm.value.username, { expires: 30 })
         Cookies.set(passwordKey, encrypt(loginForm.value.password), { expires: 30 })
         Cookies.set(rememberMeKey, loginForm.value.rememberMe, { expires: 30 })
@@ -135,7 +180,7 @@ function handleLogin() {
       }).catch(() => {
         loading.value = false
         // 重新获取验证码
-        if (captchaEnabled.value) {
+        if (loginForm.value.loginType === "password" && captchaEnabled.value) {
           getCode()
         }
       })
@@ -160,7 +205,19 @@ function getCookie() {
   loginForm.value = {
     username: username === undefined ? loginForm.value.username : username,
     password: password === undefined ? loginForm.value.password : decrypt(password),
-    rememberMe: rememberMe === undefined ? false : Boolean(rememberMe)
+    rememberMe: rememberMe === undefined ? false : Boolean(rememberMe),
+    loginType: loginForm.value.loginType,
+    code: loginForm.value.code,
+    uuid: loginForm.value.uuid,
+    phone: loginForm.value.phone,
+    smsCode: loginForm.value.smsCode
+  }
+}
+
+function handleLoginTypeChange() {
+  proxy.$refs.loginRef.clearValidate()
+  if (loginForm.value.loginType === "password" && !loginForm.value.uuid) {
+    getCode()
   }
 }
 
@@ -205,6 +262,19 @@ getCookie()
   font-size: 13px;
   text-align: center;
   color: #bfbfbf;
+}
+.login-tabs {
+  margin-bottom: 18px;
+}
+.sms-login-tip {
+  margin: -8px 0 22px;
+  font-size: 13px;
+  color: #909399;
+}
+.register-entry {
+  display: flex;
+  justify-content: space-between;
+  margin: -8px 0 16px;
 }
 .login-code {
   width: 33%;

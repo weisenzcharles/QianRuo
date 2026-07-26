@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { ElNotification , ElMessageBox, ElMessage, ElLoading } from 'element-plus'
-import { getToken } from '@/utils/auth'
+import { getToken, removeToken } from '@/utils/auth'
 import errorCode from '@/utils/errorCode'
 import { tansParams, blobValidate } from '@/utils/ruoyi'
 import cache from '@/plugins/cache'
@@ -27,6 +27,10 @@ service.interceptors.request.use(config => {
   config.headers = config.headers || {}
   config.headers['X-Client-Type'] = import.meta.env.VITE_APP_CLIENT_TYPE || 'merchant'
   config.headers['X-App-Code'] = import.meta.env.VITE_APP_CODE || 'rental-merchant-web'
+  const forbiddenPrefixes = ['/system/', '/schedule/', '/code/']
+  if (forbiddenPrefixes.some(prefix => config.url?.startsWith(prefix))) {
+    return Promise.reject(new Error('商户端禁止访问平台接口'))
+  }
   // 是否需要设置 token
   const isToken = (config.headers || {}).isToken === false
   // 是否需要防止数据重复提交
@@ -88,6 +92,12 @@ service.interceptors.response.use(res => {
       return res.data
     }
     if (code === 401) {
+      const isNoTokenRequest = (res.config.headers || {}).isToken === false
+      if (isNoTokenRequest || window.location.pathname === '/login') {
+        removeToken()
+        isRelogin.show = false
+        return Promise.reject(new Error(msg))
+      }
       if (!isRelogin.show) {
         isRelogin.show = true
         ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', { confirmButtonText: '重新登录', cancelButtonText: '取消', type: 'warning' }).then(() => {

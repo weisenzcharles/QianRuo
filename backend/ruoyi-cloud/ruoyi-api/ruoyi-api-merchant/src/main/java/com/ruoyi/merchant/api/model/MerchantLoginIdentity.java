@@ -1,0 +1,77 @@
+package com.ruoyi.merchant.api.model;
+
+import java.io.Serializable;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+/**
+ * 商户认证身份。该契约不依赖平台用户模型。
+ */
+public class MerchantLoginIdentity implements Serializable
+{
+    private static final long serialVersionUID = 1L;
+
+    private Long userId;
+    private String username;
+    private String nickname;
+    private String phone;
+    private String email;
+    private String avatar;
+    private String password;
+    private String status;
+    private String delFlag;
+    private Long passwordUpdatedAt;
+    private Boolean mustChangePassword;
+    private Long createdAt;
+    private Long tenantId;
+    private Long merchantId;
+    private String memberRole;
+    private String warehouseScopeType;
+    private Set<Long> warehouseIds = new LinkedHashSet<Long>();
+    private Set<String> roles = new LinkedHashSet<String>();
+    private Set<String> permissions = new LinkedHashSet<String>();
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    public String getNickname() { return nickname; }
+    public void setNickname(String nickname) { this.nickname = nickname; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getAvatar() { return avatar; }
+    public void setAvatar(String avatar) { this.avatar = avatar; }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getDelFlag() { return delFlag; }
+    public void setDelFlag(String delFlag) { this.delFlag = delFlag; }
+    public Long getPasswordUpdatedAt() { return passwordUpdatedAt; }
+    public void setPasswordUpdatedAt(Long passwordUpdatedAt) { this.passwordUpdatedAt = passwordUpdatedAt; }
+    public Boolean getMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(Boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+    public Long getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
+    public Long getMerchantId() { return merchantId; }
+    public void setMerchantId(Long merchantId) { this.merchantId = merchantId; }
+    public String getMemberRole() { return memberRole; }
+    public void setMemberRole(String memberRole) { this.memberRole = memberRole; }
+    public String getWarehouseScopeType() { return warehouseScopeType; }
+    public void setWarehouseScopeType(String warehouseScopeType) { this.warehouseScopeType = warehouseScopeType; }
+    public Set<Long> getWarehouseIds() { return warehouseIds; }
+    public void setWarehouseIds(Set<Long> warehouseIds) { this.warehouseIds = copy(warehouseIds); }
+    public Set<String> getRoles() { return roles; }
+    public void setRoles(Set<String> roles) { this.roles = copy(roles); }
+    public Set<String> getPermissions() { return permissions; }
+    public void setPermissions(Set<String> permissions) { this.permissions = copy(permissions); }
+
+    private static <T> Set<T> copy(Set<T> source)
+    {
+        return source == null ? new LinkedHashSet<T>() : new LinkedHashSet<T>(source);
+    }
+}

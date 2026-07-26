@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.auth.form.LoginBody;
 import com.ruoyi.auth.form.RegisterBody;
+import com.ruoyi.auth.form.SmsLoginBody;
 import com.ruoyi.auth.form.UnLockBody;
 import com.ruoyi.auth.service.SysLoginService;
 import com.ruoyi.common.core.domain.R;
@@ -37,6 +38,15 @@ public class TokenController
     {
         // 用户登录
         LoginUser userInfo = sysLoginService.login(form.getUsername(), form.getPassword());
+        // 获取登录token
+        return R.ok(tokenService.createToken(userInfo));
+    }
+
+    @PostMapping("smsLogin")
+    public R<?> smsLogin(@RequestBody SmsLoginBody form)
+    {
+        // 手机验证码登录
+        LoginUser userInfo = sysLoginService.smsLogin(form.getPhone(), form.getCode());
         // 获取登录token
         return R.ok(tokenService.createToken(userInfo));
     }

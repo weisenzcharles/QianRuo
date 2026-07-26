@@ -26,6 +26,31 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member` (
   `nickname` VARCHAR(64) DEFAULT NULL COMMENT '商户昵称',
   `contact_name` VARCHAR(64) DEFAULT NULL COMMENT '联系人',
   `contact_phone` VARCHAR(32) DEFAULT NULL COMMENT '联系电话',
+  `service_phone` VARCHAR(32) DEFAULT NULL COMMENT '客服电话',
+  `contact_email` VARCHAR(128) DEFAULT NULL COMMENT '联系邮箱',
+  `alipay_real_name` VARCHAR(64) DEFAULT NULL COMMENT '支付宝实名',
+  `alipay_account` VARCHAR(128) DEFAULT NULL COMMENT '支付宝账号',
+  `store_logo_url` VARCHAR(500) DEFAULT NULL COMMENT '店铺logo地址',
+  `store_description` VARCHAR(1000) DEFAULT NULL COMMENT '店铺描述',
+  `registered_capital` DECIMAL(18,2) DEFAULT NULL COMMENT '企业注册资本',
+  `business_scope` VARCHAR(2000) DEFAULT NULL COMMENT '营业执照经营范围',
+  `license_address` VARCHAR(500) DEFAULT NULL COMMENT '营业执照地址',
+  `license_valid_from` DATE DEFAULT NULL COMMENT '营业执照有效期开始',
+  `license_valid_to` DATE DEFAULT NULL COMMENT '营业执照有效期结束',
+  `license_long_term` TINYINT NOT NULL DEFAULT 0 COMMENT '营业执照是否长期：0否 1是',
+  `license_image_url` VARCHAR(500) DEFAULT NULL COMMENT '营业执照图片地址',
+  `legal_representative_name` VARCHAR(64) DEFAULT NULL COMMENT '法人姓名',
+  `legal_representative_id_no` VARCHAR(64) DEFAULT NULL COMMENT '法人身份证号',
+  `legal_id_front_url` VARCHAR(500) DEFAULT NULL COMMENT '法人身份证人像面',
+  `legal_id_back_url` VARCHAR(500) DEFAULT NULL COMMENT '法人身份证国徽面',
+  `signing_date` DATE DEFAULT NULL COMMENT '签约日期',
+  `contract_valid_from` DATE DEFAULT NULL COMMENT '合同有效期开始',
+  `contract_valid_to` DATE DEFAULT NULL COMMENT '合同有效期结束',
+  `contract_file_url` VARCHAR(500) DEFAULT NULL COMMENT '签约合同文件地址',
+  `audit_time` DATETIME DEFAULT NULL COMMENT '最后审核时间',
+  `audit_remark` VARCHAR(500) DEFAULT NULL COMMENT '审核备注',
+  `freeze_time` DATETIME DEFAULT NULL COMMENT '冻结时间',
+  `freeze_reason` VARCHAR(500) DEFAULT NULL COMMENT '冻结原因',
   `wechat_qr_file_id` BIGINT DEFAULT NULL COMMENT '微信二维码文件ID',
   `vip_level` VARCHAR(32) NOT NULL DEFAULT 'free' COMMENT '会员等级',
   `storage_quota_mb` BIGINT NOT NULL DEFAULT 1024 COMMENT '存储额度MB',
@@ -39,15 +64,44 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member` (
   `del_flag` CHAR(1) NOT NULL DEFAULT '0' COMMENT '删除标志：0存在 2删除',
   PRIMARY KEY (`member_id`),
   UNIQUE KEY `uk_rental_member_code` (`member_code`),
+  UNIQUE KEY `uk_rental_member_contact_phone` (`contact_phone`),
   KEY `idx_rental_member_tenant` (`tenant_id`),
   KEY `idx_rental_member_auth_status` (`auth_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁商户/会员主体';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user` (
+  `merchant_user_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商户用户ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `user_name` VARCHAR(64) NOT NULL COMMENT '登录账号',
+  `nick_name` VARCHAR(64) NOT NULL COMMENT '用户昵称',
+  `phone` VARCHAR(32) NOT NULL COMMENT '手机号',
+  `email` VARCHAR(64) DEFAULT NULL COMMENT '邮箱',
+  `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像',
+  `password` VARCHAR(100) DEFAULT NULL COMMENT '登录密码',
+  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '账号状态：0正常 1停用',
+  `del_flag` CHAR(1) NOT NULL DEFAULT '0' COMMENT '删除标志：0存在 2删除',
+  `login_ip` VARCHAR(128) DEFAULT NULL COMMENT '最后登录IP',
+  `login_date` DATETIME DEFAULT NULL COMMENT '最后登录时间',
+  `pwd_update_date` DATETIME DEFAULT NULL COMMENT '密码最后更新时间',
+  `must_change_password` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否必须修改初始密码：0否 1是',
+  `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建者',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (`merchant_user_id`),
+  UNIQUE KEY `uk_rental_merchant_user_name` (`user_name`),
+  UNIQUE KEY `uk_rental_merchant_user_phone` (`phone`),
+  KEY `idx_rental_merchant_user_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_merchant_user_status` (`status`, `del_flag`)
+) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端用户';
 
 CREATE TABLE IF NOT EXISTS `ry_rental_user_member` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
-  `user_id` BIGINT NOT NULL COMMENT 'RuoYi sys_user 用户ID',
+  `merchant_user_id` BIGINT NOT NULL COMMENT '商户用户ID',
   `member_role` VARCHAR(32) NOT NULL DEFAULT 'staff' COMMENT '商户内角色',
   `warehouse_scope_type` VARCHAR(20) NOT NULL DEFAULT 'all' COMMENT '仓库范围：all全部 specified指定',
   `sensitive_scope` VARCHAR(32) NOT NULL DEFAULT 'masked' COMMENT '敏感字段权限：masked脱敏 detail明文 export导出',
@@ -59,23 +113,129 @@ CREATE TABLE IF NOT EXISTS `ry_rental_user_member` (
   `remark` VARCHAR(500) DEFAULT NULL,
   `del_flag` CHAR(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_rental_user_member` (`member_id`, `user_id`),
-  KEY `idx_rental_user_member_user` (`user_id`),
+  UNIQUE KEY `uk_rental_user_member` (`member_id`, `merchant_user_id`),
+  KEY `idx_rental_user_member_user` (`merchant_user_id`),
   KEY `idx_rental_user_member_tenant` (`tenant_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户员工与系统用户绑定';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户员工与商户用户绑定';
 
 CREATE TABLE IF NOT EXISTS `ry_rental_user_warehouse_scope` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
-  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `merchant_user_id` BIGINT NOT NULL COMMENT '商户用户ID',
   `warehouse_id` BIGINT NOT NULL COMMENT '仓库ID',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_rental_user_warehouse` (`member_id`, `user_id`, `warehouse_id`),
+  UNIQUE KEY `uk_rental_user_warehouse` (`member_id`, `merchant_user_id`, `warehouse_id`),
   KEY `idx_rental_user_warehouse_tenant` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户仓库数据权限';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_menu` (
+  `menu_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商户菜单ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `menu_name` VARCHAR(50) NOT NULL COMMENT '菜单名称',
+  `parent_id` BIGINT NOT NULL DEFAULT 0 COMMENT '父菜单ID',
+  `order_num` INT NOT NULL DEFAULT 0 COMMENT '显示顺序',
+  `path` VARCHAR(200) DEFAULT '' COMMENT '路由地址',
+  `component` VARCHAR(255) DEFAULT NULL COMMENT '组件路径',
+  `query` VARCHAR(255) DEFAULT NULL COMMENT '路由参数',
+  `route_name` VARCHAR(50) DEFAULT '' COMMENT '路由名称',
+  `is_frame` INT NOT NULL DEFAULT 1 COMMENT '是否外链：0是 1否',
+  `is_cache` INT NOT NULL DEFAULT 0 COMMENT '是否缓存：0缓存 1不缓存',
+  `menu_type` CHAR(1) NOT NULL DEFAULT '' COMMENT '菜单类型：M目录 C菜单 F按钮',
+  `visible` CHAR(1) NOT NULL DEFAULT '0' COMMENT '显示状态：0显示 1隐藏',
+  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '菜单状态：0正常 1停用',
+  `perms` VARCHAR(100) DEFAULT NULL COMMENT '权限标识',
+  `icon` VARCHAR(100) DEFAULT '#' COMMENT '菜单图标',
+  `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建者',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `remark` VARCHAR(500) DEFAULT '' COMMENT '备注',
+  `del_flag` CHAR(1) NOT NULL DEFAULT '0' COMMENT '删除标志：0存在 2删除',
+  PRIMARY KEY (`menu_id`),
+  UNIQUE KEY `uk_rental_merchant_menu_path` (`member_id`, `parent_id`, `path`),
+  KEY `idx_rental_merchant_menu_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_merchant_menu_parent` (`member_id`, `parent_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2100 DEFAULT CHARSET=utf8mb4 COMMENT='商户端菜单权限';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_oper_log` (
+  `oper_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '日志主键',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `operator_user_id` BIGINT NOT NULL COMMENT '商户用户ID',
+  `title` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '模块标题',
+  `business_type` INT NOT NULL DEFAULT 0 COMMENT '业务类型',
+  `method` VARCHAR(200) NOT NULL DEFAULT '' COMMENT '方法名称',
+  `request_method` VARCHAR(10) NOT NULL DEFAULT '' COMMENT '请求方式',
+  `operator_type` INT NOT NULL DEFAULT 0 COMMENT '操作类别',
+  `oper_name` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '操作人员',
+  `oper_url` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '请求URL',
+  `oper_ip` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '主机地址',
+  `oper_param` VARCHAR(2000) NOT NULL DEFAULT '' COMMENT '请求参数',
+  `json_result` VARCHAR(2000) NOT NULL DEFAULT '' COMMENT '返回参数',
+  `status` INT NOT NULL DEFAULT 0 COMMENT '操作状态：0正常 1异常',
+  `error_msg` VARCHAR(2000) NOT NULL DEFAULT '' COMMENT '错误消息',
+  `oper_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  `cost_time` BIGINT NOT NULL DEFAULT 0 COMMENT '消耗时间（毫秒）',
+  PRIMARY KEY (`oper_id`),
+  KEY `idx_merchant_oper_log_scope_time` (`tenant_id`, `member_id`, `oper_time`),
+  KEY `idx_merchant_oper_log_scope_status` (`tenant_id`, `member_id`, `status`, `oper_time`),
+  KEY `idx_merchant_oper_log_scope_user` (`tenant_id`, `member_id`, `operator_user_id`, `oper_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户操作日志';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role` (
+  `role_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商户角色ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `role_name` VARCHAR(30) NOT NULL COMMENT '角色名称',
+  `role_key` VARCHAR(100) NOT NULL COMMENT '角色权限字符串',
+  `role_sort` INT NOT NULL COMMENT '显示顺序',
+  `menu_check_strictly` TINYINT NOT NULL DEFAULT 1 COMMENT '菜单树选择项是否父子联动',
+  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '角色状态：0正常 1停用',
+  `del_flag` CHAR(1) NOT NULL DEFAULT '0' COMMENT '删除标志：0存在 2删除',
+  `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建者',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (`role_id`),
+  UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `del_flag`),
+  UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `del_flag`),
+  KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端角色';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role_menu` (
+  `role_id` BIGINT NOT NULL COMMENT '商户角色ID',
+  `menu_id` BIGINT NOT NULL COMMENT '商户菜单ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  PRIMARY KEY (`role_id`, `menu_id`),
+  KEY `idx_rental_merchant_role_menu_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_merchant_role_menu_menu` (`menu_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户角色和菜单关联';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user_role` (
+  `merchant_user_id` BIGINT NOT NULL COMMENT '商户用户ID',
+  `role_id` BIGINT NOT NULL COMMENT '商户角色ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  PRIMARY KEY (`merchant_user_id`, `role_id`),
+  KEY `idx_rental_merchant_user_role_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_merchant_user_role_role` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户用户和角色关联';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user_menu` (
+  `merchant_user_id` BIGINT NOT NULL COMMENT '商户用户ID',
+  `menu_id` BIGINT NOT NULL COMMENT '商户菜单ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  PRIMARY KEY (`merchant_user_id`, `menu_id`),
+  KEY `idx_rental_merchant_user_menu_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_merchant_user_menu_menu` (`menu_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户用户和菜单关联';
 
 -- ----------------------------
 -- 2. 仓库与基础资料

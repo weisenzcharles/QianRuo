@@ -1,4 +1,5 @@
-FROM nginx:1.27-alpine
+ARG NGINX_BASE_IMAGE=m.daocloud.io/docker.io/library/nginx:1.27
+FROM ${NGINX_BASE_IMAGE}
 
 ARG DIST_DIR
 ARG NGINX_CONF

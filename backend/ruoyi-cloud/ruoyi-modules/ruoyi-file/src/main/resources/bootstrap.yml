@@ -24,3 +24,20 @@ spring:
     import:
       - nacos:application-${spring.profiles.active}.${spring.config.file-extension}
       - nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+# Keep the file service bootable while Nacos is recovering. Environment or
+# Nacos values still override these container-safe defaults.
+file:
+  domain: ${FILE_DOMAIN:http://127.0.0.1:9300}
+  path: ${FILE_PATH:/home/ruoyi/uploadPath}
+  prefix: ${FILE_PREFIX:/statics}
+
+minio:
+  url: ${MINIO_URL:http://127.0.0.1:9000}
+  accessKey: ${MINIO_ACCESS_KEY:minioadmin}
+  secretKey: ${MINIO_SECRET_KEY:minioadmin}
+  bucketName: ${MINIO_BUCKET_NAME:test}
+
+referer:
+  enabled: ${REFERER_ENABLED:false}
+  allowed-domains: ${REFERER_ALLOWED_DOMAINS:localhost,127.0.0.1}

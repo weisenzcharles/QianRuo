@@ -3,7 +3,7 @@ import request from '@/utils/request'
 // 查询菜单列表
 export function listMenu(query) {
   return request({
-    url: '/system/menu/list',
+    url: '/admin/menu/list',
     method: 'get',
     params: query
   })
@@ -12,7 +12,7 @@ export function listMenu(query) {
 // 查询菜单详细
 export function getMenu(menuId) {
   return request({
-    url: '/system/menu/' + menuId,
+    url: '/admin/menu/' + menuId,
     method: 'get'
   })
 }
@@ -20,7 +20,7 @@ export function getMenu(menuId) {
 // 查询菜单下拉树结构
 export function treeselect() {
   return request({
-    url: '/system/menu/treeselect',
+    url: '/admin/menu/treeselect',
     method: 'get'
   })
 }
@@ -28,7 +28,7 @@ export function treeselect() {
 // 根据角色ID查询菜单下拉树结构
 export function roleMenuTreeselect(roleId) {
   return request({
-    url: '/system/menu/roleMenuTreeselect/' + roleId,
+    url: '/admin/menu/roleMenuTreeselect/' + roleId,
     method: 'get'
   })
 }
@@ -36,7 +36,7 @@ export function roleMenuTreeselect(roleId) {
 // 新增菜单
 export function addMenu(data) {
   return request({
-    url: '/system/menu',
+    url: '/admin/menu',
     method: 'post',
     data: data
   })
@@ -45,7 +45,7 @@ export function addMenu(data) {
 // 修改菜单
 export function updateMenu(data) {
   return request({
-    url: '/system/menu',
+    url: '/admin/menu',
     method: 'put',
     data: data
   })
@@ -54,7 +54,7 @@ export function updateMenu(data) {
 // 保存菜单排序
 export function updateMenuSort(data) {
   return request({
-    url: '/system/menu/updateSort',
+    url: '/admin/menu/updateSort',
     method: 'put',
     data: data
   })
@@ -63,7 +63,7 @@ export function updateMenuSort(data) {
 // 删除菜单
 export function delMenu(menuId) {
   return request({
-    url: '/system/menu/' + menuId,
+    url: '/admin/menu/' + menuId,
     method: 'delete'
   })
 }

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalWarehouseMapper">
+
+    <resultMap type="RentalWarehouse" id="RentalWarehouseResult">
+        <id property="warehouseId" column="warehouse_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="warehouseCode" column="warehouse_code" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="status" column="status" />
+    </resultMap>
+
+    <select id="selectEnabledByMember" resultMap="RentalWarehouseResult">
+        select warehouse_id, tenant_id, member_id, warehouse_code, warehouse_name, status
+        from `ry_rental`.`ry_rental_warehouse`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and status = '0'
+          and del_flag = '0'
+        order by warehouse_name, warehouse_id
+    </select>
+
+    <select id="countEnabledByIds" resultType="Integer">
+        select count(1)
+        from `ry_rental`.`ry_rental_warehouse`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and status = '0'
+          and del_flag = '0'
+          and warehouse_id in
+        <foreach collection="warehouseIds" item="warehouseId" open="(" separator="," close=")">
+            #{warehouseId}
+        </foreach>
+    </select>
+
+</mapper>

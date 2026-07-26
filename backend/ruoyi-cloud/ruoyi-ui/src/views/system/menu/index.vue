@@ -33,7 +33,7 @@
           icon="el-icon-plus"
           size="mini"
           @click="handleAdd"
-          v-hasPermi="['system:menu:add']"
+          v-hasPermi="['admin:menu:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -43,7 +43,7 @@
           icon="el-icon-check"
           size="mini"
           @click="handleSaveSort"
-          v-hasPermi="['system:menu:edit']"
+          v-hasPermi="['admin:menu:edit']"
         >保存排序</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -100,21 +100,21 @@
             type="text"
             icon="el-icon-edit"
             @click="handleUpdate(scope.row)"
-            v-hasPermi="['system:menu:edit']"
+            v-hasPermi="['admin:menu:edit']"
           >修改</el-button>
           <el-button
             size="mini"
             type="text"
             icon="el-icon-plus"
             @click="handleAdd(scope.row)"
-            v-hasPermi="['system:menu:add']"
+            v-hasPermi="['admin:menu:add']"
           >新增</el-button>
           <el-button
             size="mini"
             type="text"
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
-            v-hasPermi="['system:menu:remove']"
+            v-hasPermi="['admin:menu:remove']"
           >删除</el-button>
         </template>
       </el-table-column>
@@ -236,7 +236,7 @@
             <el-form-item prop="perms">
               <el-input v-model="form.perms" placeholder="请输入权限标识" maxlength="100" />
               <span slot="label">
-                <el-tooltip content="控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasPermi('system:user:list')`)" placement="top">
+                <el-tooltip content="控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasPermi('admin:user:list')`)" placement="top">
                 <i class="el-icon-question"></i>
                 </el-tooltip>
                 权限字符

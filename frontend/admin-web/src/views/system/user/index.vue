@@ -39,19 +39,19 @@
 
             <el-row :gutter="10" class="mb8">
               <el-col :span="1.5">
-                <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['system:user:add']">新增</el-button>
+                <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['admin:user:add']">新增</el-button>
               </el-col>
               <el-col :span="1.5">
-                <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['system:user:edit']">修改</el-button>
+                <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['admin:user:edit']">修改</el-button>
               </el-col>
               <el-col :span="1.5">
-                <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['system:user:remove']">删除</el-button>
+                <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['admin:user:remove']">删除</el-button>
               </el-col>
               <el-col :span="1.5">
-                <el-button type="info" plain icon="Upload" @click="handleImport" v-hasPermi="['system:user:import']">导入</el-button>
+                <el-button type="info" plain icon="Upload" @click="handleImport" v-hasPermi="['admin:user:import']">导入</el-button>
               </el-col>
               <el-col :span="1.5">
-                <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['system:user:export']">导出</el-button>
+                <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['admin:user:export']">导出</el-button>
               </el-col>
               <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" :columns="columns"></right-toolbar>
             </el-row>
@@ -81,16 +81,16 @@
               <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
                 <template #default="scope">
                   <el-tooltip content="修改" placement="top" v-if="scope.row.userId !== 1">
-                    <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:user:edit']"></el-button>
+                    <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['admin:user:edit']"></el-button>
                   </el-tooltip>
                   <el-tooltip content="删除" placement="top" v-if="scope.row.userId !== 1">
-                    <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:user:remove']"></el-button>
+                    <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['admin:user:remove']"></el-button>
                   </el-tooltip>
                   <el-tooltip content="重置密码" placement="top" v-if="scope.row.userId !== 1">
-                    <el-button link type="primary" icon="Key" @click="handleResetPwd(scope.row)" v-hasPermi="['system:user:resetPwd']"></el-button>
+                    <el-button link type="primary" icon="Key" @click="handleResetPwd(scope.row)" v-hasPermi="['admin:user:resetPwd']"></el-button>
                   </el-tooltip>
                   <el-tooltip content="分配角色" placement="top" v-if="scope.row.userId !== 1">
-                    <el-button link type="primary" icon="CircleCheck" @click="handleAuthRole(scope.row)" v-hasPermi="['system:user:edit']"></el-button>
+                    <el-button link type="primary" icon="CircleCheck" @click="handleAuthRole(scope.row)" v-hasPermi="['admin:user:edit']"></el-button>
                   </el-tooltip>
                 </template>
               </el-table-column>
@@ -254,7 +254,7 @@ const upload = reactive({
   // 设置上传的请求头部
   headers: { Authorization: "Bearer " + getToken() },
   // 上传的地址
-  url: import.meta.env.VITE_APP_BASE_API + "/system/user/importData"
+  url: import.meta.env.VITE_APP_BASE_API + "/admin/user/importData"
 })
 // 列显隐信息
 const columns = ref({
@@ -311,10 +311,29 @@ function getList() {
 
 /** 查询部门下拉树结构 */
 function getDeptTree() {
-  deptTreeSelect().then(response => {
+  return deptTreeSelect().then(response => {
     deptOptions.value = response.data
     enabledDeptOptions.value = filterDisabledDept(JSON.parse(JSON.stringify(response.data)))
+    if (queryParams.value.deptId && !containsDept(response.data, queryParams.value.deptId)) {
+      queryParams.value.deptId = undefined
+    }
+    nextTick(() => {
+      proxy.$refs.deptTreeRef?.filter(deptName.value)
+      proxy.$refs.deptTreeRef?.setCurrentKey(queryParams.value.deptId || null)
+    })
   })
+}
+
+/** 判断当前部门是否仍在部门树中 */
+function containsDept(deptList, deptId) {
+  return deptList.some(dept => String(dept.id) === String(deptId)
+    || (dept.children && containsDept(dept.children, deptId)))
+}
+
+/** 页面从缓存恢复时同步部门树和用户列表 */
+async function refreshDepartmentContext() {
+  await getDeptTree()
+  getList()
 }
 
 /** 过滤禁用的部门 */
@@ -555,5 +574,18 @@ onMounted(() => {
   proxy.getConfigKey("sys.user.initPassword").then(response => {
     initPassword.value = response.msg
   })
+})
+
+let shouldRefreshOnActivate = false
+onDeactivated(() => {
+  shouldRefreshOnActivate = true
+})
+
+onActivated(() => {
+  if (!shouldRefreshOnActivate) {
+    return
+  }
+  shouldRefreshOnActivate = false
+  refreshDepartmentContext()
 })
 </script>

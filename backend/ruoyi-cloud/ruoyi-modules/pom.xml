@@ -9,7 +9,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <modules>
-        <module>ruoyi-system</module>
+        <module>platform-service</module>
+        <module>ruoyi-merchant-service</module>
         <module>ruoyi-gen</module>
         <module>ruoyi-job</module>
         <module>ruoyi-file</module>

@@ -183,6 +183,15 @@ public class RedisService
     }
 
     /**
+     * 从缓存Set移除单个值。
+     */
+    public <T> boolean removeCacheSetValue(final String key, final T value)
+    {
+        Long count = redisTemplate.opsForSet().remove(key, value);
+        return count != null && count > 0;
+    }
+
+    /**
      * 缓存Map
      *
      * @param key

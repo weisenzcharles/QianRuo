@@ -1,6 +1,21 @@
 -- 租赁系统 UTF-8 数据修复脚本
 -- 说明：用于修复早期初始化时未显式指定 MySQL 客户端字符集导致的菜单、字典中文乱码。
 
+SET @add_client_type_sql = (
+  SELECT IF(
+    COUNT(*) = 0,
+    'ALTER TABLE sys_menu ADD COLUMN client_type VARCHAR(20) NOT NULL DEFAULT ''platform'' COMMENT ''客户端类型：platform平台后台 merchant商家端 all共用'' AFTER perms',
+    'SELECT 1'
+  )
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'sys_menu'
+    AND column_name = 'client_type'
+);
+PREPARE add_client_type_stmt FROM @add_client_type_sql;
+EXECUTE add_client_type_stmt;
+DEALLOCATE PREPARE add_client_type_stmt;
+
 UPDATE sys_dict_type
 SET dict_name = CASE dict_type
   WHEN 'rental_order_status' THEN '租赁订单状态'
@@ -81,11 +96,108 @@ SET menu_name = CASE menu_id
   WHEN 2004 THEN '商户修改'
   WHEN 2005 THEN '商户删除'
   WHEN 2006 THEN '商户导出'
+  WHEN 2007 THEN '商户用户'
+  WHEN 2008 THEN '商户用户查询'
+  WHEN 2009 THEN '商户用户新增'
+  WHEN 2010 THEN '商户用户修改'
+  WHEN 2011 THEN '商户用户删除'
+  WHEN 2012 THEN '商户用户重置密码'
+  WHEN 2020 THEN '商户权限'
+  WHEN 2021 THEN '商户权限查询'
+  WHEN 2022 THEN '商户权限新增'
+  WHEN 2023 THEN '商户权限修改'
+  WHEN 2024 THEN '商户权限删除'
   ELSE menu_name
 END,
 remark = CASE menu_id
   WHEN 2000 THEN '租赁商户后台管理目录'
   WHEN 2001 THEN '租赁商户主体管理'
+  WHEN 2007 THEN '平台商户用户管理'
+  WHEN 2020 THEN '平台商户角色权限管理'
   ELSE remark
 END
-WHERE menu_id BETWEEN 2000 AND 2006;
+WHERE menu_id BETWEEN 2000 AND 2024;
+
+UPDATE sys_menu SET client_type = 'platform' WHERE client_type IS NULL OR client_type = '';
+UPDATE sys_menu SET client_type = 'platform' WHERE menu_id BETWEEN 2000 AND 2024;
+UPDATE sys_menu SET client_type = 'merchant' WHERE menu_id BETWEEN 2100 AND 2170;
+
+UPDATE `ry_rental`.`ry_rental_merchant_menu`
+SET menu_name = CASE menu_id
+  WHEN 2100 THEN '商家工作台'
+  WHEN 2110 THEN '订单中心'
+  WHEN 2120 THEN '仓库库存'
+  WHEN 2130 THEN '商品资料'
+  WHEN 2140 THEN '物流归还'
+  WHEN 2150 THEN '联盟协作'
+  WHEN 2160 THEN '周转市场'
+  WHEN 2170 THEN '商家设置'
+  WHEN 2180 THEN '角色权限'
+  WHEN 2181 THEN '角色查询'
+  WHEN 2182 THEN '角色新增'
+  WHEN 2183 THEN '角色修改'
+  WHEN 2184 THEN '角色删除'
+  WHEN 2190 THEN '操作日志'
+  WHEN 2191 THEN '日志导出'
+  ELSE menu_name
+END,
+remark = CASE menu_id
+  WHEN 2100 THEN '商家工作台概览'
+  WHEN 2110 THEN '商家订单中心'
+  WHEN 2120 THEN '商家仓库库存'
+  WHEN 2130 THEN '商家商品资料'
+  WHEN 2140 THEN '商家物流归还'
+  WHEN 2150 THEN '商家联盟协作'
+  WHEN 2160 THEN '商家周转市场'
+  WHEN 2170 THEN '商家设置'
+  WHEN 2180 THEN '商户角色与菜单权限'
+  WHEN 2181 THEN '商户角色查询'
+  WHEN 2182 THEN '商户角色新增'
+  WHEN 2183 THEN '商户角色修改'
+  WHEN 2184 THEN '商户角色删除'
+  WHEN 2190 THEN '当前商户操作日志'
+  WHEN 2191 THEN '导出当前商户操作日志'
+  ELSE remark
+END
+WHERE menu_id BETWEEN 2100 AND 2191;
+
+UPDATE `ry_rental`.`ry_rental_merchant_role`
+SET role_name = CASE role_key
+  WHEN 'merchant_admin' THEN '商户管理员'
+  ELSE role_name
+END,
+remark = CASE role_key
+  WHEN 'merchant_admin' THEN '商户默认管理员角色'
+  ELSE remark
+END
+WHERE role_key = 'merchant_admin';
+
+UPDATE `ry_rental`.`ry_rental_member`
+SET legal_subject_name = CASE member_id
+  WHEN 1 THEN '迁渃演示商户'
+  ELSE legal_subject_name
+END,
+nickname = CASE member_id
+  WHEN 1 THEN '演示商户'
+  ELSE nickname
+END,
+contact_name = CASE member_id
+  WHEN 1 THEN '商家管理员'
+  ELSE contact_name
+END,
+remark = CASE member_id
+  WHEN 1 THEN '本地开发商家端演示商户'
+  ELSE remark
+END
+WHERE member_id = 1;
+
+UPDATE `ry_rental`.`ry_rental_merchant_user`
+SET nick_name = CASE merchant_user_id
+  WHEN 100000 THEN '商家管理员'
+  ELSE nick_name
+END,
+remark = CASE merchant_user_id
+  WHEN 100000 THEN '本地开发商家端账号'
+  ELSE remark
+END
+WHERE merchant_user_id = 100000;

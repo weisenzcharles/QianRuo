@@ -27,6 +27,11 @@ service.interceptors.request.use(config => {
   config.headers = config.headers || {}
   config.headers['X-Client-Type'] = import.meta.env.VITE_APP_CLIENT_TYPE || 'platform'
   config.headers['X-App-Code'] = import.meta.env.VITE_APP_CODE || 'rental-admin-web'
+  const requestUrl = config.url || ''
+  if (requestUrl === '/system' || requestUrl.startsWith('/system/')
+      || requestUrl === '/merchant' || requestUrl.startsWith('/merchant/')) {
+    return Promise.reject(new Error('平台端禁止访问旧系统接口或商户接口'))
+  }
   // 是否需要设置 token
   const isToken = (config.headers || {}).isToken === false
   // 是否需要防止数据重复提交

@@ -33,7 +33,7 @@
           icon="el-icon-plus"
           size="mini"
           @click="handleAdd"
-          v-hasPermi="['system:dept:add']"
+          v-hasPermi="['admin:dept:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -43,7 +43,7 @@
           icon="el-icon-check"
           size="mini"
           @click="handleSaveSort"
-          v-hasPermi="['system:dept:edit']"
+          v-hasPermi="['admin:dept:edit']"
         >保存排序</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -89,14 +89,14 @@
             type="text"
             icon="el-icon-edit"
             @click="handleUpdate(scope.row)"
-            v-hasPermi="['system:dept:edit']"
+            v-hasPermi="['admin:dept:edit']"
           >修改</el-button>
           <el-button
             size="mini"
             type="text"
             icon="el-icon-plus"
             @click="handleAdd(scope.row)"
-            v-hasPermi="['system:dept:add']"
+            v-hasPermi="['admin:dept:add']"
           >新增</el-button>
           <el-button
             v-if="scope.row.parentId != 0"
@@ -104,7 +104,7 @@
             type="text"
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
-            v-hasPermi="['system:dept:remove']"
+            v-hasPermi="['admin:dept:remove']"
           >删除</el-button>
         </template>
       </el-table-column>

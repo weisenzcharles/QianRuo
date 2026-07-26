@@ -1,8 +1,10 @@
 package com.ruoyi.common.security.config;
 
+import java.text.SimpleDateFormat;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import java.util.TimeZone;
+import com.ruoyi.common.core.utils.DateUtils;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -12,6 +14,11 @@ import org.springframework.context.annotation.Bean;
  */
 public class ApplicationConfig
 {
+    public ApplicationConfig()
+    {
+        DateUtils.useDefaultTimeZone();
+    }
+
     /**
      * 时区配置
      */
@@ -20,7 +27,11 @@ public class ApplicationConfig
     {
         ObjectMapper objectMapper = JsonMapper.builder().build();
         objectMapper.findAndRegisterModules();
-        objectMapper.setTimeZone(TimeZone.getDefault());
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        SimpleDateFormat dateFormat = new SimpleDateFormat(DateUtils.YYYY_MM_DD_HH_MM_SS);
+        dateFormat.setTimeZone(DateUtils.DEFAULT_TIME_ZONE);
+        objectMapper.setDateFormat(dateFormat);
+        objectMapper.setTimeZone(DateUtils.DEFAULT_TIME_ZONE);
         return objectMapper;
     }
 }

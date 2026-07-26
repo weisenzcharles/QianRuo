@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalMerchantUserRoleMapper">
+
+    <select id="countUserRoleByRoleId" resultType="Integer">
+        select count(1)
+        from `ry_rental`.`ry_rental_merchant_user_role`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and role_id = #{roleId}
+    </select>
+
+    <delete id="deleteUserRoleInfo">
+        delete from `ry_rental`.`ry_rental_merchant_user_role`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and merchant_user_id = #{userRole.userId}
+          and role_id = #{userRole.roleId}
+    </delete>
+
+    <delete id="deleteUserRoleInfos">
+        delete from `ry_rental`.`ry_rental_merchant_user_role`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and role_id = #{roleId}
+          and merchant_user_id in
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteUserRoleByUserIds">
+        delete from `ry_rental`.`ry_rental_merchant_user_role`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and merchant_user_id in
+        <foreach collection="merchantUserIds" item="merchantUserId" open="(" separator="," close=")">
+            #{merchantUserId}
+        </foreach>
+    </delete>
+
+    <insert id="batchUserRole">
+        insert ignore into `ry_rental`.`ry_rental_merchant_user_role`(tenant_id, member_id, merchant_user_id, role_id) values
+        <foreach item="item" collection="list" separator=",">
+            (#{tenantId}, #{memberId}, #{item.userId}, #{item.roleId})
+        </foreach>
+    </insert>
+
+</mapper>

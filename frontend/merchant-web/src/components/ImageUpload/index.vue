@@ -102,7 +102,11 @@ const dialogImageUrl = ref("")
 const dialogVisible = ref(false)
 const baseUrl = import.meta.env.VITE_APP_BASE_API
 const uploadImgUrl = ref(baseUrl + props.action) // 上传的图片服务器地址
-const headers = ref({ Authorization: "Bearer " + getToken() })
+const headers = ref({
+  Authorization: "Bearer " + getToken(),
+  "X-Client-Type": import.meta.env.VITE_APP_CLIENT_TYPE || "merchant",
+  "X-App-Code": import.meta.env.VITE_APP_CODE || "rental-merchant-web"
+})
 const fileList = ref([])
 const showTip = computed(
   () => props.isShowTip && (props.fileType || props.fileSize)

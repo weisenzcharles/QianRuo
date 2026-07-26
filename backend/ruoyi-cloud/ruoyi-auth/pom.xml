@@ -15,6 +15,11 @@
     </description>
     
     <dependencies>
+
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-api-merchant</artifactId>
+        </dependency>
         
         <!-- SpringCloud Alibaba Nacos -->
         <dependency>

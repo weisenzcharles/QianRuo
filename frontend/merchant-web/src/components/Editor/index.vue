@@ -37,7 +37,9 @@ const { proxy } = getCurrentInstance()
 const quillEditorRef = ref()
 const uploadUrl = ref(import.meta.env.VITE_APP_BASE_API + "/file/upload") // 上传的图片服务器地址
 const headers = ref({
-  Authorization: "Bearer " + getToken()
+  Authorization: "Bearer " + getToken(),
+  "X-Client-Type": import.meta.env.VITE_APP_CLIENT_TYPE || "merchant",
+  "X-App-Code": import.meta.env.VITE_APP_CODE || "rental-merchant-web"
 })
 
 const props = defineProps({
@@ -189,7 +191,7 @@ function handlePasteCapture(e) {
 function insertImage(file) {
   const formData = new FormData()
   formData.append("file", file)
-  axios.post(uploadUrl.value, formData, { headers: { "Content-Type": "multipart/form-data", Authorization: headers.value.Authorization } }).then(res => {
+  axios.post(uploadUrl.value, formData, { headers: { "Content-Type": "multipart/form-data", ...headers.value } }).then(res => {
     handleUploadSuccess(res.data)
   })
 }

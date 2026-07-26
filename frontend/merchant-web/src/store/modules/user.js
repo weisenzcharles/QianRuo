@@ -1,6 +1,6 @@
 import router from '@/router'
-import { ElMessageBox, } from 'element-plus'
-import { login, logout, getInfo } from '@/api/login'
+import { ElMessageBox } from 'element-plus'
+import { login, smsLogin, logout, getInfo } from '@/api/login'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import { isEmpty } from "@/utils/validate"
 import useLockStore from '@/store/modules/lock'
@@ -16,23 +16,38 @@ const useUserStore = defineStore(
       nickName: '',
       avatar: '',
       roles: [],
-      permissions: []
+      permissions: [],
+      mustChangePassword: false
     }),
     actions: {
       // 登录
       login(userInfo) {
-        const username = userInfo.username.trim()
+        removeToken()
+        this.token = ''
+        this.roles = []
+        this.permissions = []
+        this.mustChangePassword = false
+        const loginType = userInfo.loginType || 'password'
+        const username = (userInfo.username || '').trim()
         const password = userInfo.password
         const code = userInfo.code
         const uuid = userInfo.uuid
+        const phone = (userInfo.phone || '').trim()
+        const smsCode = userInfo.smsCode
+        const loginAction = loginType === 'sms' ? smsLogin(phone, smsCode) : login(username, password, code, uuid)
         return new Promise((resolve, reject) => {
-          login(username, password, code, uuid).then(res => {
+          loginAction.then(res => {
             let data = res.data
             setToken(data.access_token)
             this.token = data.access_token
             useLockStore().unlockScreen()
             resolve()
           }).catch(error => {
+            this.token = ''
+            this.roles = []
+            this.permissions = []
+            this.mustChangePassword = false
+            removeToken()
             reject(error)
           })
         })
@@ -53,20 +68,20 @@ const useUserStore = defineStore(
             this.name = user.userName
             this.nickName = user.nickName
             this.avatar = avatar
-            /* 初始密码提示 */
-            if(res.isDefaultModifyPwd) {
-              ElMessageBox.confirm('您的密码还是初始密码，请修改密码！',  '安全提示', {  confirmButtonText: '确定',  cancelButtonText: '取消',  type: 'warning' }).then(() => {
-                router.push({ name: 'Profile', params: { activeTab: 'resetPwd' } })
-              }).catch(() => {})
-            }
             /* 过期密码提示 */
-            if(!res.isDefaultModifyPwd && res.isPasswordExpired) {
+            this.mustChangePassword = res.mustChangePassword === true
+            if(!this.mustChangePassword && res.isPasswordExpired) {
               ElMessageBox.confirm('您的密码已过期，请尽快修改密码！',  '安全提示', {  confirmButtonText: '确定',  cancelButtonText: '取消',  type: 'warning' }).then(() => {
                 router.push({ name: 'Profile', params: { activeTab: 'resetPwd' } })
               }).catch(() => {})
             }
             resolve(res)
           }).catch(error => {
+            this.token = ''
+            this.roles = []
+            this.permissions = []
+            this.mustChangePassword = false
+            removeToken()
             reject(error)
           })
         })
@@ -78,12 +93,21 @@ const useUserStore = defineStore(
             this.token = ''
             this.roles = []
             this.permissions = []
+            this.mustChangePassword = false
             removeToken()
             resolve()
           }).catch(error => {
+            this.token = ''
+            this.roles = []
+            this.permissions = []
+            this.mustChangePassword = false
+            removeToken()
             reject(error)
           })
         })
+      },
+      completePasswordInitialization() {
+        this.mustChangePassword = false
       }
     }
   })

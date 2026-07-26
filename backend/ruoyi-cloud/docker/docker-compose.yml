@@ -90,10 +90,10 @@ services:
       - ruoyi-redis
     links:
       - ruoyi-redis
-  ruoyi-modules-system:
-    container_name: ruoyi-modules-system
+  platform-service:
+    container_name: platform-service
     build:
-      context: ./ruoyi/modules/system
+      context: ./ruoyi/modules/platform
       dockerfile: dockerfile
     ports:
       - "9201:9201"

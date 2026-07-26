@@ -208,7 +208,14 @@
             <!-- 系统接口 -->
             <dependency>
                 <groupId>com.ruoyi</groupId>
-                <artifactId>ruoyi-api-system</artifactId>
+                <artifactId>ruoyi-api-platform</artifactId>
+                <version>${ruoyi.version}</version>
+            </dependency>
+
+            <!-- 商户接口 -->
+            <dependency>
+                <groupId>com.ruoyi</groupId>
+                <artifactId>ruoyi-api-merchant</artifactId>
                 <version>${ruoyi.version}</version>
             </dependency>
 

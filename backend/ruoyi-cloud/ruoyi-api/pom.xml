@@ -9,7 +9,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <modules>
-        <module>ruoyi-api-system</module>
+        <module>ruoyi-api-platform</module>
+        <module>ruoyi-api-merchant</module>
     </modules>
 
     <artifactId>ruoyi-api</artifactId>

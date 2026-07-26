@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantRoleMapper">
+    <resultMap id="role" type="com.ruoyi.merchant.model.MerchantRoleVO">
+        <id property="roleId" column="role_id" />
+        <result property="roleName" column="role_name" />
+        <result property="roleKey" column="role_key" />
+        <result property="roleSort" column="role_sort" />
+        <result property="menuCheckStrictly" column="menu_check_strictly" />
+        <result property="status" column="status" />
+        <result property="delFlag" column="del_flag" />
+        <result property="remark" column="remark" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+    <resultMap id="user" type="com.ruoyi.merchant.model.MerchantRoleUserVO">
+        <id property="userId" column="merchant_user_id" />
+        <result property="userName" column="user_name" />
+        <result property="nickName" column="nick_name" />
+        <result property="phonenumber" column="phone" />
+        <result property="email" column="email" />
+        <result property="status" column="status" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+    <sql id="roleColumns">
+        r.role_id, r.role_name, r.role_key, r.role_sort, r.menu_check_strictly,
+        r.status, r.del_flag, r.remark, r.create_time
+    </sql>
+    <select id="selectList" resultMap="role">
+        select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId} and r.del_flag = '0'
+        <if test="query.roleName != null and query.roleName != ''">
+          and r.role_name like concat('%', #{query.roleName}, '%')
+        </if>
+        <if test="query.roleKey != null and query.roleKey != ''">
+          and r.role_key like concat('%', #{query.roleKey}, '%')
+        </if>
+        <if test="query.status != null and query.status != ''">and r.status = #{query.status}</if>
+        <if test="query.params.beginTime != null and query.params.beginTime != ''">
+          and date_format(r.create_time, '%Y%m%d') &gt;= date_format(#{query.params.beginTime}, '%Y%m%d')
+        </if>
+        <if test="query.params.endTime != null and query.params.endTime != ''">
+          and date_format(r.create_time, '%Y%m%d') &lt;= date_format(#{query.params.endTime}, '%Y%m%d')
+        </if>
+        order by r.role_sort, r.role_id
+    </select>
+    <select id="selectById" resultMap="role">
+        select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
+          and r.role_id = #{roleId} and r.del_flag = '0'
+    </select>
+    <select id="selectByName" resultMap="role">
+        select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
+          and r.role_name = #{roleName} and r.del_flag = '0' limit 1
+    </select>
+    <select id="selectByKey" resultMap="role">
+        select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
+          and r.role_key = #{roleKey} and r.del_flag = '0' limit 1
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="command.roleId">
+        insert into `ry_rental`.`ry_rental_merchant_role`(
+          tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly,
+          status, del_flag, create_by, create_time, remark
+        ) values (
+          #{tenantId}, #{merchantId}, #{command.roleName}, #{command.roleKey}, #{command.roleSort},
+          #{command.menuCheckStrictly}, #{command.status}, '0', #{operator}, sysdate(), #{command.remark})
+    </insert>
+    <update id="update">
+        update `ry_rental`.`ry_rental_merchant_role`
+        set role_name = #{command.roleName}, role_key = #{command.roleKey}, role_sort = #{command.roleSort},
+            menu_check_strictly = #{command.menuCheckStrictly}, status = #{command.status},
+            remark = #{command.remark}, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId}
+          and role_id = #{command.roleId} and del_flag = '0'
+    </update>
+    <update id="updateStatus">
+        update `ry_rental`.`ry_rental_merchant_role`
+        set status = #{status}, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId} and del_flag = '0'
+    </update>
+    <update id="softDelete">
+        update `ry_rental`.`ry_rental_merchant_role`
+        set del_flag = '2', update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id in
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId}</foreach>
+    </update>
+    <select id="countUsers" resultType="Integer">
+        select count(1) from `ry_rental`.`ry_rental_merchant_user_role`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+    </select>
+    <select id="selectUserIdsByRole" resultType="Long">
+        select merchant_user_id from `ry_rental`.`ry_rental_merchant_user_role`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+    </select>
+    <delete id="deleteRoleMenus">
+        delete from `ry_rental`.`ry_rental_merchant_role_menu`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+    </delete>
+    <insert id="insertRoleMenus">
+        insert into `ry_rental`.`ry_rental_merchant_role_menu`(tenant_id, member_id, role_id, menu_id) values
+        <foreach collection="menuIds" item="menuId" separator=",">
+          (#{tenantId}, #{merchantId}, #{roleId}, #{menuId})
+        </foreach>
+    </insert>
+    <select id="selectAllocatedUsers" resultMap="user">
+        select u.merchant_user_id, u.user_name, u.nick_name, u.phone, u.email, u.status, u.create_time
+        from `ry_rental`.`ry_rental_merchant_user` u
+        inner join `ry_rental`.`ry_rental_merchant_user_role` ur
+          on ur.tenant_id = u.tenant_id and ur.member_id = u.member_id and ur.merchant_user_id = u.merchant_user_id
+        where u.tenant_id = #{tenantId} and u.member_id = #{merchantId} and u.del_flag = '0'
+          and ur.role_id = #{query.roleId}
+        <if test="query.userName != null and query.userName != ''">
+          and u.user_name like concat('%', #{query.userName}, '%')
+        </if>
+        <if test="query.phonenumber != null and query.phonenumber != ''">
+          and u.phone like concat('%', #{query.phonenumber}, '%')
+        </if>
+        order by u.merchant_user_id
+    </select>
+    <select id="selectUnallocatedUsers" resultMap="user">
+        select u.merchant_user_id, u.user_name, u.nick_name, u.phone, u.email, u.status, u.create_time
+        from `ry_rental`.`ry_rental_merchant_user` u
+        where u.tenant_id = #{tenantId} and u.member_id = #{merchantId} and u.del_flag = '0'
+          and not exists (select 1 from `ry_rental`.`ry_rental_merchant_user_role` ur
+            where ur.tenant_id = #{tenantId} and ur.member_id = #{merchantId}
+              and ur.merchant_user_id = u.merchant_user_id and ur.role_id = #{query.roleId})
+        <if test="query.userName != null and query.userName != ''">
+          and u.user_name like concat('%', #{query.userName}, '%')
+        </if>
+        <if test="query.phonenumber != null and query.phonenumber != ''">
+          and u.phone like concat('%', #{query.phonenumber}, '%')
+        </if>
+        order by u.merchant_user_id
+    </select>
+    <select id="countUsersInMerchant" resultType="Integer">
+        select count(1) from `ry_rental`.`ry_rental_merchant_user`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and del_flag = '0'
+          and merchant_user_id in
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">#{userId}</foreach>
+    </select>
+    <delete id="deleteUserRole">
+        delete from `ry_rental`.`ry_rental_merchant_user_role`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+          and merchant_user_id in
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">#{userId}</foreach>
+    </delete>
+    <insert id="insertUserRole">
+        insert ignore into `ry_rental`.`ry_rental_merchant_user_role`(tenant_id, member_id, merchant_user_id, role_id) values
+        <foreach collection="userIds" item="userId" separator=",">
+          (#{tenantId}, #{merchantId}, #{userId}, #{roleId})
+        </foreach>
+    </insert>
+</mapper>

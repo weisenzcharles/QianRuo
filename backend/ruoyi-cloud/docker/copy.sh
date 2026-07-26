@@ -27,8 +27,8 @@ cp ../ruoyi-auth/target/ruoyi-auth.jar ./ruoyi/auth/jar
 echo "begin copy ruoyi-visual "
 cp ../ruoyi-visual/ruoyi-monitor/target/ruoyi-visual-monitor.jar  ./ruoyi/visual/monitor/jar
 
-echo "begin copy ruoyi-modules-system "
-cp ../ruoyi-modules/ruoyi-system/target/ruoyi-modules-system.jar ./ruoyi/modules/system/jar
+echo "begin copy platform-service "
+cp ../ruoyi-modules/platform-service/target/platform-service.jar ./ruoyi/modules/platform/jar
 
 echo "begin copy ruoyi-modules-file "
 cp ../ruoyi-modules/ruoyi-file/target/ruoyi-modules-file.jar ./ruoyi/modules/file/jar
@@ -38,4 +38,3 @@ cp ../ruoyi-modules/ruoyi-job/target/ruoyi-modules-job.jar ./ruoyi/modules/job/j
 
 echo "begin copy ruoyi-modules-gen "
 cp ../ruoyi-modules/ruoyi-gen/target/ruoyi-modules-gen.jar ./ruoyi/modules/gen/jar
-

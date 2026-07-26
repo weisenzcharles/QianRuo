@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalMerchantRoleMenuMapper">
+
+    <select id="checkMenuExistRole" resultType="Integer">
+        select count(1)
+        from `ry_rental`.`ry_rental_merchant_role_menu`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and menu_id = #{menuId}
+    </select>
+
+    <delete id="deleteRoleMenuByRoleId">
+        delete from `ry_rental`.`ry_rental_merchant_role_menu`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and role_id = #{roleId}
+    </delete>
+
+    <delete id="deleteRoleMenu">
+        delete from `ry_rental`.`ry_rental_merchant_role_menu`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and role_id in
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+            #{roleId}
+        </foreach>
+    </delete>
+
+    <insert id="batchRoleMenu">
+        insert ignore into `ry_rental`.`ry_rental_merchant_role_menu`(tenant_id, member_id, role_id, menu_id) values
+        <foreach item="item" collection="list" separator=",">
+            (#{tenantId}, #{memberId}, #{item.roleId}, #{item.menuId})
+        </foreach>
+    </insert>
+
+</mapper>

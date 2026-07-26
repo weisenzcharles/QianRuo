@@ -19,16 +19,16 @@ spring:
         # 配置中心地址
         server-addr: 127.0.0.1:8848
     sentinel:
-      # 取消控制台懒加载
-      eager: true
+      # 未配置控制台时不主动建立连接
+      eager: ${SENTINEL_EAGER:false}
       transport:
-        # 控制台地址
-        dashboard: 127.0.0.1:8718
+        # 可选控制台地址，例如 ruoyi-sentinel:8718
+        dashboard: ${SENTINEL_DASHBOARD:}
       # nacos配置持久化
       datasource:
         ds1:
           nacos:
-            server-addr: 127.0.0.1:8848
+            server-addr: ${spring.cloud.nacos.config.server-addr}
             dataId: sentinel-ruoyi-gateway
             groupId: DEFAULT_GROUP
             data-type: json
@@ -39,3 +39,8 @@ spring:
     import:
       - nacos:application-${spring.profiles.active}.${spring.config.file-extension}
       - nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+management:
+  health:
+    sentinel:
+      enabled: ${SENTINEL_HEALTH_ENABLED:false}

@@ -34,7 +34,7 @@ ARCH_ROWS = [
     ("前端二：admin-web", "平台内部管理后台，基于同框架独立工程或同 monorepo 独立 app", "仅平台内部人员使用；管理会员、商户认证、平台财务、风控、系统配置、周转市场审核、全局统计和运营工具。"),
     ("ruoyi-gateway", "统一 API 网关", "路由、鉴权前置、限流、黑名单、灰度、接口审计入口；按 merchant/admin 前端来源做策略区分。"),
     ("ruoyi-auth", "认证中心", "登录、刷新令牌、验证码、OAuth/微信授权预留；支持平台员工和商家员工两类身份。"),
-    ("ruoyi-system", "系统基础服务", "用户、角色、菜单、部门、岗位、字典、参数、通知公告、操作日志；扩展商户、租户、仓库权限、敏感字段权限。"),
+    ("platform-service", "系统基础服务", "用户、角色、菜单、部门、岗位、字典、参数、通知公告、操作日志；扩展商户、租户、仓库权限、敏感字段权限。"),
     ("ruoyi-file", "文件服务", "发货视频、验机图片、开箱视频、商品图片、设备图片；私有文件、临时访问 URL、大小/类型限制。"),
     ("ruoyi-job", "定时任务", "时效检查、逾期扫描、库存快照重算、保险到期提醒、佣金结算、视频过期清理、物流路由同步。"),
     ("ruoyi-gen", "代码生成", "用于基础 CRUD 快速生成；先生成字典、基础表、简单管理页；复杂流程和状态机由手写业务代码实现。"),
@@ -46,7 +46,7 @@ ARCH_ROWS = [
 
 
 REPO_ROWS = [
-    ("后端仓库", "RuoYi-Cloud 原始结构 + 新增 rental-* 服务", "保留 ruoyi-auth/gateway/modules/common/api 等约定；新增业务服务不直接塞满 ruoyi-system。"),
+    ("后端仓库", "RuoYi-Cloud 原始结构 + 新增 rental-* 服务", "保留 ruoyi-auth/gateway/modules/common/api 等约定；新增业务服务不直接塞满 platform-service。"),
     ("前端仓库方案 A", "两个独立前端工程 merchant-web、admin-web", "隔离最清晰，路由、菜单、权限、部署互不影响；推荐商业系统前期采用。"),
     ("前端仓库方案 B", "一个 monorepo 下两个 app", "共享组件和 API SDK 更方便，但构建配置稍复杂。若团队熟悉 pnpm workspace 可采用。"),
     ("共享前端包", "components/hooks/api-types/permission-utils", "抽出状态标签、表格筛选、上传组件、字典组件、权限指令、脱敏展示组件。"),
@@ -82,7 +82,7 @@ PHASE_ROWS = [
 
 
 MODULE_TASKS = [
-    ("系统基础", "商户主体、认证状态、商户员工、角色、菜单、仓库权限、字典、参数、公告", "ruoyi-system 扩展 + admin/merchant 双端菜单"),
+    ("系统基础", "商户主体、认证状态、商户员工、角色、菜单、仓库权限、字典、参数、公告", "platform-service 扩展 + admin/merchant 双端菜单"),
     ("商品中心", "品牌型号、商品、SN、配件、套餐、二维码条码、导入导出、成本收益字段", "rental-business: product 子模块"),
     ("仓库库存", "仓库、库存流水、库存快照、库存预占、调货、盘点、告警、库存穿透", "rental-business: inventory/warehouse 子模块"),
     ("订单中心", "录单、复制解析预留、订单状态机、SN 绑定、发货、归还、验机、售后、取消追回、工作台", "rental-business: order 子模块"),

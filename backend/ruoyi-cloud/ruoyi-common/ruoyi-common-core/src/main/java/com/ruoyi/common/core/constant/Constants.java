@@ -128,6 +128,37 @@ public class Constants
     public static final String RESOURCE_PREFIX = "/profile";
 
     /**
+     * 前端客户端类型请求头
+     */
+    public static final String CLIENT_TYPE_HEADER = "X-Client-Type";
+
+    /**
+     * 前端应用编码请求头
+     */
+    public static final String APP_CODE_HEADER = "X-App-Code";
+
+    /**
+     * 平台后台客户端
+     */
+    public static final String CLIENT_TYPE_PLATFORM = "platform";
+
+    /**
+     * 商家端客户端
+     */
+    public static final String CLIENT_TYPE_MERCHANT = "merchant";
+
+    /**
+     * 两端共用
+     */
+    public static final String CLIENT_TYPE_ALL = "all";
+
+    /** 全部仓库数据权限 */
+    public static final String WAREHOUSE_SCOPE_ALL = "all";
+
+    /** 指定仓库数据权限 */
+    public static final String WAREHOUSE_SCOPE_SPECIFIED = "specified";
+
+    /**
      * 自动识别json对象白名单配置（仅允许解析的包名，范围越小越安全）
      */
     public static final String[] JSON_WHITELIST_STR = { "com.ruoyi" };

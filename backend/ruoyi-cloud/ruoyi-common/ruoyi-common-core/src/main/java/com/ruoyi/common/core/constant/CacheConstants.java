@@ -32,6 +32,28 @@ public class CacheConstants
      */
     public final static String LOGIN_TOKEN_KEY = "login_tokens:";
 
+    /** 平台登录令牌缓存前缀 */
+    public final static String PLATFORM_LOGIN_TOKEN_KEY = LOGIN_TOKEN_KEY + "platform:";
+
+    /** 商户登录令牌缓存前缀 */
+    public final static String MERCHANT_LOGIN_TOKEN_KEY = LOGIN_TOKEN_KEY + "merchant:";
+
+    /** 用户登录令牌索引，用于权限变化后失效指定用户的全部会话 */
+    public final static String LOGIN_USER_TOKEN_KEY = "login_user_tokens:";
+
+    public static String loginTokenKey(String clientType, String token)
+    {
+        if (Constants.CLIENT_TYPE_PLATFORM.equals(clientType))
+        {
+            return PLATFORM_LOGIN_TOKEN_KEY + token;
+        }
+        if (Constants.CLIENT_TYPE_MERCHANT.equals(clientType))
+        {
+            return MERCHANT_LOGIN_TOKEN_KEY + token;
+        }
+        throw new IllegalArgumentException("Unsupported login client type: " + clientType);
+    }
+
     /**
      * 验证码 redis key
      */

@@ -110,6 +110,22 @@ public class JwtUtils
     }
 
     /**
+     * 根据令牌获取登录终端类型
+     */
+    public static String getClientType(String token)
+    {
+        return getClientType(parseToken(token));
+    }
+
+    /**
+     * 根据身份信息获取登录终端类型
+     */
+    public static String getClientType(Claims claims)
+    {
+        return getValue(claims, SecurityConstants.LOGIN_CLIENT_TYPE);
+    }
+
+    /**
      * 根据身份信息获取键值
      * 
      * @param claims 身份信息
