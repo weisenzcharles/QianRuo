@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 	
-    <artifactId>platform-service</artifactId>
+    <artifactId>ruoyi-platform-service</artifactId>
 
     <description>
         平台后台独立服务
