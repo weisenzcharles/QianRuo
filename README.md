@@ -49,7 +49,7 @@
 │       ├── ruoyi-auth/           # 认证中心
 │       ├── ruoyi-api/            # 远程接口定义
 │       ├── ruoyi-common/         # 通用能力
-│       ├── ruoyi-modules/        # system/file/gen/job 等基础模块
+│       ├── ruoyi-modules/        # platform/merchant/file/gen/job 等可执行模块
 │       ├── ruoyi-visual/         # 监控模块
 │       ├── docker/               # Docker 部署参考
 │       └── sql/                  # RuoYi 原生 SQL
@@ -71,6 +71,8 @@
 - 商品中心：品牌型号、商品、设备 SN、配件、套餐、二维码/条码、导入导出和收益统计字段。
 - 物流与小程序：快递下单、路由同步、时效检查、客户归还入口、订单查询、开箱视频上传。
 - 财务计费：会员余额、快递扣费、增值服务、佣金、保证金、发票和不可变流水。
+- 商户协作：全局工作台、任务、抽检评分、内部通知、私有知识库、操作记录和 30 天回收站。
+- 平台治理：协议版本、完整认证、客服工单、合同证据、分账提现、开票红冲、风控和运维告警。
 - 多仓联盟：共享库存、联盟协助订单、接单上限、转派/拒绝和公众池。
 - 库存周转市场：标准化发帖、筛选、私信、关注、举报、保证金和后台风控。
 - 平台运营：会员统计、认证审核、平台财务、总库存、订单统计、小程序授权、市场风控和推广佣金。
@@ -163,7 +165,7 @@ mvn clean install
 1. 启动 Nacos、Redis、MySQL。
 2. 启动 `ruoyi-gateway`。
 3. 启动 `ruoyi-auth`。
-4. 启动 `ruoyi-modules/platform-service`。
+4. 启动 `ruoyi-modules/ruoyi-platform-service`（运行时服务名仍为 `platform-service`）。
 5. 按需启动 `ruoyi-file`、`ruoyi-job`、`ruoyi-gen`、`ruoyi-visual/ruoyi-monitor`。
 
 具体端口与注册配置以各模块 `bootstrap.yml` 和 Nacos 配置为准。
@@ -217,11 +219,15 @@ cp deploy/.env.example deploy/.env
 
 ## 设计文档
 
+- `docs/design/1.0需求基线与实施差异.md`：最新三个 1.0 Word 文档的统一术语、不可变规则、实现差异和新增表组。
+- `docs/design/项目架构图.md`：当前运行架构、Maven 模块依赖、认证隔离、服务调用和全量数据关系图。
 - `docs/design/租赁项目设计文档.md`：项目总体定位与核心模块。
 - `docs/design/租赁项目详细功能规格书.md`：业务规则、字段、权限、安全、状态机和验收基线。
 - `docs/design/租赁系统RuoYi-Cloud开发计划.md`：工程拆分、开发阶段和模块任务清单。
 - `docs/design/第1阶段完成状态.md`：双前端与权限骨架的当前完成情况。
 - `docs/design/租赁项目原始文档抽取汇总.md`：原始需求资料抽取结果。
+
+当前产品需求以 `docs/design` 下三个 `1.0-` 开头的 Word 文件为权威源；研发设计以 Markdown 文档为持续维护版本。旧版拆分 Word 文档仅用于历史追溯，发生冲突时不再覆盖最新 1.0 基线。
 - `docs/项目路由清单.md`：网关、后端 API、平台端和商户端页面路由总表。
 
 ## 商户账号开通

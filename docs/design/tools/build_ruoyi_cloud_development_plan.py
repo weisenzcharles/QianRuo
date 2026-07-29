@@ -1,3 +1,5 @@
+"""历史排版生成器，仅用于旧版开发计划追溯，不得覆盖当前 1.0 Markdown 研发基线。"""
+
 from __future__ import annotations
 
 from datetime import date
@@ -126,7 +128,7 @@ def title_page(doc: Document) -> None:
         doc,
         ["项目", "说明"],
         [
-            ("文档版本", "V1.0 开发计划版"),
+            ("文档版本", "历史归档版，不作为当前研发基线"),
             ("整理日期", date.today().isoformat()),
             ("技术基线", "RuoYi-Cloud-Vue3-TypeScript + RuoYi-Cloud 二次开发"),
             ("前端形态", "merchant-web 商家端 + admin-web 平台内部管理后台"),

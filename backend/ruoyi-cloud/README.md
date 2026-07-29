@@ -50,7 +50,8 @@ com.ruoyi
 ├── ruoyi-gateway         // 网关模块 [8080]
 ├── ruoyi-auth            // 认证中心 [9200]
 ├── ruoyi-api             // 接口模块
-│       └── ruoyi-api-platform                          // 系统接口
+│       └── ruoyi-api-platform                          // 平台内部接口契约
+│       └── ruoyi-api-merchant                          // 商户内部接口契约
 ├── ruoyi-common          // 通用模块
 │       └── ruoyi-common-core                         // 核心模块
 │       └── ruoyi-common-datascope                    // 权限范围
@@ -62,7 +63,8 @@ com.ruoyi
 │       └── ruoyi-common-sensitive                    // 数据脱敏
 │       └── ruoyi-common-swagger                      // 系统接口
 ├── ruoyi-modules         // 业务模块
-│       └── platform-service                           // 平台服务 [9201]
+│       └── ruoyi-platform-service                     // 平台服务 [9201]，运行名 platform-service
+│       └── ruoyi-merchant-service                     // 商户服务 [9210]，运行名 merchant-service
 │       └── ruoyi-gen                                 // 代码生成 [9202]
 │       └── ruoyi-job                                 // 定时任务 [9203]
 │       └── ruoyi-file                                // 文件服务 [9300]
