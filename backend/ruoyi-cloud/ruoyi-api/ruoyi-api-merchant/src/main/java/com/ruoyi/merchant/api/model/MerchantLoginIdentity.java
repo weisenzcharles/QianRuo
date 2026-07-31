@@ -19,7 +19,7 @@ public class MerchantLoginIdentity implements Serializable
     private String avatar;
     private String password;
     private String status;
-    private String delFlag;
+    private String isdeleted;
     private Long passwordUpdatedAt;
     private Boolean mustChangePassword;
     private Long createdAt;
@@ -47,8 +47,8 @@ public class MerchantLoginIdentity implements Serializable
     public void setPassword(String password) { this.password = password; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
-    public String getDelFlag() { return delFlag; }
-    public void setDelFlag(String delFlag) { this.delFlag = delFlag; }
+    public String getIsdeleted() { return isdeleted; }
+    public void setIsdeleted(String isdeleted) { this.isdeleted = isdeleted; }
     public Long getPasswordUpdatedAt() { return passwordUpdatedAt; }
     public void setPasswordUpdatedAt(Long passwordUpdatedAt) { this.passwordUpdatedAt = passwordUpdatedAt; }
     public Boolean getMustChangePassword() { return mustChangePassword; }

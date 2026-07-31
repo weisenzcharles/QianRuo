@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_user` (
   `email` VARCHAR(64) DEFAULT NULL COMMENT '邮箱',
   `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像',
   `password` VARCHAR(100) DEFAULT NULL COMMENT '登录密码',
-  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '账号状态：0正常 1停用',
-  `del_flag` CHAR(1) NOT NULL DEFAULT '0' COMMENT '删除标志：0存在 2删除',
+  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '账号状态：0正常 1停用',
+  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   `login_ip` VARCHAR(128) DEFAULT NULL COMMENT '最后登录IP',
   `login_date` DATETIME DEFAULT NULL COMMENT '最后登录时间',
   `pwd_update_date` DATETIME DEFAULT NULL COMMENT '密码最后更新时间',
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_user` (
   UNIQUE KEY `uk_rental_merchant_user_name` (`user_name`),
   UNIQUE KEY `uk_rental_merchant_user_phone` (`phone`),
   KEY `idx_rental_merchant_user_member` (`tenant_id`, `member_id`),
-  KEY `idx_rental_merchant_user_status` (`status`, `del_flag`)
+  KEY `idx_rental_merchant_user_status` (`status`, `isdeleted`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端用户';
 
 CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_menu` (
@@ -61,8 +61,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_menu` (
   `is_frame` INT NOT NULL DEFAULT 1 COMMENT '是否外链：0是 1否',
   `is_cache` INT NOT NULL DEFAULT 0 COMMENT '是否缓存：0缓存 1不缓存',
   `menu_type` CHAR(1) NOT NULL DEFAULT '' COMMENT '菜单类型：M目录 C菜单 F按钮',
-  `visible` CHAR(1) NOT NULL DEFAULT '0' COMMENT '显示状态：0显示 1隐藏',
-  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '菜单状态：0正常 1停用',
+  `visible` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '显示状态：0显示 1隐藏',
+  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '菜单状态：0正常 1停用',
   `perms` VARCHAR(100) DEFAULT NULL COMMENT '权限标识',
   `icon` VARCHAR(100) DEFAULT '#' COMMENT '菜单图标',
   `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建者',
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_menu` (
   `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT '' COMMENT '备注',
-  `del_flag` CHAR(1) NOT NULL DEFAULT '0' COMMENT '删除标志：0存在 2删除',
+  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   PRIMARY KEY (`menu_id`),
   UNIQUE KEY `uk_rental_merchant_menu_path` (`member_id`, `parent_id`, `path`),
   KEY `idx_rental_merchant_menu_member` (`tenant_id`, `member_id`),
@@ -85,16 +85,16 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_role` (
   `role_key` VARCHAR(100) NOT NULL COMMENT '角色权限字符串',
   `role_sort` INT NOT NULL COMMENT '显示顺序',
   `menu_check_strictly` TINYINT NOT NULL DEFAULT 1 COMMENT '菜单树选择项是否父子联动',
-  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '角色状态：0正常 1停用',
-  `del_flag` CHAR(1) NOT NULL DEFAULT '0' COMMENT '删除标志：0存在 2删除',
+  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '角色状态：0正常 1停用',
+  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建者',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
   PRIMARY KEY (`role_id`),
-  UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `del_flag`),
-  UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `del_flag`),
+  UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `isdeleted`),
+  UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `isdeleted`),
   KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端角色';
 
@@ -390,19 +390,40 @@ SELECT 2024, '商户权限删除', 2020, 4, '#', '', '', '', 1, 0, 'F', '0', '0'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2024);
 UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2024;
 
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2030, '产品类目', 2000, 6, 'product-class', 'rental/productClass/index', '', '', 1, 0, 'C', '0', '0', 'platform:class:list', 'tree-table', 'system', NOW(), '', NULL, '平台多级产品类目管理'
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2030);
+UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2030;
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2031, '类目查询', 2030, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:class:query', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2031);
+UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2031;
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2032, '类目新增', 2030, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:class:add', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2032);
+UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2032;
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2033, '类目修改', 2030, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:class:edit', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2033);
+UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2033;
+INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+SELECT 2034, '类目删除', 2030, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:class:remove', '#', 'system', NOW(), '', NULL, ''
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2034);
+UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2034;
+
 -- 商户账号、菜单与角色只写入 ry_rental 独立表
 INSERT INTO `ry_rental`.`ry_rental_member` (member_id, tenant_id, member_code, member_type, auth_status, legal_subject_name, nickname, contact_name, contact_phone, vip_level, storage_quota_mb, external_accept_enabled, status, create_by, create_time, remark)
 SELECT 1, 10001, 'MERCHANT_DEMO', 'enterprise', 'verified', '迁渃演示商户', '演示商户', '商家管理员', '15500000000', 'standard', 10240, 1, '0', 'system', NOW(), '本地开发商家端演示商户'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_member` WHERE member_id = 1);
 
-INSERT INTO `ry_rental`.`ry_rental_merchant_user` (tenant_id, member_id, user_name, nick_name, phone, email, password, status, del_flag, login_ip, login_date, pwd_update_date, must_change_password, create_by, create_time, remark)
+INSERT INTO `ry_rental`.`ry_rental_merchant_user` (tenant_id, member_id, user_name, nick_name, phone, email, password, status, isdeleted, login_ip, login_date, pwd_update_date, must_change_password, create_by, create_time, remark)
 SELECT 10001, 1, '15500000000', '商家管理员', '15500000000', 'merchant@example.com', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', NOW(), NOW(), 0, 'system', NOW(), '本地开发商家端账号'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_user` WHERE phone = '15500000000');
 
 INSERT INTO `ry_rental`.`ry_rental_user_member` (tenant_id, member_id, merchant_user_id, member_role, warehouse_scope_type, sensitive_scope, status, create_by, create_time, remark)
 SELECT u.tenant_id, u.member_id, u.merchant_user_id, 'owner', 'all', 'detail', '0', 'system', NOW(), '本地开发商家端账号绑定'
 FROM `ry_rental`.`ry_rental_merchant_user` u
-WHERE u.phone = '15500000000' AND u.del_flag = '0'
+WHERE u.phone = '15500000000' AND u.isdeleted = '0'
   AND NOT EXISTS (
     SELECT 1 FROM `ry_rental`.`ry_rental_user_member` um
     WHERE um.member_id = u.member_id AND um.merchant_user_id = u.merchant_user_id
@@ -453,31 +474,37 @@ WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu
 INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT 2191, 0, 0, '日志导出', 2190, 1, 'operlog-export', '', '', '', 1, 0, 'F', '0', '0', 'merchant:operlog:export', '#', 'system', NOW(), '导出当前商户操作日志'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2191);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2192, 0, 0, '经营类目', 0, 11, 'merchant-product-class', 'merchant/productClass/index', '', '', 1, 0, 'C', '0', '0', 'merchant:class:list', 'tree-table', 'system', NOW(), '选择平台允许经营的产品类目'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2192);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2193, 0, 0, '经营类目保存', 2192, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'merchant:class:edit', '#', 'system', NOW(), ''
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2193);
 
-INSERT INTO `ry_rental`.`ry_rental_merchant_role` (tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly, status, del_flag, create_by, create_time, remark)
+INSERT INTO `ry_rental`.`ry_rental_merchant_role` (tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly, status, isdeleted, create_by, create_time, remark)
 SELECT 10001, 1, '商户管理员', 'merchant_admin', 1, 1, '0', '0', 'system', NOW(), '商户默认管理员角色'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_role` WHERE tenant_id = 10001 AND member_id = 1 AND role_key = 'merchant_admin' AND del_flag = '0');
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_role` WHERE tenant_id = 10001 AND member_id = 1 AND role_key = 'merchant_admin' AND isdeleted = '0');
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_role_menu` (tenant_id, member_id, role_id, menu_id)
 SELECT r.tenant_id, r.member_id, r.role_id, m.menu_id
 FROM `ry_rental`.`ry_rental_merchant_role` r
 INNER JOIN `ry_rental`.`ry_rental_merchant_menu` m ON m.tenant_id = 0 AND m.member_id = 0
 WHERE r.tenant_id = 10001 AND r.member_id = 1 AND r.role_key = 'merchant_admin'
-  AND r.del_flag = '0' AND m.del_flag = '0';
+  AND r.isdeleted = '0' AND m.isdeleted = '0';
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_user_role` (tenant_id, member_id, merchant_user_id, role_id)
 SELECT u.tenant_id, u.member_id, u.merchant_user_id, r.role_id
 FROM `ry_rental`.`ry_rental_merchant_user` u
 INNER JOIN `ry_rental`.`ry_rental_merchant_role` r
   ON r.tenant_id = u.tenant_id AND r.member_id = u.member_id
-WHERE u.phone = '15500000000' AND u.del_flag = '0'
-  AND r.role_key = 'merchant_admin' AND r.del_flag = '0';
+WHERE u.phone = '15500000000' AND u.isdeleted = '0'
+  AND r.role_key = 'merchant_admin' AND r.isdeleted = '0';
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_user_menu` (tenant_id, member_id, merchant_user_id, menu_id)
 SELECT u.tenant_id, u.member_id, u.merchant_user_id, m.menu_id
 FROM `ry_rental`.`ry_rental_merchant_user` u
 INNER JOIN `ry_rental`.`ry_rental_merchant_menu` m ON m.tenant_id = 0 AND m.member_id = 0
-WHERE u.phone = '15500000000' AND u.del_flag = '0' AND m.del_flag = '0';
+WHERE u.phone = '15500000000' AND u.isdeleted = '0' AND m.isdeleted = '0';
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_user_menu` (tenant_id, member_id, merchant_user_id, menu_id)
 SELECT ur.tenant_id, ur.member_id, ur.merchant_user_id, rm.menu_id
@@ -494,5 +521,5 @@ INNER JOIN `ry_rental`.`ry_rental_merchant_menu` m
   ON m.menu_id = um.menu_id
 WHERE m.tenant_id = 0
   AND m.member_id = 0
-  AND m.del_flag = '0'
+  AND m.isdeleted = '0'
   AND m.parent_id <> 0;

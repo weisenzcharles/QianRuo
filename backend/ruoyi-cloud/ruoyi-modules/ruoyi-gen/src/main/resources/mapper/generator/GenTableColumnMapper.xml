@@ -35,7 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectGenTableColumnListByTableId" parameterType="GenTableColumn" resultMap="GenTableColumnResult">
         <include refid="selectGenTableColumnVo"/>
-        where table_id = #{tableId}
+        where table_id = #{tableId} and isdeleted = 0
         order by sort
     </select>
 
@@ -107,21 +107,21 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null">update_by = #{updateBy},</if>
             update_time = sysdate()
         </set>
-        where column_id = #{columnId}
+        where column_id = #{columnId} and isdeleted = 0
     </update>
 
-    <delete id="deleteGenTableColumnByIds" parameterType="Long">
-        delete from gen_table_column where table_id in
+    <update id="deleteGenTableColumnByIds" parameterType="Long">
+        update gen_table_column set isdeleted = 1 where table_id in
         <foreach collection="array" item="tableId" open="(" separator="," close=")">
             #{tableId}
         </foreach>
-    </delete>
-    
-    <delete id="deleteGenTableColumns">
-        delete from gen_table_column where column_id in
+    </update>
+
+    <update id="deleteGenTableColumns">
+        update gen_table_column set isdeleted = 1 where column_id in
         <foreach collection="list" item="item" open="(" separator="," close=")">
             #{item.columnId}
         </foreach>
-    </delete>
+    </update>
 
 </mapper>

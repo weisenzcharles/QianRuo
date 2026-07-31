@@ -107,6 +107,10 @@
 
 商家端操作日志由 `merchant-service` 独立写入 `ry_rental_merchant_oper_log`。商户管理员默认拥有查看与导出权限，其他商户用户需通过角色权限分配；日志查询始终限制在当前登录态的 `tenantId + memberId` 范围内。
 
+平台统一维护多级产品类目，商户只能在 `/merchant/class/**` 中选择经营范围。商户商品、型号和套餐业务只读取当前商户已选类目；平台有效类目通过内部 Feign 契约提供，商户服务不跨库调用平台 Mapper。
+
+所有 Controller 接口由通用切面记录入库审计，应用表统一使用 `isdeleted` 软删除。MyBatis 运行时拒绝物理 `DELETE` 和 `TRUNCATE`，代码生成模板也默认生成软删除 SQL。
+
 平台商户资料统一维护店铺、企业资质、法人身份、签约合同、认证审核和冻结状态。店铺主账号从商户用户绑定关系实时读取，不在商户主体表重复保存；审核时间、冻结时间及解冻清理由后端状态规则统一处理。
 
 平台系统接口统一使用 `/admin/user/**` 等平台命名空间并由 `platform-service` 提供；商户系统接口必须统一使用 `/merchant/**`。商户用户信息接口为 `/merchant/user/getInfo`，禁止两个终端回退调用旧 `/system/**` 路径。
@@ -149,7 +153,7 @@ database/migrations/V20260721_001__rental_base_schema.sql
 # 本地 Docker 环境使用：./scripts/deploy.sh local-migrate-db
 ```
 
-部署脚本会按 `scripts/deploy.sh` 中 `DATABASE_MIGRATIONS` 的登记顺序执行全部幂等迁移，包括账号隔离、双端路由、仓库权限、商户日志和完整商户资料字段。
+部署脚本会按 `scripts/deploy.sh` 中 `DATABASE_MIGRATIONS` 的登记顺序执行全部幂等迁移，包括账号隔离、双端路由、仓库权限、商户日志、产品类目、全接口审计字段和统一 `isdeleted` 软删除字段。
 
 ### 3. 启动后端
 
@@ -221,6 +225,8 @@ cp deploy/.env.example deploy/.env
 
 - `docs/design/1.0需求基线与实施差异.md`：最新三个 1.0 Word 文档的统一术语、不可变规则、实现差异和新增表组。
 - `docs/design/项目架构图.md`：当前运行架构、Maven 模块依赖、认证隔离、服务调用和全量数据关系图。
+- `docs/design/商品与套餐库存数据结构设计.md`：共享资源池、版本化 BOM、套餐容量、订单预占和并发防超卖设计。
+- `docs/design/产品类目、接口审计与软删除设计.md`：平台多级类目、商户经营范围、全接口审计和统一软删除规范。
 - `docs/design/租赁项目设计文档.md`：项目总体定位与核心模块。
 - `docs/design/租赁项目详细功能规格书.md`：业务规则、字段、权限、安全、状态机和验收基线。
 - `docs/design/租赁系统RuoYi-Cloud开发计划.md`：工程拆分、开发阶段和模块任务清单。

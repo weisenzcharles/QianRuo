@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalProductClassMapper">
+    <resultMap id="productClassResult" type="com.ruoyi.system.domain.rental.RentalProductClass">
+        <id property="classId" column="class_id" />
+        <result property="parentId" column="parent_id" />
+        <result property="ancestors" column="ancestors" />
+        <result property="classCode" column="class_code" />
+        <result property="className" column="class_name" />
+        <result property="classLevel" column="class_level" />
+        <result property="sortNo" column="sort_no" />
+        <result property="status" column="status" />
+        <result property="isdeleted" column="isdeleted" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="columns">
+        class_id, parent_id, ancestors, class_code, class_name, class_level, sort_no,
+        status, isdeleted, create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectList" resultMap="productClassResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_product_class`
+        where isdeleted = 0
+        <if test="className != null and className != ''">
+            and class_name like concat('%', #{className}, '%')
+        </if>
+        <if test="status != null and status != ''">and status = #{status}</if>
+        order by parent_id, sort_no, class_id
+    </select>
+
+    <select id="selectActiveList" resultMap="productClassResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_product_class`
+        where status = '0' and isdeleted = 0
+        order by parent_id, sort_no, class_id
+    </select>
+
+    <select id="selectById" resultMap="productClassResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_product_class`
+        where class_id = #{classId} and isdeleted = 0
+    </select>
+
+    <select id="countByCode" resultType="int">
+        select count(1) from `ry_rental`.`ry_rental_product_class`
+        where class_code = #{classCode} and isdeleted = 0
+        <if test="excludeClassId != null">and class_id != #{excludeClassId}</if>
+    </select>
+
+    <select id="countByName" resultType="int">
+        select count(1) from `ry_rental`.`ry_rental_product_class`
+        where parent_id = #{parentId} and class_name = #{className} and isdeleted = 0
+        <if test="excludeClassId != null">and class_id != #{excludeClassId}</if>
+    </select>
+
+    <select id="countChildren" resultType="int">
+        select count(1) from `ry_rental`.`ry_rental_product_class`
+        where parent_id = #{classId} and isdeleted = 0
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="classId">
+        insert into `ry_rental`.`ry_rental_product_class`(
+            parent_id, ancestors, class_code, class_name, class_level, sort_no, status,
+            isdeleted, create_by, create_time, remark
+        ) values (
+            #{parentId}, #{ancestors}, #{classCode}, #{className}, #{classLevel}, #{sortNo},
+            #{status}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="update">
+        update `ry_rental`.`ry_rental_product_class`
+        set parent_id = #{parentId}, ancestors = #{ancestors}, class_code = #{classCode},
+            class_name = #{className}, class_level = #{classLevel}, sort_no = #{sortNo},
+            status = #{status}, update_by = #{updateBy}, update_time = sysdate(), remark = #{remark}
+        where class_id = #{classId} and isdeleted = 0
+    </update>
+
+    <update id="updateDescendantHierarchy">
+        update `ry_rental`.`ry_rental_product_class`
+        set ancestors = concat(
+                #{newAncestorPrefix},
+                substring(ancestors, char_length(#{oldAncestorPrefix}) + 1)
+            ),
+            class_level = class_level + #{levelOffset},
+            update_by = #{operator},
+            update_time = sysdate()
+        where (ancestors = #{oldAncestorPrefix}
+               or ancestors like concat(#{oldAncestorPrefix}, ',%'))
+          and isdeleted = 0
+    </update>
+
+    <update id="softDelete">
+        update `ry_rental`.`ry_rental_product_class`
+        set isdeleted = 1, update_by = #{operator}, update_time = sysdate()
+        where class_id = #{classId} and isdeleted = 0
+    </update>
+</mapper>

@@ -17,30 +17,35 @@
         <result property="errorMsg" column="error_msg" />
         <result property="operTime" column="oper_time" />
         <result property="costTime" column="cost_time" />
+        <result property="traceId" column="trace_id" />
+        <result property="httpStatus" column="http_status" />
     </resultMap>
 
     <sql id="columns">
         oper_id, operator_user_id, title, business_type, method, request_method, oper_name,
-        oper_url, oper_ip, oper_param, json_result, status, error_msg, oper_time, cost_time
+        oper_url, oper_ip, oper_param, json_result, status, error_msg, oper_time, cost_time,
+        trace_id, http_status
     </sql>
 
     <insert id="insert">
         insert into `ry_rental`.`ry_rental_merchant_oper_log`(
           tenant_id, member_id, operator_user_id, title, business_type, method, request_method,
           operator_type, oper_name, oper_url, oper_ip, oper_param, json_result, status,
-          error_msg, oper_time, cost_time
+          error_msg, oper_time, cost_time, trace_id, http_status, isdeleted
         ) values (
-          #{record.tenantId}, #{record.merchantId}, #{record.operatorUserId}, #{record.title},
+          #{record.tenantId}, #{record.merchantId}, #{record.operatorUserId}, coalesce(#{record.title}, ''),
           #{record.businessType}, #{record.method}, #{record.requestMethod}, #{record.operatorType},
-          #{record.operName}, #{record.operUrl}, #{record.operIp}, #{record.operParam},
-          #{record.jsonResult}, #{record.status}, #{record.errorMsg}, sysdate(), #{record.costTime}
+          coalesce(#{record.operName}, ''), coalesce(#{record.operUrl}, ''), coalesce(#{record.operIp}, ''),
+          coalesce(#{record.operParam}, ''), coalesce(#{record.jsonResult}, ''), #{record.status},
+          coalesce(#{record.errorMsg}, ''), sysdate(), #{record.costTime},
+          #{record.traceId}, #{record.httpStatus}, 0
         )
     </insert>
 
     <select id="selectList" resultMap="operLog">
         select <include refid="columns" />
         from `ry_rental`.`ry_rental_merchant_oper_log`
-        where tenant_id = #{tenantId} and member_id = #{merchantId}
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and isdeleted = 0
         <if test="query.operIp != null and query.operIp != ''">
           and oper_ip like concat('%', #{query.operIp}, '%')
         </if>

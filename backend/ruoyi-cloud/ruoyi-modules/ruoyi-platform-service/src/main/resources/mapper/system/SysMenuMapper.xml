@@ -33,10 +33,11 @@
         select menu_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, ifnull(perms,'') as perms, ifnull(client_type, 'admin') as client_type, icon, create_time
 		from sys_menu
     </sql>
-    
+
     <select id="selectMenuList" parameterType="SysMenu" resultMap="SysMenuResult">
 		<include refid="selectMenuVo"/>
 		<where>
+			isdeleted = 0
 			<if test="menuName != null and menuName != ''">
 				AND menu_name like concat('%', #{menuName}, '%')
 			</if>
@@ -52,20 +53,20 @@
 		</where>
 		order by parent_id, order_num
 	</select>
-	
+
 	<select id="selectMenuTreeAll" resultMap="SysMenuResult">
 		select distinct m.menu_id, m.parent_id, m.menu_name, m.path, m.component, m.`query`, m.route_name, m.visible, m.status, ifnull(m.perms,'') as perms, ifnull(m.client_type, 'admin') as client_type, m.is_frame, m.is_cache, m.menu_type, m.icon, m.order_num, m.create_time
-		from sys_menu m where m.menu_type in ('M', 'C') and m.status = 0
+		from sys_menu m where m.menu_type in ('M', 'C') and m.status = 0 and m.isdeleted = 0
 		order by m.parent_id, m.order_num
 	</select>
-	
+
 	<select id="selectMenuListByUserId" parameterType="SysMenu" resultMap="SysMenuResult">
 		select distinct m.menu_id, m.parent_id, m.menu_name, m.path, m.component, m.`query`, m.route_name, m.visible, m.status, ifnull(m.perms,'') as perms, ifnull(m.client_type, 'admin') as client_type, m.is_frame, m.is_cache, m.menu_type, m.icon, m.order_num, m.create_time
 		from sys_menu m
-		left join sys_role_menu rm on m.menu_id = rm.menu_id
-		left join sys_user_role ur on rm.role_id = ur.role_id
-		left join sys_role ro on ur.role_id = ro.role_id
-		where ur.user_id = #{params.userId}
+		left join sys_role_menu rm on m.menu_id = rm.menu_id and rm.isdeleted = 0
+		left join sys_user_role ur on rm.role_id = ur.role_id and ur.isdeleted = 0
+		left join sys_role ro on ur.role_id = ro.role_id and ro.isdeleted = 0
+		where ur.user_id = #{params.userId} and m.isdeleted = 0
 		<if test="menuName != null and menuName != ''">
             AND m.menu_name like concat('%', #{menuName}, '%')
 		</if>
@@ -80,73 +81,79 @@
 		</if>
 		order by m.parent_id, m.order_num
 	</select>
-    
+
     <select id="selectMenuTreeByUserId" parameterType="Long" resultMap="SysMenuResult">
 		select distinct m.menu_id, m.parent_id, m.menu_name, m.path, m.component, m.`query`, m.route_name, m.visible, m.status, ifnull(m.perms,'') as perms, ifnull(m.client_type, 'admin') as client_type, m.is_frame, m.is_cache, m.menu_type, m.icon, m.order_num, m.create_time
 		from sys_menu m
-			 left join sys_role_menu rm on m.menu_id = rm.menu_id
-			 left join sys_user_role ur on rm.role_id = ur.role_id
-			 left join sys_role ro on ur.role_id = ro.role_id
-			 left join sys_user u on ur.user_id = u.user_id
-		where u.user_id = #{userId} and m.menu_type in ('M', 'C') and m.status = 0  AND ro.status = 0
+			 left join sys_role_menu rm on m.menu_id = rm.menu_id and rm.isdeleted = 0
+			 left join sys_user_role ur on rm.role_id = ur.role_id and ur.isdeleted = 0
+			 left join sys_role ro on ur.role_id = ro.role_id and ro.isdeleted = 0
+			 left join sys_user u on ur.user_id = u.user_id and u.isdeleted = 0
+		where u.user_id = #{userId} and m.menu_type in ('M', 'C') and m.status = 0
+		  and m.isdeleted = 0 and ro.status = 0
 		order by m.parent_id, m.order_num
 	</select>
-	
+
 	<select id="selectMenuListByRoleId" resultType="Long">
 		select m.menu_id
 		from sys_menu m
-            left join sys_role_menu rm on m.menu_id = rm.menu_id
-        where rm.role_id = #{roleId}
+	            left join sys_role_menu rm on m.menu_id = rm.menu_id and rm.isdeleted = 0
+	        where rm.role_id = #{roleId} and m.isdeleted = 0
             <if test="menuCheckStrictly">
-              and m.menu_id not in (select m.parent_id from sys_menu m inner join sys_role_menu rm on m.menu_id = rm.menu_id and rm.role_id = #{roleId})
+	              and m.menu_id not in (select m.parent_id from sys_menu m inner join sys_role_menu rm
+	                on m.menu_id = rm.menu_id and rm.role_id = #{roleId} and rm.isdeleted = 0 where m.isdeleted = 0)
             </if>
 		order by m.parent_id, m.order_num
 	</select>
-	
+
 	<select id="selectMenuPerms" resultType="String">
 		select distinct m.perms
 		from sys_menu m
-			 left join sys_role_menu rm on m.menu_id = rm.menu_id
-			 left join sys_user_role ur on rm.role_id = ur.role_id
+			 left join sys_role_menu rm on m.menu_id = rm.menu_id and rm.isdeleted = 0
+			 left join sys_user_role ur on rm.role_id = ur.role_id and ur.isdeleted = 0
+		where m.isdeleted = 0
 	</select>
 
 	<select id="selectMenuPermsByUserId" resultType="String">
 		select distinct m.perms
 		from sys_menu m
-			 left join sys_role_menu rm on m.menu_id = rm.menu_id
-			 left join sys_user_role ur on rm.role_id = ur.role_id
-			 left join sys_role r on r.role_id = ur.role_id
+			 left join sys_role_menu rm on m.menu_id = rm.menu_id and rm.isdeleted = 0
+			 left join sys_user_role ur on rm.role_id = ur.role_id and ur.isdeleted = 0
+			 left join sys_role r on r.role_id = ur.role_id and r.isdeleted = 0
 		where m.status = '0' and r.status = '0' and ur.user_id = #{userId}
+		  and m.isdeleted = 0
 		  and (m.client_type = #{clientType} or m.client_type = 'all')
 	</select>
-	
+
 	<select id="selectMenuPermsByRoleId" resultType="String">
 		select distinct m.perms
 		from sys_menu m
-			 left join sys_role_menu rm on m.menu_id = rm.menu_id
+			 left join sys_role_menu rm on m.menu_id = rm.menu_id and rm.isdeleted = 0
 		where m.status = '0' and rm.role_id = #{roleId}
+		  and m.isdeleted = 0
 		  and (m.client_type = #{clientType} or m.client_type = 'all')
 	</select>
-	
+
 	<select id="selectMenuById" parameterType="Long" resultMap="SysMenuResult">
 		<include refid="selectMenuVo"/>
-		where menu_id = #{menuId}
+		where menu_id = #{menuId} and isdeleted = 0
 	</select>
-	
+
 	<select id="hasChildByMenuId" resultType="Integer">
-	    select count(1) from sys_menu where parent_id = #{menuId}  
+	    select count(1) from sys_menu where parent_id = #{menuId} and isdeleted = 0
 	</select>
-	
+
 	<select id="checkMenuNameUnique" parameterType="SysMenu" resultMap="SysMenuResult">
 		<include refid="selectMenuVo"/>
-		where menu_name= #{menuName} and parent_id = #{parentId} limit 1
+		where menu_name= #{menuName} and parent_id = #{parentId} and isdeleted = 0 limit 1
 	</select>
-	
+
 	<select id="selectMenusByPathOrRouteName" parameterType="SysMenu" resultMap="SysMenuResult">
 		<include refid="selectMenuVo"/>
-		where menu_type in ('M', 'C') and (path = #{path} or path = #{routeName} or route_name = #{path} or route_name = #{routeName})
+		where menu_type in ('M', 'C') and isdeleted = 0
+		  and (path = #{path} or path = #{routeName} or route_name = #{path} or route_name = #{routeName})
 	</select>
-	
+
 	<update id="updateMenu" parameterType="SysMenu">
 		update sys_menu
 		<set>
@@ -169,7 +176,7 @@
 			<if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
 			update_time = sysdate()
 		</set>
-		where menu_id = #{menuId}
+		where menu_id = #{menuId} and isdeleted = 0
 	</update>
 
 	<insert id="insertMenu" parameterType="SysMenu">
@@ -215,13 +222,13 @@
 		sysdate()
 		)
 	</insert>
-	
+
 	<update id="updateMenuSort" parameterType="SysMenu">
-	    update sys_menu set order_num = #{orderNum} where menu_id = #{menuId}
+	    update sys_menu set order_num = #{orderNum} where menu_id = #{menuId} and isdeleted = 0
 	</update>
 
-	<delete id="deleteMenuById" parameterType="Long">
-	    delete from sys_menu where menu_id = #{menuId}
-	</delete>
+	<update id="deleteMenuById" parameterType="Long">
+	    update sys_menu set isdeleted = 1 where menu_id = #{menuId}
+	</update>
 
 </mapper>

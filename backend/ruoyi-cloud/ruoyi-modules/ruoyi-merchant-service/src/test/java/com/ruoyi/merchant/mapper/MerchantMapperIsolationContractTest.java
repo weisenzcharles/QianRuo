@@ -60,6 +60,14 @@ public class MerchantMapperIsolationContractTest
         assertScoped(mapper, "insert", "selectList");
     }
 
+    /** 验证商户产品类目选择的查询、删除和恢复操作始终包含租户及商户条件。 */
+    @Test
+    public void productClassSelectionsAreMerchantScoped() throws Exception
+    {
+        Document mapper = load("mapper/merchant/MerchantProductClassMapper.xml");
+        assertScoped(mapper, "selectClassIds", "countSelected", "softDeleteAll", "upsertSelections");
+    }
+
     /**
      * 断言指定映射语句同时包含租户和商户参数，防止跨商户读写。
      *

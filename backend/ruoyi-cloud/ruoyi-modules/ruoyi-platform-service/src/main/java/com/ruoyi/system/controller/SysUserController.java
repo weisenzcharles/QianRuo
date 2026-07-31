@@ -158,7 +158,7 @@ public class SysUserController extends BaseController
         sysUser.setAvatar(source.getAvatar());
         sysUser.setPassword(source.getPassword());
         sysUser.setStatus(source.getStatus());
-        sysUser.setDelFlag(source.getDelFlag());
+        sysUser.setIsdeleted(source.getIsdeleted());
         sysUser.setLoginIp(source.getLoginIp());
         sysUser.setPwdUpdateDate(source.getPwdUpdateDate());
         sysUser.setMustChangePassword(source.getMustChangePassword());

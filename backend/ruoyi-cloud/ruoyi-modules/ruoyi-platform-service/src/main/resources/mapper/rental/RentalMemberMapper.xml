@@ -49,7 +49,7 @@
         <result property="updateBy" column="update_by" />
         <result property="updateTime" column="update_time" />
         <result property="remark" column="remark" />
-        <result property="delFlag" column="del_flag" />
+        <result property="isdeleted" column="isdeleted" />
     </resultMap>
 
     <sql id="selectRentalMemberVo">
@@ -63,7 +63,7 @@
                m.contract_valid_to, m.contract_file_url, m.audit_time, m.audit_remark,
                m.freeze_time, m.freeze_reason, m.wechat_qr_file_id, m.vip_level,
                m.storage_quota_mb, m.external_accept_enabled, m.status, m.create_by,
-               m.create_time, m.update_by, m.update_time, m.remark, m.del_flag,
+               m.create_time, m.update_by, m.update_time, m.remark, m.isdeleted,
                (
                    select u.user_name
                    from `ry_rental`.`ry_rental_user_member` um
@@ -74,8 +74,8 @@
                    where um.tenant_id = m.tenant_id
                      and um.member_id = m.member_id
                      and um.member_role = 'owner'
-                     and um.status = '0' and um.del_flag = '0'
-                     and u.status = '0' and u.del_flag = '0'
+                     and um.status = '0' and um.isdeleted = '0'
+                     and u.status = '0' and u.isdeleted = '0'
                    order by um.id
                    limit 1
                ) as main_account
@@ -85,7 +85,7 @@
     <select id="selectRentalMemberList" parameterType="com.ruoyi.system.domain.rental.RentalMember" resultMap="RentalMemberResult">
         <include refid="selectRentalMemberVo" />
         <where>
-            m.del_flag = '0'
+            m.isdeleted = '0'
             <if test="tenantId != null">AND m.tenant_id = #{tenantId}</if>
             <if test="memberCode != null and memberCode != ''">
                 AND m.member_code like concat('%', #{memberCode}, '%')
@@ -115,18 +115,18 @@
 
     <select id="selectRentalMemberById" parameterType="Long" resultMap="RentalMemberResult">
         <include refid="selectRentalMemberVo" />
-        where m.member_id = #{memberId} and m.del_flag = '0'
+        where m.member_id = #{memberId} and m.isdeleted = '0'
     </select>
 
     <select id="selectRentalMemberByContactPhone" parameterType="String" resultMap="RentalMemberResult">
         <include refid="selectRentalMemberVo" />
-        where m.contact_phone = #{contactPhone} and m.del_flag = '0'
+        where m.contact_phone = #{contactPhone} and m.isdeleted = '0'
         order by m.member_id desc limit 1
     </select>
 
     <select id="checkMemberCodeUnique" parameterType="String" resultMap="RentalMemberResult">
         <include refid="selectRentalMemberVo" />
-        where m.member_code = #{memberCode} and m.del_flag = '0' limit 1
+        where m.member_code = #{memberCode} and m.isdeleted = '0' limit 1
     </select>
 
     <insert id="insertRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember"
@@ -198,26 +198,26 @@
             remark = #{remark},
             update_by = #{updateBy},
             update_time = sysdate()
-        where member_id = #{memberId} and del_flag = '0'
+        where member_id = #{memberId} and isdeleted = '0'
     </update>
 
     <update id="auditRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember">
         update `ry_rental`.`ry_rental_member`
         set auth_status = #{authStatus}, audit_time = #{auditTime}, audit_remark = #{auditRemark},
             update_by = #{updateBy}, update_time = sysdate()
-        where member_id = #{memberId} and auth_status = 'pending' and del_flag = '0'
+        where member_id = #{memberId} and auth_status = 'pending' and isdeleted = '0'
     </update>
 
     <update id="markRegistrationPending" parameterType="com.ruoyi.system.domain.rental.RentalMember">
         update `ry_rental`.`ry_rental_member`
         set auth_status = 'pending', audit_time = null, audit_remark = null,
             update_by = #{updateBy}, update_time = sysdate()
-        where member_id = #{memberId} and auth_status = 'rejected' and del_flag = '0'
+        where member_id = #{memberId} and auth_status = 'rejected' and isdeleted = '0'
     </update>
 
     <update id="deleteRentalMemberByIds" parameterType="Long">
         update `ry_rental`.`ry_rental_member`
-        set del_flag = '2', update_time = sysdate()
+        set isdeleted = 1, update_time = sysdate()
         where member_id in
         <foreach collection="array" item="memberId" open="(" separator="," close=")">
             #{memberId}

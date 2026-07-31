@@ -19,7 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and status = '0'
-          and del_flag = '0'
+          and isdeleted = '0'
         order by warehouse_name, warehouse_id
     </select>
 
@@ -29,7 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and status = '0'
-          and del_flag = '0'
+          and isdeleted = '0'
           and warehouse_id in
         <foreach collection="warehouseIds" item="warehouseId" open="(" separator="," close=")">
             #{warehouseId}

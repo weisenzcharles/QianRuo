@@ -4,11 +4,11 @@ echo [信息] 使用Jar命令运行Modules-System工程。
 echo.
 
 cd %~dp0
-cd ../ruoyi-modules/platform-service/target
+cd ../ruoyi-modules/ruoyi-platform-service/target
 
 set JAVA_OPTS=-Xms512m -Xmx1024m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=512m
 
-java -Dfile.encoding=utf-8 %JAVA_OPTS% -jar platform-service.jar
+java -Dfile.encoding=utf-8 %JAVA_OPTS% -jar ruoyi-platform-service.jar
 
 cd bin
 pause

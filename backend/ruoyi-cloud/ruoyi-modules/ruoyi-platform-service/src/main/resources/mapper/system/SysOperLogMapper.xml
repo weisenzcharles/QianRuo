@@ -6,6 +6,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 	<resultMap type="SysOperLog" id="SysOperLogResult">
 		<id     property="operId"         column="oper_id"        />
+		<result property="operatorUserId" column="operator_user_id" />
+		<result property="clientType"     column="client_type" />
+		<result property="tenantId"       column="tenant_id" />
+		<result property="merchantId"     column="member_id" />
+		<result property="traceId"        column="trace_id" />
+		<result property="httpStatus"     column="http_status" />
+		<result property="isdeleted"      column="isdeleted" />
 		<result property="title"          column="title"          />
 		<result property="businessType"   column="business_type"  />
 		<result property="method"         column="method"         />
@@ -24,18 +31,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</resultMap>
 
 	<sql id="selectOperLogVo">
-        select oper_id, title, business_type, method, request_method, operator_type, oper_name, dept_name, oper_url, oper_ip, oper_param, json_result, status, error_msg, oper_time, cost_time
+        select oper_id, operator_user_id, client_type, tenant_id, member_id, trace_id, http_status,
+               title, business_type, method, request_method, operator_type, oper_name, dept_name,
+               oper_url, oper_ip, oper_param, json_result, status, error_msg, oper_time, cost_time, isdeleted
         from sys_oper_log
     </sql>
-    
+
 	<insert id="insertOperlog" parameterType="SysOperLog">
-		insert into sys_oper_log(title, business_type, method, request_method, operator_type, oper_name, dept_name, oper_url, oper_ip, oper_param, json_result, status, error_msg, cost_time, oper_time)
-        values (#{title}, #{businessType}, #{method}, #{requestMethod}, #{operatorType}, #{operName}, #{deptName}, #{operUrl}, #{operIp}, #{operParam}, #{jsonResult}, #{status}, #{errorMsg}, #{costTime}, sysdate())
+		insert into sys_oper_log(operator_user_id, client_type, tenant_id, member_id, trace_id, http_status,
+            title, business_type, method, request_method, operator_type, oper_name, dept_name, oper_url,
+            oper_ip, oper_param, json_result, status, error_msg, cost_time, oper_time, isdeleted)
+        values (#{operatorUserId}, #{clientType}, #{tenantId}, #{merchantId}, #{traceId}, #{httpStatus},
+            #{title}, #{businessType}, #{method}, #{requestMethod}, #{operatorType}, #{operName}, #{deptName},
+            #{operUrl}, #{operIp}, #{operParam}, #{jsonResult}, #{status}, #{errorMsg}, #{costTime}, sysdate(), 0)
 	</insert>
-	
+
 	<select id="selectOperLogList" parameterType="SysOperLog" resultMap="SysOperLogResult">
 		<include refid="selectOperLogVo"/>
 		<where>
+			isdeleted = 0
 			<if test="operIp != null and operIp != ''">
 				AND oper_ip like concat('%', #{operIp}, '%')
 			</if>
@@ -49,7 +63,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			    AND business_type in
 			    <foreach collection="businessTypes" item="businessType" open="(" separator="," close=")">
 		 			#{businessType}
-		        </foreach> 
+		        </foreach>
 			</if>
 			<if test="status != null">
 				AND status = #{status}
@@ -66,21 +80,21 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		</where>
 		order by oper_id desc
 	</select>
-	
-	<delete id="deleteOperLogByIds" parameterType="Long">
- 		delete from sys_oper_log where oper_id in
- 		<foreach collection="array" item="operId" open="(" separator="," close=")">
- 			#{operId}
-        </foreach> 
- 	</delete>
- 	
- 	<select id="selectOperLogById" parameterType="Long" resultMap="SysOperLogResult">
+
+	<update id="deleteOperLogByIds" parameterType="Long">
+		 update sys_oper_log set isdeleted = 1 where oper_id in
+        <foreach collection="array" item="operId" open="(" separator="," close=")">
+        #{operId}
+        </foreach>
+	</update>
+
+        <select id="selectOperLogById" parameterType="Long" resultMap="SysOperLogResult">
 		<include refid="selectOperLogVo"/>
-		where oper_id = #{operId}
+		where oper_id = #{operId} and isdeleted = 0
 	</select>
-	
-	<update id="cleanOperLog">
-        truncate table sys_oper_log
+
+    <update id="cleanOperLog">
+        update sys_oper_log set isdeleted = 1 where isdeleted = 0
     </update>
 
-</mapper> 
+</mapper>

@@ -27,7 +27,7 @@ public class RentalUserMember extends BaseEntity
 
     private String status;
 
-    private String delFlag;
+    private String isdeleted;
 
     public Long getId()
     {
@@ -109,13 +109,13 @@ public class RentalUserMember extends BaseEntity
         this.status = status;
     }
 
-    public String getDelFlag()
+    public String getIsdeleted()
     {
-        return delFlag;
+        return isdeleted;
     }
 
-    public void setDelFlag(String delFlag)
+    public void setIsdeleted(String isdeleted)
     {
-        this.delFlag = delFlag;
+        this.isdeleted = isdeleted;
     }
 }

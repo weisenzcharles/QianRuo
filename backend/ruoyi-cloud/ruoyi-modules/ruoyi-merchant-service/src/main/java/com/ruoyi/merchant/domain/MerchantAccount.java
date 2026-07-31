@@ -15,7 +15,7 @@ public class MerchantAccount
     private String avatar;
     private String password;
     private String status;
-    private String delFlag;
+    private String isdeleted;
     private String loginIp;
     private Date loginDate;
     private Date passwordUpdateDate;
@@ -42,8 +42,8 @@ public class MerchantAccount
     public void setPassword(String password) { this.password = password; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
-    public String getDelFlag() { return delFlag; }
-    public void setDelFlag(String delFlag) { this.delFlag = delFlag; }
+    public String getIsdeleted() { return isdeleted; }
+    public void setIsdeleted(String isdeleted) { this.isdeleted = isdeleted; }
     public String getLoginIp() { return loginIp; }
     public void setLoginIp(String loginIp) { this.loginIp = loginIp; }
     public Date getLoginDate() { return loginDate; }

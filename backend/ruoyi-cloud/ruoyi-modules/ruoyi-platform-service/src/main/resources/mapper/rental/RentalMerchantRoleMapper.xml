@@ -13,7 +13,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="menuCheckStrictly" column="menu_check_strictly" />
         <result property="deptCheckStrictly" column="dept_check_strictly" />
         <result property="status" column="status" />
-        <result property="delFlag" column="del_flag" />
+        <result property="isdeleted" column="isdeleted" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
         <result property="updateBy" column="update_by" />
@@ -23,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectRoleVo">
         select distinct r.role_id, r.role_name, r.role_key, r.role_sort, '1' as data_scope,
-               r.menu_check_strictly, 1 as dept_check_strictly, r.status, r.del_flag,
+               r.menu_check_strictly, 1 as dept_check_strictly, r.status, r.isdeleted,
                r.create_by, r.create_time, r.update_by, r.update_time, r.remark
         from `ry_rental`.`ry_rental_merchant_role` r
     </sql>
@@ -32,7 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectRoleVo" />
         where r.tenant_id = #{params.tenantId}
           and r.member_id = #{params.memberId}
-          and r.del_flag = '0'
+          and r.isdeleted = '0'
         <if test="roleId != null and roleId != 0">
             and r.role_id = #{roleId}
         </if>
@@ -60,8 +60,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 on ur.role_id = r.role_id and ur.tenant_id = r.tenant_id and ur.member_id = r.member_id
         where r.tenant_id = #{tenantId}
           and r.member_id = #{memberId}
-          and r.del_flag = '0'
-          and ur.merchant_user_id = #{merchantUserId}
+	          and r.isdeleted = '0'
+	          and ur.merchant_user_id = #{merchantUserId}
+	          and ur.isdeleted = 0
     </select>
 
     <select id="selectRoleListByUserId" resultType="Long">
@@ -71,8 +72,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 on ur.role_id = r.role_id and ur.tenant_id = r.tenant_id and ur.member_id = r.member_id
         where r.tenant_id = #{tenantId}
           and r.member_id = #{memberId}
-          and r.del_flag = '0'
-          and ur.merchant_user_id = #{merchantUserId}
+	          and r.isdeleted = '0'
+	          and ur.merchant_user_id = #{merchantUserId}
+	          and ur.isdeleted = 0
     </select>
 
     <select id="selectRoleById" resultMap="MerchantRoleResult">
@@ -80,7 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where r.tenant_id = #{tenantId}
           and r.member_id = #{memberId}
           and r.role_id = #{roleId}
-          and r.del_flag = '0'
+          and r.isdeleted = '0'
     </select>
 
     <select id="checkRoleNameUnique" resultMap="MerchantRoleResult">
@@ -88,7 +90,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where r.tenant_id = #{tenantId}
           and r.member_id = #{memberId}
           and r.role_name = #{roleName}
-          and r.del_flag = '0'
+          and r.isdeleted = '0'
         limit 1
     </select>
 
@@ -97,14 +99,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where r.tenant_id = #{tenantId}
           and r.member_id = #{memberId}
           and r.role_key = #{roleKey}
-          and r.del_flag = '0'
+          and r.isdeleted = '0'
         limit 1
     </select>
 
     <insert id="insertRole" parameterType="SysRole" useGeneratedKeys="true" keyProperty="roleId">
         insert into `ry_rental`.`ry_rental_merchant_role`(
             tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly,
-            status, del_flag, create_by, create_time, remark
+            status, isdeleted, create_by, create_time, remark
         ) values (
             #{params.tenantId}, #{params.memberId}, #{roleName}, #{roleKey}, #{roleSort},
             #{menuCheckStrictly}, #{status}, '0', #{createBy}, sysdate(), #{remark}
@@ -126,12 +128,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = #{params.tenantId}
           and member_id = #{params.memberId}
           and role_id = #{roleId}
-          and del_flag = '0'
+          and isdeleted = '0'
     </update>
 
     <update id="deleteRoleById">
         update `ry_rental`.`ry_rental_merchant_role`
-        set del_flag = '2',
+        set isdeleted = 1,
             update_time = sysdate()
         where tenant_id = #{tenantId}
           and member_id = #{memberId}
@@ -140,7 +142,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="deleteRoleByIds">
         update `ry_rental`.`ry_rental_merchant_role`
-        set del_flag = '2',
+        set isdeleted = 1,
             update_time = sysdate()
         where tenant_id = #{tenantId}
           and member_id = #{memberId}

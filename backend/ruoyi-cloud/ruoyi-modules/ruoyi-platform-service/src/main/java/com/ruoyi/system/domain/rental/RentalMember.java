@@ -129,7 +129,7 @@ public class RentalMember extends BaseEntity
     @Excel(name = "冻结状态", readConverterExp = "0=未冻结,1=已冻结")
     private String status;
 
-    private String delFlag;
+    private String isdeleted;
 
     public Long getMemberId() { return memberId; }
     public void setMemberId(Long memberId) { this.memberId = memberId; }
@@ -277,8 +277,8 @@ public class RentalMember extends BaseEntity
     @NotBlank(message = "冻结状态不能为空")
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
-    public String getDelFlag() { return delFlag; }
-    public void setDelFlag(String delFlag) { this.delFlag = delFlag; }
+    public String getIsdeleted() { return isdeleted; }
+    public void setIsdeleted(String isdeleted) { this.isdeleted = isdeleted; }
 
     @Override
     public String toString()
@@ -303,7 +303,7 @@ public class RentalMember extends BaseEntity
             .append("externalAcceptEnabled", externalAcceptEnabled).append("status", status)
             .append("createBy", getCreateBy()).append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy()).append("updateTime", getUpdateTime())
-            .append("remark", getRemark()).append("delFlag", delFlag)
+            .append("remark", getRemark()).append("isdeleted", isdeleted)
             .toString();
     }
 }

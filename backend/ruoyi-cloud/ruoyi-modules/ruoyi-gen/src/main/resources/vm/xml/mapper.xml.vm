@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="${packageName}.mapper.${ClassName}Mapper">
-    
+
     <resultMap type="${ClassName}" id="${ClassName}Result">
 #foreach ($column in $columns)
         <result property="${column.javaField}"    column="${column.columnName}"    />
@@ -28,7 +28,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="select${ClassName}List" parameterType="${ClassName}" resultMap="${ClassName}Result">
         <include refid="select${ClassName}Vo"/>
-        <where>  
+        <where>
+            isdeleted = 0
 #foreach($column in $columns)
 #set($queryType=$column.queryType)
 #set($javaField=$column.javaField)
@@ -57,15 +58,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 #end
         </where>
     </select>
-    
+
     <select id="select${ClassName}By${pkColumn.capJavaField}" parameterType="${pkColumn.javaType}" resultMap="#if($table.sub)${ClassName}${subClassName}Result#else${ClassName}Result#end">
 #if($table.crud || $table.tree)
         <include refid="select${ClassName}Vo"/>
-        where ${pkColumn.columnName} = #{${pkColumn.javaField}}
+        where ${pkColumn.columnName} = #{${pkColumn.javaField}} and isdeleted = 0
 #elseif($table.sub)
         select#foreach($column in $columns) $column.columnName#if($foreach.count != $columns.size()),#end#end
         from ${tableName}
-        where ${pkColumn.columnName} = #{${pkColumn.javaField}}
+        where ${pkColumn.columnName} = #{${pkColumn.javaField}} and isdeleted = 0
 #end
     </select>
 #if($table.sub)
@@ -73,7 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="select${subClassName}List" resultMap="${subClassName}Result">
         select#foreach ($column in $subTable.columns) $column.columnName#if($foreach.count != $subTable.columns.size()),#end#end
         from ${subTableName}
-        where ${subTableFkName} = #{${subTableFkName}}
+        where ${subTableFkName} = #{${subTableFkName}} and isdeleted = 0
     </select>
 #end
 
@@ -104,31 +105,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 #end
 #end
         </trim>
-        where ${pkColumn.columnName} = #{${pkColumn.javaField}}
+        where ${pkColumn.columnName} = #{${pkColumn.javaField}} and isdeleted = 0
     </update>
 
-    <delete id="delete${ClassName}By${pkColumn.capJavaField}" parameterType="${pkColumn.javaType}">
-        delete from ${tableName} where ${pkColumn.columnName} = #{${pkColumn.javaField}}
-    </delete>
+    <update id="delete${ClassName}By${pkColumn.capJavaField}" parameterType="${pkColumn.javaType}">
+        update ${tableName} set isdeleted = 1 where ${pkColumn.columnName} = #{${pkColumn.javaField}} and isdeleted = 0
+    </update>
 
-    <delete id="delete${ClassName}By${pkColumn.capJavaField}s" parameterType="String">
-        delete from ${tableName} where ${pkColumn.columnName} in 
+    <update id="delete${ClassName}By${pkColumn.capJavaField}s" parameterType="String">
+        update ${tableName} set isdeleted = 1 where isdeleted = 0 and ${pkColumn.columnName} in
         <foreach item="${pkColumn.javaField}" collection="array" open="(" separator="," close=")">
             #{${pkColumn.javaField}}
         </foreach>
-    </delete>
+    </update>
 #if($table.sub)
-    
-    <delete id="delete${subClassName}By${subTableFkClassName}s" parameterType="String">
-        delete from ${subTableName} where ${subTableFkName} in 
+
+    <update id="delete${subClassName}By${subTableFkClassName}s" parameterType="String">
+        update ${subTableName} set isdeleted = 1 where isdeleted = 0 and ${subTableFkName} in
         <foreach item="${subTableFkclassName}" collection="array" open="(" separator="," close=")">
             #{${subTableFkclassName}}
         </foreach>
-    </delete>
+    </update>
 
-    <delete id="delete${subClassName}By${subTableFkClassName}" parameterType="${pkColumn.javaType}">
-        delete from ${subTableName} where ${subTableFkName} = #{${subTableFkclassName}}
-    </delete>
+    <update id="delete${subClassName}By${subTableFkClassName}" parameterType="${pkColumn.javaType}">
+        update ${subTableName} set isdeleted = 1 where ${subTableFkName} = #{${subTableFkclassName}} and isdeleted = 0
+    </update>
 
     <insert id="batch${subClassName}">
         insert into ${subTableName}(#foreach($column in $subTable.columns) $column.columnName#if($foreach.count != $subTable.columns.size()),#end#end) values

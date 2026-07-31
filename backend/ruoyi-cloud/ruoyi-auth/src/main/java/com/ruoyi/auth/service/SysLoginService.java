@@ -9,6 +9,7 @@ import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.constant.UserConstants;
 import com.ruoyi.common.core.context.ClientContextHolder;
 import com.ruoyi.common.core.domain.R;
+import com.ruoyi.common.core.enums.SoftDeleteStatus;
 import com.ruoyi.common.core.enums.UserStatus;
 import com.ruoyi.common.core.exception.ServiceException;
 import com.ruoyi.common.core.text.Convert;
@@ -96,7 +97,7 @@ public class SysLoginService
 
         LoginUser userInfo = userResult.getData();
         SysUser user = userResult.getData().getSysUser();
-        if (UserStatus.DELETED.getCode().equals(user.getDelFlag()))
+        if (SoftDeleteStatus.DELETED.getCode().equals(user.getIsdeleted()))
         {
             recordLogService.recordLogininfor(username, Constants.LOGIN_FAIL, "对不起，您的账号已被删除");
             throw new ServiceException("对不起，您的账号：" + username + " 已被删除");
@@ -150,7 +151,7 @@ public class SysLoginService
 
         LoginUser userInfo = userResult.getData();
         SysUser user = userInfo.getSysUser();
-        if (UserStatus.DELETED.getCode().equals(user.getDelFlag()))
+        if (SoftDeleteStatus.DELETED.getCode().equals(user.getIsdeleted()))
         {
             recordLogService.recordLogininfor(phone, Constants.LOGIN_FAIL, "对不起，您的账号已被删除");
             throw new ServiceException("对不起，您的账号已被删除");
@@ -266,12 +267,24 @@ public class SysLoginService
         recordLogService.recordLogininfor(username, Constants.REGISTER, "注册成功");
     }
 
+    /**
+     * 按商户用户名调用独立商户身份服务并转换为统一登录结果。
+     *
+     * @param username 商户登录用户名
+     * @return 统一登录用户结果
+     */
     private R<LoginUser> getMerchantLoginUser(String username)
     {
         return adaptMerchantResult(remoteMerchantUserService.getByUsername(username, SecurityConstants.INNER,
                 Constants.CLIENT_TYPE_MERCHANT));
     }
 
+    /**
+     * 将商户身份内部契约转换为认证中心使用的登录用户对象。
+     *
+     * @param result 商户身份服务返回结果
+     * @return 统一登录用户结果
+     */
     private R<LoginUser> adaptMerchantResult(R<MerchantLoginIdentity> result)
     {
         if (result == null || R.FAIL == result.getCode() || result.getData() == null)
@@ -288,7 +301,7 @@ public class SysLoginService
         user.setAvatar(identity.getAvatar());
         user.setPassword(identity.getPassword());
         user.setStatus(identity.getStatus());
-        user.setDelFlag(identity.getDelFlag());
+        user.setIsdeleted(identity.getIsdeleted());
         user.setPwdUpdateDate(identity.getPasswordUpdatedAt() == null
                 ? null : new Date(identity.getPasswordUpdatedAt()));
         user.setMustChangePassword(identity.getMustChangePassword());

@@ -43,7 +43,7 @@ public class RentalMerchantUser extends BaseEntity
     private String status;
 
     /** 删除标志 */
-    private String delFlag;
+    private String isdeleted;
 
     /** 最后登录IP */
     private String loginIp;
@@ -178,14 +178,14 @@ public class RentalMerchantUser extends BaseEntity
         this.status = status;
     }
 
-    public String getDelFlag()
+    public String getIsdeleted()
     {
-        return delFlag;
+        return isdeleted;
     }
 
-    public void setDelFlag(String delFlag)
+    public void setIsdeleted(String isdeleted)
     {
-        this.delFlag = delFlag;
+        this.isdeleted = isdeleted;
     }
 
     public String getLoginIp()

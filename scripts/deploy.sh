@@ -52,7 +52,7 @@ export JAVA_BASE_IMAGE NGINX_BASE_IMAGE MYSQL_IMAGE REDIS_IMAGE NACOS_IMAGE
 BACKEND_IMAGES=(
   "ruoyi-gateway:backend/ruoyi-cloud/ruoyi-gateway/target/ruoyi-gateway.jar:ruoyi-gateway"
   "ruoyi-auth:backend/ruoyi-cloud/ruoyi-auth/target/ruoyi-auth.jar:ruoyi-auth"
-  "platform-service:backend/ruoyi-cloud/ruoyi-modules/platform-service/target/platform-service.jar:platform-service"
+  "platform-service:backend/ruoyi-cloud/ruoyi-modules/ruoyi-platform-service/target/ruoyi-platform-service.jar:platform-service"
   "merchant-service:backend/ruoyi-cloud/ruoyi-modules/ruoyi-merchant-service/target/ruoyi-merchant-service.jar:merchant-service"
   "ruoyi-modules-gen:backend/ruoyi-cloud/ruoyi-modules/ruoyi-gen/target/ruoyi-modules-gen.jar:ruoyi-gen"
   "ruoyi-modules-job:backend/ruoyi-cloud/ruoyi-modules/ruoyi-job/target/ruoyi-modules-job.jar:ruoyi-job"
@@ -66,6 +66,7 @@ FRONTEND_IMAGES=(
 )
 
 DATABASE_MIGRATIONS=(
+  "database/migrations/V20260730_000__isdeleted_prerequisite.sql"
   "database/migrations/V20260723_001__password_initialization_state.sql"
   "database/migrations/V20260723_002__merchant_role_permission_namespace.sql"
   "database/migrations/V20260723_003__merchant_gateway_route.sql"
@@ -76,6 +77,7 @@ DATABASE_MIGRATIONS=(
   "database/migrations/V20260724_008__merchant_operation_log.sql"
   "database/migrations/V20260724_009__complete_merchant_profile.sql"
   "database/migrations/V20260724_010__merchant_registration_workflow.sql"
+  "database/migrations/V20260730_001__product_class_audit_soft_delete.sql"
 )
 
 usage() {
@@ -193,11 +195,27 @@ build_backend_artifacts() {
   mvn -f "$ROOT_DIR/backend/ruoyi-cloud/pom.xml" package
 }
 
-verify_merchant_backend_artifacts() {
+# 校验指定服务的 JAR 文件已经完成打包，避免 jar 命令对不存在的文件输出无关的 Java 异常堆栈。
+require_backend_jar() {
+  local service_name="$1"
+  local jar_path="$2"
+
+  if [[ ! -f "$jar_path" ]]; then
+    echo "$service_name JAR is missing: ${jar_path#"$ROOT_DIR/"}. Run ./scripts/deploy.sh build after backend packaging succeeds." >&2
+    exit 1
+  fi
+}
+
+# 校验平台端、商户端和网关的关键类与资源均已写入最终 JAR，防止部署不完整的服务镜像。
+verify_backend_artifacts() {
   local merchant_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-modules/ruoyi-merchant-service/target/ruoyi-merchant-service.jar"
-  local platform_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-modules/platform-service/target/platform-service.jar"
+  local platform_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-modules/ruoyi-platform-service/target/ruoyi-platform-service.jar"
   local gateway_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-gateway/target/ruoyi-gateway.jar"
   need_cmd jar
+
+  require_backend_jar "Platform service" "$platform_jar"
+  require_backend_jar "Merchant service" "$merchant_jar"
+  require_backend_jar "Gateway" "$gateway_jar"
 
   if ! jar tf "$platform_jar" | grep 'com/ruoyi/system/PlatformServiceApplication.class' >/dev/null; then
     echo "Platform service JAR does not contain PlatformServiceApplication; refusing to deploy an incomplete image." >&2
@@ -251,7 +269,7 @@ build_frontend_artifacts() {
 build_images() {
   need_cmd docker
   require_registry
-  verify_merchant_backend_artifacts
+  verify_backend_artifacts
   log "Building backend Docker images"
   for item in "${BACKEND_IMAGES[@]}"; do
     IFS=: read -r image_name jar_file app_name <<<"$item"

@@ -50,7 +50,7 @@ public class SysRole extends BaseEntity
     private String status;
 
     /** 删除标志（0代表存在 2代表删除） */
-    private String delFlag;
+    private String isdeleted;
 
     /** 用户是否存在此角色标识 默认不存在 */
     private boolean flag = false;
@@ -174,14 +174,14 @@ public class SysRole extends BaseEntity
         this.status = status;
     }
 
-    public String getDelFlag()
+    public String getIsdeleted()
     {
-        return delFlag;
+        return isdeleted;
     }
 
-    public void setDelFlag(String delFlag)
+    public void setIsdeleted(String isdeleted)
     {
-        this.delFlag = delFlag;
+        this.isdeleted = isdeleted;
     }
 
     public boolean isFlag()
@@ -235,7 +235,7 @@ public class SysRole extends BaseEntity
             .append("menuCheckStrictly", isMenuCheckStrictly())
             .append("deptCheckStrictly", isDeptCheckStrictly())
             .append("status", getStatus())
-            .append("delFlag", getDelFlag())
+            .append("isdeleted", getIsdeleted())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

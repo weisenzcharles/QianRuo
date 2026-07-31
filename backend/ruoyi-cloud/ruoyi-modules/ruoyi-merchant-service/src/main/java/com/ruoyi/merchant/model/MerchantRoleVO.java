@@ -11,7 +11,7 @@ public class MerchantRoleVO
     private Integer roleSort;
     private Boolean menuCheckStrictly;
     private String status;
-    private String delFlag;
+    private String isdeleted;
     private String remark;
     private Date createTime;
     private Long[] menuIds;
@@ -28,8 +28,8 @@ public class MerchantRoleVO
     public void setMenuCheckStrictly(Boolean menuCheckStrictly) { this.menuCheckStrictly = menuCheckStrictly; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
-    public String getDelFlag() { return delFlag; }
-    public void setDelFlag(String delFlag) { this.delFlag = delFlag; }
+    public String getIsdeleted() { return isdeleted; }
+    public void setIsdeleted(String isdeleted) { this.isdeleted = isdeleted; }
     public String getRemark() { return remark; }
     public void setRemark(String remark) { this.remark = remark; }
     public Date getCreateTime() { return createTime; }

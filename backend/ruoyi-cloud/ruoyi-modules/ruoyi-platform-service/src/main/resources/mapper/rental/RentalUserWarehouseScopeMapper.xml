@@ -10,23 +10,24 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and merchant_user_id = #{merchantUserId}
+          and isdeleted = 0
         order by warehouse_id
     </select>
 
     <insert id="batchInsert">
         insert into `ry_rental`.`ry_rental_user_warehouse_scope`(
-            tenant_id, member_id, merchant_user_id, warehouse_id, create_by, create_time
+            tenant_id, member_id, merchant_user_id, warehouse_id, create_by, create_time, isdeleted
         ) values
         <foreach collection="warehouseIds" item="warehouseId" separator=",">
-            (#{tenantId}, #{memberId}, #{merchantUserId}, #{warehouseId}, #{createBy}, sysdate())
+            (#{tenantId}, #{memberId}, #{merchantUserId}, #{warehouseId}, #{createBy}, sysdate(), 0)
         </foreach>
+        on duplicate key update isdeleted = 0, create_by = values(create_by), create_time = values(create_time)
     </insert>
 
-    <delete id="deleteByUser">
-        delete from `ry_rental`.`ry_rental_user_warehouse_scope`
-        where tenant_id = #{tenantId}
+    <update id="deleteByUser">
+        update `ry_rental`.`ry_rental_user_warehouse_scope` set isdeleted = 1 where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and merchant_user_id = #{merchantUserId}
-    </delete>
+    </update>
 
 </mapper>

@@ -178,7 +178,7 @@ public class MerchantIdentityService
         identity.setAvatar(account.getAvatar());
         identity.setPassword(account.getPassword());
         identity.setStatus(account.getStatus());
-        identity.setDelFlag(account.getDelFlag());
+        identity.setIsdeleted(account.getIsdeleted());
         identity.setPasswordUpdatedAt(account.getPasswordUpdateDate() == null
                 ? null : account.getPasswordUpdateDate().getTime());
         identity.setMustChangePassword(account.getMustChangePassword());

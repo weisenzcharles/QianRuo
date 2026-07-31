@@ -9,26 +9,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="deptId"     column="dept_id"      />
 	</resultMap>
 
-	<delete id="deleteRoleDeptByRoleId" parameterType="Long">
-		delete from sys_role_dept where role_id=#{roleId}
-	</delete>
-	
+	<update id="deleteRoleDeptByRoleId" parameterType="Long">
+		update sys_role_dept set isdeleted = 1 where role_id=#{roleId}
+	</update>
+
 	<select id="selectCountRoleDeptByDeptId" resultType="Integer">
-	    select count(1) from sys_role_dept where dept_id=#{deptId}
+	    select count(1) from sys_role_dept where dept_id=#{deptId} and isdeleted = 0
 	</select>
-	
-	<delete id="deleteRoleDept" parameterType="Long">
- 		delete from sys_role_dept where role_id in
- 		<foreach collection="array" item="roleId" open="(" separator="," close=")">
- 			#{roleId}
-        </foreach> 
- 	</delete>
-	
+
+	<update id="deleteRoleDept" parameterType="Long">
+        update sys_role_dept set isdeleted = 1 where role_id in
+        <foreach collection="array" item="roleId" open="(" separator="," close=")">
+        #{roleId}
+        </foreach>
+        </update>
+
 	<insert id="batchRoleDept">
-		insert into sys_role_dept(role_id, dept_id) values
+		insert into sys_role_dept(role_id, dept_id, isdeleted) values
 		<foreach item="item" index="index" collection="list" separator=",">
-			(#{item.roleId},#{item.deptId})
+			(#{item.roleId},#{item.deptId},0)
 		</foreach>
+		on duplicate key update isdeleted = 0
 	</insert>
-	
-</mapper> 
+
+</mapper>

@@ -2,8 +2,6 @@ package com.ruoyi.merchant.application;
 
 import java.util.List;
 import org.springframework.stereotype.Service;
-import com.ruoyi.common.core.constant.Constants;
-import com.ruoyi.common.core.exception.ServiceException;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.merchant.domain.MerchantOperLogRecord;
 import com.ruoyi.merchant.mapper.MerchantOperLogMapper;
@@ -22,13 +20,17 @@ public class MerchantOperLogService
         this.operLogMapper = operLogMapper;
     }
 
+    /**
+     * 把通用审计对象转换为商户日志记录；匿名注册请求允许归属字段为空但仍必须落库追踪。
+     *
+     * @param source 通用操作审计对象
+     * @return 受影响行数
+     */
     public int record(SysOperLog source)
     {
-        if (source == null || !Constants.CLIENT_TYPE_MERCHANT.equals(source.getClientType())
-                || source.getTenantId() == null || source.getMerchantId() == null
-                || source.getOperatorUserId() == null)
+        if (source == null)
         {
-            throw new ServiceException("商户操作日志缺少可信登录上下文");
+            return 0;
         }
         MerchantOperLogRecord record = new MerchantOperLogRecord();
         record.setTenantId(source.getTenantId());
@@ -47,9 +49,18 @@ public class MerchantOperLogService
         record.setStatus(source.getStatus());
         record.setErrorMsg(source.getErrorMsg());
         record.setCostTime(source.getCostTime());
+        record.setTraceId(source.getTraceId());
+        record.setHttpStatus(source.getHttpStatus());
+        record.setIsdeleted(0);
         return operLogMapper.insert(record);
     }
 
+    /**
+     * 查询当前登录商户的未删除操作日志，租户和商户归属只从登录上下文读取。
+     *
+     * @param query 日志筛选条件
+     * @return 当前商户操作日志集合
+     */
     public List<MerchantOperLogVO> list(MerchantOperLogQuery query)
     {
         return operLogMapper.selectList(MerchantContextUtils.getTenantId(),

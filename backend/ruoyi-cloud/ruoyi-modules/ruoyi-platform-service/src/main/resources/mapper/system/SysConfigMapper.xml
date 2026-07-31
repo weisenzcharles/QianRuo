@@ -3,9 +3,9 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ruoyi.system.mapper.SysConfigMapper">
-    
+
     <resultMap type="SysConfig" id="SysConfigResult">
-    	<id     property="configId"      column="config_id"      />
+        <id     property="configId"      column="config_id"      />
         <result property="configName"    column="config_name"    />
         <result property="configKey"     column="config_key"     />
         <result property="configValue"   column="config_value"   />
@@ -15,15 +15,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"      column="update_by"      />
         <result property="updateTime"    column="update_time"    />
     </resultMap>
-    
+
     <sql id="selectConfigVo">
-        select config_id, config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark 
+        select config_id, config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark
 		from sys_config
     </sql>
-    
+
     <!-- 查询条件 -->
 	<sql id="sqlwhereSearch">
 		<where>
+			isdeleted = 0
 			<if test="configId !=null">
 				and config_id = #{configId}
 			</if>
@@ -32,15 +33,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			</if>
 		</where>
 	</sql>
-    
+
     <select id="selectConfig" parameterType="SysConfig" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
         <include refid="sqlwhereSearch"/>
     </select>
-    
+
     <select id="selectConfigList" parameterType="SysConfig" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
         <where>
+            isdeleted = 0
 			<if test="configName != null and configName != ''">
 				AND config_name like concat('%', #{configName}, '%')
 			</if>
@@ -58,17 +60,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			</if>
 		</where>
     </select>
-    
+
     <select id="selectConfigById" parameterType="Long" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
-        where config_id = #{configId}
+        where config_id = #{configId} and isdeleted = 0
     </select>
-    
+
     <select id="checkConfigKeyUnique" parameterType="String" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
-        where config_key = #{configKey} limit 1
+        where config_key = #{configKey} and isdeleted = 0 limit 1
     </select>
-    
+
     <insert id="insertConfig" parameterType="SysConfig">
         insert into sys_config (
 			<if test="configName != null and configName != '' ">config_name,</if>
@@ -77,7 +79,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="configType != null and configType != '' ">config_type,</if>
 			<if test="createBy != null and createBy != ''">create_by,</if>
 			<if test="remark != null and remark != ''">remark,</if>
- 			create_time
+        create_time
         )values(
 			<if test="configName != null and configName != ''">#{configName},</if>
 			<if test="configKey != null and configKey != ''">#{configKey},</if>
@@ -85,12 +87,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="configType != null and configType != ''">#{configType},</if>
 			<if test="createBy != null and createBy != ''">#{createBy},</if>
 			<if test="remark != null and remark != ''">#{remark},</if>
- 			sysdate()
+        sysdate()
 		)
     </insert>
-	 
+
     <update id="updateConfig" parameterType="SysConfig">
-        update sys_config 
+        update sys_config
         <set>
             <if test="configName != null and configName != ''">config_name = #{configName},</if>
             <if test="configKey != null and configKey != ''">config_key = #{configKey},</if>
@@ -98,20 +100,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="configType != null and configType != ''">config_type = #{configType},</if>
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
- 			update_time = sysdate()
+        update_time = sysdate()
         </set>
-        where config_id = #{configId}
+        where config_id = #{configId} and isdeleted = 0
     </update>
-	
-    <delete id="deleteConfigById" parameterType="Long">
-        delete from sys_config where config_id = #{configId}
-    </delete>
-    
-    <delete id="deleteConfigByIds" parameterType="Long">
-        delete from sys_config where config_id in 
+
+    <update id="deleteConfigById" parameterType="Long">
+        update sys_config set isdeleted = 1 where config_id = #{configId}
+    </update>
+
+    <update id="deleteConfigByIds" parameterType="Long">
+        update sys_config set isdeleted = 1 where config_id in
         <foreach item="configId" collection="array" open="(" separator="," close=")">
-        	#{configId}
+        #{configId}
         </foreach>
-    </delete>
-    
+    </update>
+
 </mapper>

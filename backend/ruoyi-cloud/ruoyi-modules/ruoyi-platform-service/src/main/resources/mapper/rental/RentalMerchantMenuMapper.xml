@@ -41,7 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             tenant_id = 0
             and member_id = 0
-            and del_flag = '0'
+            and isdeleted = '0'
             <if test="menuName != null and menuName != ''">
                 and menu_name like concat('%', #{menuName}, '%')
             </if>
@@ -62,7 +62,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from `ry_rental`.`ry_rental_merchant_menu` m
         where m.tenant_id = 0
           and m.member_id = 0
-          and m.del_flag = '0'
+          and m.isdeleted = '0'
           and m.menu_type in ('M', 'C')
           and m.status = '0'
         order by m.parent_id, m.order_num
@@ -75,7 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from `ry_rental`.`ry_rental_merchant_menu` m
         where m.tenant_id = 0
           and m.member_id = 0
-          and m.del_flag = '0'
+          and m.isdeleted = '0'
           and m.menu_type in ('M', 'C')
           and m.status = '0'
           and exists (
@@ -87,12 +87,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                         from `ry_rental`.`ry_rental_merchant_menu` cm
                         where cm.tenant_id = 0
                           and cm.member_id = 0
-                          and cm.del_flag = '0'
+                          and cm.isdeleted = '0'
                           and cm.parent_id = m.menu_id
                     ))
                 and um.tenant_id = #{tenantId}
-                and um.member_id = #{memberId}
-                and um.merchant_user_id = #{merchantUserId}
+	                and um.member_id = #{memberId}
+	                and um.merchant_user_id = #{merchantUserId}
+	                and um.isdeleted = 0
           )
         order by m.parent_id, m.order_num
     </select>
@@ -104,10 +105,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 on m.menu_id = rm.menu_id
         where rm.role_id = #{roleId}
           and rm.tenant_id = #{tenantId}
-          and rm.member_id = #{memberId}
+	          and rm.member_id = #{memberId}
+	          and rm.isdeleted = 0
           and m.tenant_id = 0
           and m.member_id = 0
-          and m.del_flag = '0'
+          and m.isdeleted = '0'
           <if test="menuCheckStrictly">
               and m.menu_id not in (
                   select cm.parent_id
@@ -116,10 +118,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                           on cm.menu_id = crm.menu_id
                   where crm.role_id = #{roleId}
                     and crm.tenant_id = #{tenantId}
-                    and crm.member_id = #{memberId}
+	                    and crm.member_id = #{memberId}
+	                    and crm.isdeleted = 0
                     and cm.tenant_id = 0
                     and cm.member_id = 0
-                    and cm.del_flag = '0'
+                    and cm.isdeleted = '0'
               )
           </if>
         order by m.parent_id, m.order_num
@@ -131,14 +134,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where m.tenant_id = 0
           and m.member_id = 0
           and m.status = '0'
-          and m.del_flag = '0'
+          and m.isdeleted = '0'
           and exists (
               select 1
               from `ry_rental`.`ry_rental_merchant_user_menu` um
               where um.menu_id = m.menu_id
                 and um.tenant_id = #{tenantId}
-                and um.member_id = #{memberId}
-                and um.merchant_user_id = #{merchantUserId}
+	                and um.member_id = #{memberId}
+	                and um.merchant_user_id = #{merchantUserId}
+	                and um.isdeleted = 0
           )
     </select>
 
@@ -149,11 +153,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 on m.menu_id = rm.menu_id
         where rm.role_id = #{roleId}
           and rm.tenant_id = #{tenantId}
-          and rm.member_id = #{memberId}
+	          and rm.member_id = #{memberId}
+	          and rm.isdeleted = 0
           and m.tenant_id = 0
           and m.member_id = 0
           and m.status = '0'
-          and m.del_flag = '0'
+          and m.isdeleted = '0'
     </select>
 
     <select id="selectMenuById" resultMap="MerchantMenuResult">
@@ -161,7 +166,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = 0
           and member_id = 0
           and menu_id = #{menuId}
-          and del_flag = '0'
+          and isdeleted = '0'
     </select>
 
     <select id="hasChildByMenuId" resultType="Integer">
@@ -170,15 +175,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = 0
           and member_id = 0
           and parent_id = #{menuId}
-          and del_flag = '0'
+          and isdeleted = '0'
     </select>
 
     <select id="checkMenuExistRole" resultType="Integer">
         select count(1)
         from `ry_rental`.`ry_rental_merchant_role_menu`
         where tenant_id = #{tenantId}
-          and member_id = #{memberId}
-          and menu_id = #{menuId}
+	          and member_id = #{memberId}
+	          and menu_id = #{menuId}
+	          and isdeleted = 0
     </select>
 
     <select id="checkMenuNameUnique" resultMap="MerchantMenuResult">
@@ -187,7 +193,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and member_id = 0
           and menu_name = #{menuName}
           and parent_id = #{parentId}
-          and del_flag = '0'
+          and isdeleted = '0'
         limit 1
     </select>
 
@@ -195,7 +201,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectMenuVo" />
         where tenant_id = 0
           and member_id = 0
-          and del_flag = '0'
+          and isdeleted = '0'
           and menu_type in ('M', 'C')
           and (path = #{path} or path = #{routeName} or route_name = #{path} or route_name = #{routeName})
     </select>
@@ -235,7 +241,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = 0
           and member_id = 0
           and menu_id = #{menuId}
-          and del_flag = '0'
+          and isdeleted = '0'
     </update>
 
     <update id="updateMenuSort" parameterType="SysMenu">
@@ -245,12 +251,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = 0
           and member_id = 0
           and menu_id = #{menuId}
-          and del_flag = '0'
+          and isdeleted = '0'
     </update>
 
     <update id="deleteMenuById">
         update `ry_rental`.`ry_rental_merchant_menu`
-        set del_flag = '2',
+        set isdeleted = 1,
             update_time = sysdate()
         where tenant_id = 0
           and member_id = 0

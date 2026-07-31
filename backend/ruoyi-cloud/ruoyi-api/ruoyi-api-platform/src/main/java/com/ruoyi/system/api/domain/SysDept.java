@@ -47,7 +47,7 @@ public class SysDept extends BaseEntity
     private String status;
 
     /** 删除标志（0代表存在 2代表删除） */
-    private String delFlag;
+    private String isdeleted;
 
     /** 父部门名称 */
     private String parentName;
@@ -151,14 +151,14 @@ public class SysDept extends BaseEntity
         this.status = status;
     }
 
-    public String getDelFlag()
+    public String getIsdeleted()
     {
-        return delFlag;
+        return isdeleted;
     }
 
-    public void setDelFlag(String delFlag)
+    public void setIsdeleted(String isdeleted)
     {
-        this.delFlag = delFlag;
+        this.isdeleted = isdeleted;
     }
 
     public String getParentName()
@@ -193,7 +193,7 @@ public class SysDept extends BaseEntity
             .append("phone", getPhone())
             .append("email", getEmail())
             .append("status", getStatus())
-            .append("delFlag", getDelFlag())
+            .append("isdeleted", getIsdeleted())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

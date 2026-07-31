@@ -28,7 +28,7 @@ echo "begin copy ruoyi-visual "
 cp ../ruoyi-visual/ruoyi-monitor/target/ruoyi-visual-monitor.jar  ./ruoyi/visual/monitor/jar
 
 echo "begin copy platform-service "
-cp ../ruoyi-modules/platform-service/target/platform-service.jar ./ruoyi/modules/platform/jar
+cp ../ruoyi-modules/ruoyi-platform-service/target/ruoyi-platform-service.jar ./ruoyi/modules/platform/jar/ruoyi-platform-service.jar
 
 echo "begin copy ruoyi-modules-file "
 cp ../ruoyi-modules/ruoyi-file/target/ruoyi-modules-file.jar ./ruoyi/modules/file/jar

@@ -19,6 +19,9 @@ public class MerchantOperLogRecord
     private Integer status;
     private String errorMsg;
     private Long costTime;
+    private String traceId;
+    private Integer httpStatus;
+    private Integer isdeleted;
 
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
@@ -52,4 +55,16 @@ public class MerchantOperLogRecord
     public void setErrorMsg(String errorMsg) { this.errorMsg = errorMsg; }
     public Long getCostTime() { return costTime; }
     public void setCostTime(Long costTime) { this.costTime = costTime; }
+    /** @return 调用链跟踪号 */
+    public String getTraceId() { return traceId; }
+    /** @param traceId 调用链跟踪号 */
+    public void setTraceId(String traceId) { this.traceId = traceId; }
+    /** @return HTTP 响应状态码 */
+    public Integer getHttpStatus() { return httpStatus; }
+    /** @param httpStatus HTTP 响应状态码 */
+    public void setHttpStatus(Integer httpStatus) { this.httpStatus = httpStatus; }
+    /** @return 软删除标识 */
+    public Integer getIsdeleted() { return isdeleted; }
+    /** @param isdeleted 软删除标识 */
+    public void setIsdeleted(Integer isdeleted) { this.isdeleted = isdeleted; }
 }

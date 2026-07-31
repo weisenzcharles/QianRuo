@@ -43,7 +43,7 @@ public class MerchantSessionService
         user.setAvatar(identity.getAvatar());
         user.setPassword(identity.getPassword());
         user.setStatus(identity.getStatus());
-        user.setDelFlag(identity.getDelFlag());
+        user.setIsdeleted(identity.getIsdeleted());
         user.setPwdUpdateDate(identity.getPasswordUpdatedAt() == null
                 ? null : new Date(identity.getPasswordUpdatedAt()));
         user.setMustChangePassword(identity.getMustChangePassword());

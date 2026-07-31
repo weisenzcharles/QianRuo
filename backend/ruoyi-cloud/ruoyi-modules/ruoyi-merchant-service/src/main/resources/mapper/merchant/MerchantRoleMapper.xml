@@ -8,7 +8,7 @@
         <result property="roleSort" column="role_sort" />
         <result property="menuCheckStrictly" column="menu_check_strictly" />
         <result property="status" column="status" />
-        <result property="delFlag" column="del_flag" />
+        <result property="isdeleted" column="isdeleted" />
         <result property="remark" column="remark" />
         <result property="createTime" column="create_time" />
     </resultMap>
@@ -23,11 +23,11 @@
     </resultMap>
     <sql id="roleColumns">
         r.role_id, r.role_name, r.role_key, r.role_sort, r.menu_check_strictly,
-        r.status, r.del_flag, r.remark, r.create_time
+        r.status, r.isdeleted, r.remark, r.create_time
     </sql>
     <select id="selectList" resultMap="role">
         select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
-        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId} and r.del_flag = '0'
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId} and r.isdeleted = '0'
         <if test="query.roleName != null and query.roleName != ''">
           and r.role_name like concat('%', #{query.roleName}, '%')
         </if>
@@ -46,22 +46,22 @@
     <select id="selectById" resultMap="role">
         select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
         where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
-          and r.role_id = #{roleId} and r.del_flag = '0'
+          and r.role_id = #{roleId} and r.isdeleted = '0'
     </select>
     <select id="selectByName" resultMap="role">
         select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
         where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
-          and r.role_name = #{roleName} and r.del_flag = '0' limit 1
+          and r.role_name = #{roleName} and r.isdeleted = '0' limit 1
     </select>
     <select id="selectByKey" resultMap="role">
         select <include refid="roleColumns" /> from `ry_rental`.`ry_rental_merchant_role` r
         where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
-          and r.role_key = #{roleKey} and r.del_flag = '0' limit 1
+          and r.role_key = #{roleKey} and r.isdeleted = '0' limit 1
     </select>
     <insert id="insert" useGeneratedKeys="true" keyProperty="command.roleId">
         insert into `ry_rental`.`ry_rental_merchant_role`(
           tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly,
-          status, del_flag, create_by, create_time, remark
+          status, isdeleted, create_by, create_time, remark
         ) values (
           #{tenantId}, #{merchantId}, #{command.roleName}, #{command.roleKey}, #{command.roleSort},
           #{command.menuCheckStrictly}, #{command.status}, '0', #{operator}, sysdate(), #{command.remark})
@@ -72,44 +72,45 @@
             menu_check_strictly = #{command.menuCheckStrictly}, status = #{command.status},
             remark = #{command.remark}, update_by = #{operator}, update_time = sysdate()
         where tenant_id = #{tenantId} and member_id = #{merchantId}
-          and role_id = #{command.roleId} and del_flag = '0'
+          and role_id = #{command.roleId} and isdeleted = '0'
     </update>
     <update id="updateStatus">
         update `ry_rental`.`ry_rental_merchant_role`
         set status = #{status}, update_by = #{operator}, update_time = sysdate()
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId} and del_flag = '0'
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId} and isdeleted = '0'
     </update>
     <update id="softDelete">
         update `ry_rental`.`ry_rental_merchant_role`
-        set del_flag = '2', update_by = #{operator}, update_time = sysdate()
+        set isdeleted = 1, update_by = #{operator}, update_time = sysdate()
         where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id in
         <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId}</foreach>
     </update>
     <select id="countUsers" resultType="Integer">
         select count(1) from `ry_rental`.`ry_rental_merchant_user_role`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId} and isdeleted = 0
     </select>
     <select id="selectUserIdsByRole" resultType="Long">
         select merchant_user_id from `ry_rental`.`ry_rental_merchant_user_role`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId} and isdeleted = 0
     </select>
-    <delete id="deleteRoleMenus">
-        delete from `ry_rental`.`ry_rental_merchant_role_menu`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
-    </delete>
+    <update id="deleteRoleMenus">
+        update `ry_rental`.`ry_rental_merchant_role_menu` set isdeleted = 1 where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+    </update>
     <insert id="insertRoleMenus">
-        insert into `ry_rental`.`ry_rental_merchant_role_menu`(tenant_id, member_id, role_id, menu_id) values
+        insert into `ry_rental`.`ry_rental_merchant_role_menu`(tenant_id, member_id, role_id, menu_id, isdeleted) values
         <foreach collection="menuIds" item="menuId" separator=",">
-          (#{tenantId}, #{merchantId}, #{roleId}, #{menuId})
+          (#{tenantId}, #{merchantId}, #{roleId}, #{menuId}, 0)
         </foreach>
+        on duplicate key update isdeleted = 0
     </insert>
     <select id="selectAllocatedUsers" resultMap="user">
         select u.merchant_user_id, u.user_name, u.nick_name, u.phone, u.email, u.status, u.create_time
         from `ry_rental`.`ry_rental_merchant_user` u
         inner join `ry_rental`.`ry_rental_merchant_user_role` ur
           on ur.tenant_id = u.tenant_id and ur.member_id = u.member_id and ur.merchant_user_id = u.merchant_user_id
-        where u.tenant_id = #{tenantId} and u.member_id = #{merchantId} and u.del_flag = '0'
+        where u.tenant_id = #{tenantId} and u.member_id = #{merchantId} and u.isdeleted = '0'
           and ur.role_id = #{query.roleId}
+          and ur.isdeleted = 0
         <if test="query.userName != null and query.userName != ''">
           and u.user_name like concat('%', #{query.userName}, '%')
         </if>
@@ -121,10 +122,11 @@
     <select id="selectUnallocatedUsers" resultMap="user">
         select u.merchant_user_id, u.user_name, u.nick_name, u.phone, u.email, u.status, u.create_time
         from `ry_rental`.`ry_rental_merchant_user` u
-        where u.tenant_id = #{tenantId} and u.member_id = #{merchantId} and u.del_flag = '0'
+        where u.tenant_id = #{tenantId} and u.member_id = #{merchantId} and u.isdeleted = '0'
           and not exists (select 1 from `ry_rental`.`ry_rental_merchant_user_role` ur
             where ur.tenant_id = #{tenantId} and ur.member_id = #{merchantId}
-              and ur.merchant_user_id = u.merchant_user_id and ur.role_id = #{query.roleId})
+              and ur.merchant_user_id = u.merchant_user_id and ur.role_id = #{query.roleId}
+              and ur.isdeleted = 0)
         <if test="query.userName != null and query.userName != ''">
           and u.user_name like concat('%', #{query.userName}, '%')
         </if>
@@ -135,20 +137,20 @@
     </select>
     <select id="countUsersInMerchant" resultType="Integer">
         select count(1) from `ry_rental`.`ry_rental_merchant_user`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and del_flag = '0'
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and isdeleted = '0'
           and merchant_user_id in
         <foreach collection="userIds" item="userId" open="(" separator="," close=")">#{userId}</foreach>
     </select>
-    <delete id="deleteUserRole">
-        delete from `ry_rental`.`ry_rental_merchant_user_role`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
+    <update id="deleteUserRole">
+        update `ry_rental`.`ry_rental_merchant_user_role` set isdeleted = 1 where tenant_id = #{tenantId} and member_id = #{merchantId} and role_id = #{roleId}
           and merchant_user_id in
         <foreach collection="userIds" item="userId" open="(" separator="," close=")">#{userId}</foreach>
-    </delete>
+    </update>
     <insert id="insertUserRole">
-        insert ignore into `ry_rental`.`ry_rental_merchant_user_role`(tenant_id, member_id, merchant_user_id, role_id) values
+        insert into `ry_rental`.`ry_rental_merchant_user_role`(tenant_id, member_id, merchant_user_id, role_id, isdeleted) values
         <foreach collection="userIds" item="userId" separator=",">
-          (#{tenantId}, #{merchantId}, #{userId}, #{roleId})
+          (#{tenantId}, #{merchantId}, #{userId}, #{roleId}, 0)
         </foreach>
+        on duplicate key update isdeleted = 0
     </insert>
 </mapper>

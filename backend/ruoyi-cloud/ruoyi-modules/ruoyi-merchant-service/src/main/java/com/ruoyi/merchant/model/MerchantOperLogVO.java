@@ -48,6 +48,12 @@ public class MerchantOperLogVO
     @Excel(name = "消耗时间", suffix = "毫秒")
     private Long costTime;
 
+    @Excel(name = "跟踪号")
+    private String traceId;
+
+    @Excel(name = "HTTP状态")
+    private Integer httpStatus;
+
     public Long getOperId() { return operId; }
     public void setOperId(Long operId) { this.operId = operId; }
     public Long getOperatorUserId() { return operatorUserId; }
@@ -78,4 +84,12 @@ public class MerchantOperLogVO
     public void setOperTime(Date operTime) { this.operTime = operTime; }
     public Long getCostTime() { return costTime; }
     public void setCostTime(Long costTime) { this.costTime = costTime; }
+    /** @return 调用链跟踪号 */
+    public String getTraceId() { return traceId; }
+    /** @param traceId 调用链跟踪号 */
+    public void setTraceId(String traceId) { this.traceId = traceId; }
+    /** @return HTTP 响应状态码 */
+    public Integer getHttpStatus() { return httpStatus; }
+    /** @param httpStatus HTTP 响应状态码 */
+    public void setHttpStatus(Integer httpStatus) { this.httpStatus = httpStatus; }
 }

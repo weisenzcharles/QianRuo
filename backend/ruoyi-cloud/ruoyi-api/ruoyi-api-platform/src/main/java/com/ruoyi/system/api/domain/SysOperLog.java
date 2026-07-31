@@ -31,6 +31,15 @@ public class SysOperLog extends BaseEntity
     /** 商户ID，仅商户端日志存在 */
     private Long merchantId;
 
+    /** 调用链跟踪号 */
+    private String traceId;
+
+    /** HTTP 响应状态码 */
+    private Integer httpStatus;
+
+    /** 软删除标识：0 正常，1 已删除 */
+    private Integer isdeleted;
+
     /** 操作模块 */
     @Excel(name = "操作模块")
     private String title;
@@ -143,6 +152,42 @@ public class SysOperLog extends BaseEntity
     public void setMerchantId(Long merchantId)
     {
         this.merchantId = merchantId;
+    }
+
+    /** @return 调用链跟踪号 */
+    public String getTraceId()
+    {
+        return traceId;
+    }
+
+    /** @param traceId 调用链跟踪号 */
+    public void setTraceId(String traceId)
+    {
+        this.traceId = traceId;
+    }
+
+    /** @return HTTP 响应状态码 */
+    public Integer getHttpStatus()
+    {
+        return httpStatus;
+    }
+
+    /** @param httpStatus HTTP 响应状态码 */
+    public void setHttpStatus(Integer httpStatus)
+    {
+        this.httpStatus = httpStatus;
+    }
+
+    /** @return 软删除标识 */
+    public Integer getIsdeleted()
+    {
+        return isdeleted;
+    }
+
+    /** @param isdeleted 软删除标识 */
+    public void setIsdeleted(Integer isdeleted)
+    {
+        this.isdeleted = isdeleted;
     }
 
     public String getTitle()
