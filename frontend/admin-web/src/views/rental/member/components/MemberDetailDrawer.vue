@@ -73,13 +73,75 @@
           <el-descriptions-item label="备注" :span="2">{{ display(member.remark) }}</el-descriptions-item>
         </el-descriptions>
       </section>
+
+      <section class="detail-section">
+        <h3>会员类型与接单资格</h3>
+        <el-descriptions :column="detailColumns" border>
+          <el-descriptions-item label="会员类型">{{ optionLabel(rentalMembershipTypeOptions, member.membershipType) }}</el-descriptions-item>
+          <el-descriptions-item label="当前接单资格">
+            {{ enabledQualifications.length ? enabledQualifications.map(item => qualificationLabel(item.qualificationCode)).join('、') : '暂无' }}
+          </el-descriptions-item>
+        </el-descriptions>
+        <el-table v-if="member.qualifications?.length" :data="member.qualifications" size="small" class="history-table">
+          <el-table-column label="资格" min-width="150">
+            <template #default="scope">{{ qualificationLabel(scope.row.qualificationCode) }}</template>
+          </el-table-column>
+          <el-table-column label="状态" prop="qualificationStatus" width="100" />
+          <el-table-column label="审核人" prop="reviewedBy" width="130" />
+          <el-table-column label="审核时间" width="180">
+            <template #default="scope">{{ formatDateTime(scope.row.reviewedTime) }}</template>
+          </el-table-column>
+        </el-table>
+      </section>
+
+      <section class="detail-section">
+        <h3>认证历史</h3>
+        <el-timeline v-if="member.certificationHistory?.length">
+          <el-timeline-item v-for="item in member.certificationHistory" :key="item.certificationId">
+            <div class="history-title">第 {{ item.versionNo }} 版 · {{ certificationStatusLabel(item.certificationStatus) }}</div>
+            <div class="history-meta">提交时间：{{ formatDateTime(item.submittedTime) }}　审核时间：{{ formatDateTime(item.reviewedTime) }}</div>
+            <div v-if="item.reviewRemark" class="history-remark">审核意见：{{ item.reviewRemark }}</div>
+            <div v-if="item.materials?.length" class="material-list">
+              <span v-for="material in item.materials" :key="material.materialId || material.fileUrl">{{ material.materialName }}</span>
+            </div>
+          </el-timeline-item>
+        </el-timeline>
+        <el-empty v-else description="暂无认证历史" :image-size="60" />
+      </section>
+
+      <section class="detail-section history-grid">
+        <div>
+          <h3>会员类型变更历史</h3>
+          <el-table :data="member.membershipHistory || []" size="small">
+            <el-table-column label="变更为" min-width="130">
+              <template #default="scope">{{ optionLabel(rentalMembershipTypeOptions, scope.row.membershipType) }}</template>
+            </el-table-column>
+            <el-table-column label="操作人" prop="operatorName" width="120" />
+            <el-table-column label="时间" width="170">
+              <template #default="scope">{{ formatDateTime(scope.row.operatedTime) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <div>
+          <h3>接单资格变更历史</h3>
+          <el-table :data="member.qualificationHistory || []" size="small">
+            <el-table-column label="资格" min-width="130">
+              <template #default="scope">{{ qualificationLabel(scope.row.qualificationCode) }}</template>
+            </el-table-column>
+            <el-table-column label="状态" prop="qualificationStatus" width="90" />
+            <el-table-column label="时间" width="170">
+              <template #default="scope">{{ formatDateTime(scope.row.operatedTime) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </section>
     </template>
   </el-drawer>
 </template>
 
 <script setup>
 import { parseTime } from '@/utils/ruoyi'
-import { getRentalOptionLabel, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalVipLevelOptions } from '@/utils/rental/options'
+import { getRentalOptionLabel, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalMembershipTypeOptions, rentalQualificationOptions, rentalVipLevelOptions } from '@/utils/rental/options'
 import { useWindowSize } from '@vueuse/core'
 
 const visible = defineModel({ type: Boolean, default: false })
@@ -92,6 +154,7 @@ const licensePeriod = computed(() => {
   return formatPeriod(props.member?.licenseValidFrom, props.member?.licenseValidTo)
 })
 const contractPeriod = computed(() => formatPeriod(props.member?.contractValidFrom, props.member?.contractValidTo))
+const enabledQualifications = computed(() => (props.member?.qualifications || []).filter(item => item.qualificationStatus === 'enabled'))
 
 function display(value) {
   return value === undefined || value === null || value === '' ? '-' : value
@@ -99,6 +162,14 @@ function display(value) {
 
 function optionLabel(options, value) {
   return getRentalOptionLabel(options, value) || '-'
+}
+
+function qualificationLabel(value) {
+  return getRentalOptionLabel(rentalQualificationOptions, value) || '-'
+}
+
+function certificationStatusLabel(value) {
+  return { pending: '待审核', approved: '审核通过', rejected: '审核驳回' }[value] || value || '-'
 }
 
 function formatDate(value) {
@@ -143,7 +214,45 @@ function formatQuota(value) {
   flex-wrap: wrap;
 }
 
+.history-table {
+  margin-top: 12px;
+}
+
+.history-title {
+  font-weight: 600;
+}
+
+.history-meta,
+.history-remark {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+}
+
+.material-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.material-list span {
+  padding: 2px 8px;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  border-radius: 4px;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
 @media (max-width: 760px) {
+  .history-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   :deep(.el-descriptions__body .el-descriptions__table) {
     table-layout: fixed;
   }

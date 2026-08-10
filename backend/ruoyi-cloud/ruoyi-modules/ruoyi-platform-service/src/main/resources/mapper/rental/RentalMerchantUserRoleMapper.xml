@@ -10,18 +10,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and role_id = #{roleId}
-          and isdeleted = 0
+          and is_delete = 0
     </select>
 
     <update id="deleteUserRoleInfo">
-        update `ry_rental`.`ry_rental_merchant_user_role` set isdeleted = 1 where tenant_id = #{tenantId}
+        update `ry_rental`.`ry_rental_merchant_user_role` set is_delete = 1 where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and merchant_user_id = #{userRole.userId}
           and role_id = #{userRole.roleId}
     </update>
 
     <update id="deleteUserRoleInfos">
-        update `ry_rental`.`ry_rental_merchant_user_role` set isdeleted = 1 where tenant_id = #{tenantId}
+        update `ry_rental`.`ry_rental_merchant_user_role` set is_delete = 1 where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and role_id = #{roleId}
           and merchant_user_id in
@@ -31,7 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <update id="deleteUserRoleByUserIds">
-        update `ry_rental`.`ry_rental_merchant_user_role` set isdeleted = 1 where tenant_id = #{tenantId}
+        update `ry_rental`.`ry_rental_merchant_user_role` set is_delete = 1 where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and merchant_user_id in
         <foreach collection="merchantUserIds" item="merchantUserId" open="(" separator="," close=")">
@@ -40,11 +40,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <insert id="batchUserRole">
-        insert into `ry_rental`.`ry_rental_merchant_user_role`(tenant_id, member_id, merchant_user_id, role_id, isdeleted) values
+        insert into `ry_rental`.`ry_rental_merchant_user_role`(tenant_id, member_id, merchant_user_id, role_id, is_delete) values
         <foreach item="item" collection="list" separator=",">
             (#{tenantId}, #{memberId}, #{item.userId}, #{item.roleId}, 0)
         </foreach>
-        on duplicate key update isdeleted = 0
+        on duplicate key update is_delete = 0
     </insert>
 
 </mapper>

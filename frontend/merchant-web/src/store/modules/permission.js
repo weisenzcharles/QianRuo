@@ -36,9 +36,10 @@ const usePermissionStore = defineStore(
         return new Promise(resolve => {
           // 向后端请求路由数据
           getRouters().then(res => {
-            const sdata = JSON.parse(JSON.stringify(res.data))
-            const rdata = JSON.parse(JSON.stringify(res.data))
-            const defaultData = JSON.parse(JSON.stringify(res.data))
+            const normalizedRoutes = normalizeMerchantRoutes(res.data || [])
+            const sdata = JSON.parse(JSON.stringify(normalizedRoutes))
+            const rdata = JSON.parse(JSON.stringify(normalizedRoutes))
+            const defaultData = JSON.parse(JSON.stringify(normalizedRoutes))
             const sidebarRoutes = filterAsyncRouter(sdata)
             const rewriteRoutes = filterAsyncRouter(rdata, false, true)
             const defaultRoutes = filterAsyncRouter(defaultData)
@@ -86,7 +87,10 @@ function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
 function filterChildren(childrenMap, lastRouter = false) {
   var children = []
   childrenMap.forEach(el => {
-    el.path = lastRouter ? lastRouter.path + '/' + el.path : el.path
+    // 绝对路由已经由后端定义完整路径，不能再次拼接父路由；兼容目录型相对路由时再拼接。
+    if (lastRouter && !el.path.startsWith('/')) {
+      el.path = lastRouter.path + '/' + el.path
+    }
     if (el.children && el.children.length && el.component === 'ParentView') {
       children = children.concat(filterChildren(el.children, el))
     } else {
@@ -94,6 +98,28 @@ function filterChildren(childrenMap, lastRouter = false) {
     }
   })
   return children
+}
+
+/**
+ * 规范化商户动态菜单路径。
+ *
+ * <p>商户菜单表保存业务完整路径，例如 merchant/product/my。Vue Router 的嵌套路由
+ * 默认会把子路径拼接到父路径，因此这里统一转换为带前导斜杠的绝对路径，保证每个
+ * 商户菜单都在当前单页应用内跳转，不会因为父子路径重复而产生错误页面。</p>
+ *
+ * @param {Array} routes 后端返回的商户路由树
+ * @returns {Array} 规范化后的商户路由树
+ */
+function normalizeMerchantRoutes(routes) {
+  return routes.map(route => {
+    if (route.path && !route.path.startsWith('/') && !/^https?:\/\//.test(route.path)) {
+      route.path = '/' + route.path
+    }
+    if (Array.isArray(route.children)) {
+      route.children = normalizeMerchantRoutes(route.children)
+    }
+    return route
+  })
 }
 
 // 动态路由遍历，验证是否具备权限

@@ -17,6 +17,18 @@ export const rentalVipLevelOptions = [
   { label: '旗舰版', value: 'enterprise', tagType: 'warning' }
 ]
 
+export const rentalMembershipTypeOptions = [
+  { label: '个人会员', value: 'personal_member', tagType: 'info' },
+  { label: '普通企业会员', value: 'ordinary_enterprise_member', tagType: '' },
+  { label: '入驻会员', value: 'settled_member', tagType: 'success' }
+]
+
+export const rentalQualificationOptions = [
+  { label: '对外接单', value: 'external_accept' },
+  { label: '租商联盟接单', value: 'alliance_accept' },
+  { label: '小程序接单', value: 'mini_program_accept' }
+]
+
 export const rentalYesNoOptions = [
   { label: '否', value: 0, tagType: 'info' },
   { label: '是', value: 1, tagType: 'success' }

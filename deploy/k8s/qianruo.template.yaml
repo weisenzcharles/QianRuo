@@ -15,6 +15,8 @@ stringData:
   platform-db-password: "${PLATFORM_DB_PASSWORD}"
   merchant-db-username: "${MERCHANT_DB_USERNAME}"
   merchant-db-password: "${MERCHANT_DB_PASSWORD}"
+  business-db-username: "${BUSINESS_DB_USERNAME}"
+  business-db-password: "${BUSINESS_DB_PASSWORD}"
   nacos-auth-token: "${NACOS_AUTH_TOKEN}"
   nacos-auth-identity-key: "${NACOS_AUTH_IDENTITY_KEY}"
   nacos-auth-identity-value: "${NACOS_AUTH_IDENTITY_VALUE}"
@@ -178,6 +180,16 @@ spec:
                 secretKeyRef:
                   name: qianruo-secret
                   key: merchant-db-password
+            - name: BUSINESS_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: business-db-username
+            - name: BUSINESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: business-db-password
           volumeMounts:
             - name: provision-script
               mountPath: /opt/qianruo
@@ -515,6 +527,65 @@ spec:
     - name: http
       port: 9210
       targetPort: 9210
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rental-business
+  namespace: ${K8S_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rental-business
+  template:
+    metadata:
+      labels:
+        app: rental-business
+    spec:
+      containers:
+        - name: rental-business
+          image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-business:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9220
+          envFrom:
+            - configMapRef:
+                name: qianruo-config
+          env:
+            - name: NACOS_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR
+              value: ruoyi-nacos:8848
+            - name: SPRING_DATA_REDIS_HOST
+              value: ruoyi-redis
+            - name: BUSINESS_DB_URL
+              value: jdbc:mysql://ruoyi-mysql:3306/ry_business?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
+            - name: BUSINESS_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: business-db-username
+            - name: BUSINESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qianruo-secret
+                  key: business-db-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rental-business
+  namespace: ${K8S_NAMESPACE}
+spec:
+  selector:
+    app: rental-business
+  ports:
+    - name: http
+      port: 9220
+      targetPort: 9220
 ---
 apiVersion: apps/v1
 kind: Deployment

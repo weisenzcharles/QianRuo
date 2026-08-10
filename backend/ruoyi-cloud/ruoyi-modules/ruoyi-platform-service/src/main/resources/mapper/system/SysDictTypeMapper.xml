@@ -23,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectDictTypeList" parameterType="SysDictType" resultMap="SysDictTypeResult">
 	    <include refid="selectDictTypeVo"/>
 		<where>
-			isdeleted = 0
+			is_delete = 0
 		    <if test="dictName != null and dictName != ''">
 				AND dict_name like concat('%', #{dictName}, '%')
 			</if>
@@ -44,30 +44,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 	<select id="selectDictTypeAll" resultMap="SysDictTypeResult">
 		<include refid="selectDictTypeVo"/>
-		where isdeleted = 0
+		where is_delete = 0
 	</select>
 
 	<select id="selectDictTypeById" parameterType="Long" resultMap="SysDictTypeResult">
 		<include refid="selectDictTypeVo"/>
-		where dict_id = #{dictId} and isdeleted = 0
+		where dict_id = #{dictId} and is_delete = 0
 	</select>
 
 	<select id="selectDictTypeByType" parameterType="String" resultMap="SysDictTypeResult">
 		<include refid="selectDictTypeVo"/>
-		where dict_type = #{dictType} and isdeleted = 0
+		where dict_type = #{dictType} and is_delete = 0
 	</select>
 
 	<select id="checkDictTypeUnique" parameterType="String" resultMap="SysDictTypeResult">
 		<include refid="selectDictTypeVo"/>
-		where dict_type = #{dictType} and isdeleted = 0 limit 1
+		where dict_type = #{dictType} and is_delete = 0 limit 1
 	</select>
 
 	<update id="deleteDictTypeById" parameterType="Long">
-        update sys_dict_type set isdeleted = 1 where dict_id = #{dictId}
+        update sys_dict_type set is_delete = 1 where dict_id = #{dictId}
         </update>
 
         <update id="deleteDictTypeByIds" parameterType="Long">
-        update sys_dict_type set isdeleted = 1 where dict_id in
+        update sys_dict_type set is_delete = 1 where dict_id in
         <foreach collection="array" item="dictId" open="(" separator="," close=")">
         #{dictId}
         </foreach>
@@ -83,7 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
         update_time = sysdate()
         </set>
-		where dict_id = #{dictId} and isdeleted = 0
+		where dict_id = #{dictId} and is_delete = 0
 	</update>
 
         <insert id="insertDictType" parameterType="SysDictType">

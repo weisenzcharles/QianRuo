@@ -3,8 +3,8 @@
     <el-tabs v-model="activeTab">
       <el-tab-pane label="店铺信息" name="store">
         <div class="form-grid">
-          <el-form-item label="商户编码" prop="memberCode">
-            <el-input v-model="form.memberCode" placeholder="请输入商户编码" />
+          <el-form-item label="商户编码">
+            <el-input v-model="form.memberCode" disabled placeholder="保存后由系统自动生成" />
           </el-form-item>
           <el-form-item label="店铺名称" prop="nickname">
             <el-input v-model="form.nickname" placeholder="请输入店铺名称" />
@@ -160,7 +160,6 @@ const editorFormRef = ref()
 const activeTab = ref('store')
 
 const rules = {
-  memberCode: [{ required: true, message: '商户编码不能为空', trigger: 'blur' }],
   nickname: [{ required: true, message: '店铺名称不能为空', trigger: 'blur' }],
   memberType: [{ required: true, message: '商户类型不能为空', trigger: 'change' }],
   contactPhone: [{ required: true, message: '联系电话不能为空', trigger: 'blur' }],

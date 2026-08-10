@@ -5,13 +5,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.exception.ServiceException;
+import com.ruoyi.common.core.constant.Constants;
+import com.ruoyi.common.core.constant.SecurityConstants;
+import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.StringUtils;
-import com.ruoyi.common.core.utils.uuid.IdUtils;
+import com.ruoyi.merchant.api.RemoteMerchantUserService;
+import com.ruoyi.merchant.api.model.MerchantOwnerProvisionCommand;
 import com.ruoyi.system.api.model.MerchantRegistrationApplicationCommand;
 import com.ruoyi.system.api.model.MerchantRegistrationApplicationVO;
 import com.ruoyi.system.domain.rental.RentalMember;
 import com.ruoyi.system.mapper.rental.RentalMemberMapper;
+import com.ruoyi.system.service.SysCodeRuleService;
 
 /** 平台持有的商户入驻申请应用服务。 */
 @Service
@@ -28,6 +33,15 @@ public class PlatformMerchantRegistrationService
 
     @Autowired
     private RentalMemberLifecyclePolicy lifecyclePolicy;
+
+    @Autowired
+    private RentalMemberCertificationService certificationService;
+
+    @Autowired
+    private RemoteMerchantUserService remoteMerchantUserService;
+
+    @Autowired
+    private SysCodeRuleService codeRuleService;
 
     /**
      * 创建一条新的商户入驻申请。商户编码、租户、审核状态及默认配额均由平台服务生成，
@@ -49,7 +63,8 @@ public class PlatformMerchantRegistrationService
         RentalMember member = new RentalMember();
         copyApplication(command, member);
         member.setTenantId(DEFAULT_TENANT_ID);
-        member.setMemberCode(generateMemberCode());
+        member.setMemberCode(codeRuleService.nextCode("merchant"));
+        member.setMembershipType(defaultMembershipType(member.getMemberType()));
         member.setAuthStatus(PENDING);
         member.setVipLevel("free");
         member.setStorageQuotaMb(1024L);
@@ -58,6 +73,8 @@ public class PlatformMerchantRegistrationService
         member.setCreateBy(REGISTRATION_OPERATOR);
         lifecyclePolicy.prepareForCreate(member, DateUtils.getNowDate());
         memberMapper.insertRentalMember(member);
+        certificationService.createPendingCertification(member, REGISTRATION_OPERATOR);
+        provisionMerchantOwner(member);
         return toVO(member);
     }
 
@@ -101,6 +118,10 @@ public class PlatformMerchantRegistrationService
         }
 
         RentalMember previous = memberMapper.selectRentalMemberById(member.getMemberId());
+        if (!StringUtils.equals(previous.getContactPhone(), command.getContactPhone().trim()))
+        {
+            throw new ServiceException("注册手机号已经开通商户账号，不能在驳回重提时修改");
+        }
         copyApplication(command, member);
         member.setAuthStatus(PENDING);
         member.setAuditRemark(null);
@@ -111,6 +132,8 @@ public class PlatformMerchantRegistrationService
             throw new ServiceException("申请状态已变更，请重新查询后再提交");
         }
         memberMapper.updateRentalMember(member);
+        certificationService.createPendingCertification(member, REGISTRATION_OPERATOR);
+        provisionMerchantOwner(member);
         return toVO(memberMapper.selectRentalMemberById(member.getMemberId()));
     }
 
@@ -262,16 +285,6 @@ public class PlatformMerchantRegistrationService
     }
 
     /**
-     * 生成平台唯一的商户申请编码，组合当前日期和随机标识以降低并发碰撞概率。
-     *
-     * @return 以字母 M 开头的商户编码
-     */
-    private String generateMemberCode()
-    {
-        return "M" + DateUtils.dateTime() + IdUtils.simpleUUID().substring(0, 12).toUpperCase();
-    }
-
-    /**
      * 根据已有申请状态生成阻止重复注册时的可操作提示。
      *
      * @param authStatus 当前审核状态
@@ -331,5 +344,40 @@ public class PlatformMerchantRegistrationService
     private String trim(String value)
     {
         return StringUtils.isBlank(value) ? null : value.trim();
+    }
+
+    /**
+     * 将主体类型转换为首次申请使用的会员类型，审核通过前只作为默认值保存，
+     * 最终会员类型仍由平台审核命令确认。
+     *
+     * @param memberType 商户主体类型
+     * @return 会员类型编码
+     */
+    private String defaultMembershipType(String memberType)
+    {
+        return "enterprise".equals(memberType) ? "ordinary_enterprise_member" : "personal_member";
+    }
+
+    /**
+     * 注册资料落库后立即创建商户所有者账号，使申请人在审核期间也可以通过短信验证码登录。
+     * 账号权限由商户身份服务依据认证状态清空，平台审核通过后再次幂等激活完整权限。
+     *
+     * @param member 已生成主键的商户申请
+     */
+    private void provisionMerchantOwner(RentalMember member)
+    {
+        MerchantOwnerProvisionCommand provision = new MerchantOwnerProvisionCommand();
+        provision.setTenantId(member.getTenantId());
+        provision.setMerchantId(member.getMemberId());
+        provision.setPhone(member.getContactPhone());
+        provision.setNickname(StringUtils.isBlank(member.getContactName()) ? member.getNickname() : member.getContactName());
+        provision.setEmail(member.getContactEmail());
+        provision.setOperator(REGISTRATION_OPERATOR);
+        R<Boolean> result = remoteMerchantUserService.provisionOwner(provision, SecurityConstants.INNER,
+                Constants.CLIENT_TYPE_MERCHANT);
+        if (result == null || R.FAIL == result.getCode() || !Boolean.TRUE.equals(result.getData()))
+        {
+            throw new ServiceException(result == null ? "商户管理员账号开通服务无响应" : result.getMsg());
+        }
     }
 }

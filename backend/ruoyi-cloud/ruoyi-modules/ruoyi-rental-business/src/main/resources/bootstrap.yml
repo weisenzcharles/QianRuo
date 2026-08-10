@@ -1,0 +1,33 @@
+# 租赁核心业务服务本地兜底配置。
+server:
+  port: 9220
+
+spring:
+  application:
+    name: rental-business
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      config:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+  config:
+    file-extension: yml
+    import:
+      - nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: ${BUSINESS_DB_URL:jdbc:mysql://localhost:3306/ry_business?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai}
+          username: ${BUSINESS_DB_USERNAME:qianruo_business}
+          password: ${BUSINESS_DB_PASSWORD:CHANGE_ME_BUSINESS_DB_PASSWORD}
+
+# 业务服务只扫描自己的实体和 Mapper，防止误用平台或商户数据访问类。
+mybatis:
+  typeAliasesPackage: com.ruoyi.rentalbusiness.domain
+  mapperLocations: classpath:mapper/**/*.xml

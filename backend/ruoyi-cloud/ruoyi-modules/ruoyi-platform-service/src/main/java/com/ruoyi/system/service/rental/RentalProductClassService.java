@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.exception.ServiceException;
@@ -11,6 +12,7 @@ import com.ruoyi.common.core.utils.StringUtils;
 import com.ruoyi.system.api.model.ProductClass;
 import com.ruoyi.system.domain.rental.RentalProductClass;
 import com.ruoyi.system.mapper.rental.RentalProductClassMapper;
+import com.ruoyi.system.service.SysCodeRuleService;
 
 /** 平台产品类目业务服务。 */
 @Service
@@ -21,14 +23,29 @@ public class RentalProductClassService
 
     private final RentalProductClassMapper productClassMapper;
 
+    private final SysCodeRuleService codeRuleService;
+
     /**
      * 注入平台产品类目数据访问组件。
      *
      * @param productClassMapper 平台产品类目数据访问组件
      */
-    public RentalProductClassService(RentalProductClassMapper productClassMapper)
+    @Autowired
+    public RentalProductClassService(RentalProductClassMapper productClassMapper, SysCodeRuleService codeRuleService)
     {
         this.productClassMapper = productClassMapper;
+        this.codeRuleService = codeRuleService;
+    }
+
+    /**
+     * 保留单参数构造方法供不加载 Spring 容器的层级规则单元测试使用；正式运行必须
+     * 使用注入统一编码服务的构造方法。
+     *
+     * @param productClassMapper 平台产品类目数据访问组件
+     */
+    public RentalProductClassService(RentalProductClassMapper productClassMapper)
+    {
+        this(productClassMapper, null);
     }
 
     /**
@@ -64,6 +81,7 @@ public class RentalProductClassService
     public int add(RentalProductClass productClass, String operator)
     {
         normalize(productClass);
+        productClass.setClassCode(requireCodeRuleService().nextCode("product_class"));
         prepareHierarchy(productClass);
         validateUnique(productClass);
         productClass.setCreateBy(operator);
@@ -82,6 +100,7 @@ public class RentalProductClassService
     {
         RentalProductClass existing = requireClass(productClass.getClassId());
         normalize(productClass);
+        productClass.setClassCode(existing.getClassCode());
         if (productClass.getClassId().equals(productClass.getParentId()))
         {
             throw new ServiceException("上级类目不能选择当前类目自身");
@@ -248,6 +267,20 @@ public class RentalProductClassService
             throw new ServiceException("产品类目不存在或已删除");
         }
         return productClass;
+    }
+
+    /**
+     * 获取平台统一编码服务；仅在测试未覆盖新增类目时允许为空，生产调用必须由 Spring 注入。
+     *
+     * @return 平台统一编码服务
+     */
+    private SysCodeRuleService requireCodeRuleService()
+    {
+        if (codeRuleService == null)
+        {
+            throw new ServiceException("平台统一编码服务未配置");
+        }
+        return codeRuleService;
     }
 
     /**

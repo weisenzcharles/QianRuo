@@ -61,11 +61,4 @@ public interface IRentalMemberService
      */
     public int deleteRentalMemberByIds(Long[] memberIds);
 
-    /**
-     * 校验商户编码是否唯一
-     *
-     * @param member 租赁商户
-     * @return 结果
-     */
-    public boolean checkMemberCodeUnique(RentalMember member);
 }

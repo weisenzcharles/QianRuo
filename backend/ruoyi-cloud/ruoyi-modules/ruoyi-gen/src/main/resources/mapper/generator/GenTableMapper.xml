@@ -61,7 +61,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectGenTableList" parameterType="GenTable" resultMap="GenTableResult">
 		<include refid="selectGenTableVo"/>
 		<where>
-			isdeleted = 0
+			is_delete = 0
 			<if test="tableName != null and tableName != ''">
 				AND lower(table_name) like lower(concat('%', #{tableName}, '%'))
 			</if>
@@ -81,7 +81,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		select table_name, table_comment, create_time, update_time from information_schema.tables
 		where table_schema = (select database())
 		AND table_name NOT LIKE 'qrtz\_%' AND table_name NOT LIKE 'gen\_%'
-		AND table_name NOT IN (select table_name from gen_table where isdeleted = 0)
+		AND table_name NOT IN (select table_name from gen_table where is_delete = 0)
 		<if test="tableName != null and tableName != ''">
 			AND lower(table_name) like lower(concat('%', #{tableName}, '%'))
 		</if>
@@ -116,24 +116,24 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	    SELECT t.table_id, t.table_name, t.table_comment, t.sub_table_name, t.sub_table_fk_name, t.class_name, t.tpl_category, t.tpl_web_type, t.package_name, t.module_name, t.business_name, t.function_name, t.function_author, t.gen_type, t.gen_path, t.options, t.remark,
 			   c.column_id, c.column_name, c.column_comment, c.column_type, c.java_type, c.java_field, c.is_pk, c.is_increment, c.is_required, c.is_insert, c.is_edit, c.is_list, c.is_query, c.query_type, c.html_type, c.dict_type, c.sort
 		FROM gen_table t
-			 LEFT JOIN gen_table_column c ON t.table_id = c.table_id and c.isdeleted = 0
-		where t.table_id = #{tableId} and t.isdeleted = 0 order by c.sort
+			 LEFT JOIN gen_table_column c ON t.table_id = c.table_id and c.is_delete = 0
+		where t.table_id = #{tableId} and t.is_delete = 0 order by c.sort
 	</select>
 
 	<select id="selectGenTableByName" parameterType="String" resultMap="GenTableResult">
 	    SELECT t.table_id, t.table_name, t.table_comment, t.sub_table_name, t.sub_table_fk_name, t.class_name, t.tpl_category, t.tpl_web_type, t.package_name, t.module_name, t.business_name, t.function_name, t.function_author, t.gen_type, t.gen_path, t.options, t.remark,
 			   c.column_id, c.column_name, c.column_comment, c.column_type, c.java_type, c.java_field, c.is_pk, c.is_increment, c.is_required, c.is_insert, c.is_edit, c.is_list, c.is_query, c.query_type, c.html_type, c.dict_type, c.sort
 		FROM gen_table t
-			 LEFT JOIN gen_table_column c ON t.table_id = c.table_id and c.isdeleted = 0
-		where t.table_name = #{tableName} and t.isdeleted = 0 order by c.sort
+			 LEFT JOIN gen_table_column c ON t.table_id = c.table_id and c.is_delete = 0
+		where t.table_name = #{tableName} and t.is_delete = 0 order by c.sort
 	</select>
 
 	<select id="selectGenTableAll" parameterType="String" resultMap="GenTableResult">
 	    SELECT t.table_id, t.table_name, t.table_comment, t.sub_table_name, t.sub_table_fk_name, t.class_name, t.tpl_category, t.tpl_web_type, t.package_name, t.module_name, t.business_name, t.function_name, t.function_author, t.options, t.remark,
 			   c.column_id, c.column_name, c.column_comment, c.column_type, c.java_type, c.java_field, c.is_pk, c.is_increment, c.is_required, c.is_insert, c.is_edit, c.is_list, c.is_query, c.query_type, c.html_type, c.dict_type, c.sort
 		FROM gen_table t
-			 LEFT JOIN gen_table_column c ON t.table_id = c.table_id and c.isdeleted = 0
-		where t.isdeleted = 0
+			 LEFT JOIN gen_table_column c ON t.table_id = c.table_id and c.is_delete = 0
+		where t.is_delete = 0
 		order by c.sort
 	</select>
 
@@ -195,11 +195,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()
         </set>
-        where table_id = #{tableId} and isdeleted = 0
+        where table_id = #{tableId} and is_delete = 0
     </update>
 
     <update id="deleteGenTableByIds" parameterType="Long">
-        update gen_table set isdeleted = 1 where table_id in
+        update gen_table set is_delete = 1 where table_id in
         <foreach collection="array" item="tableId" open="(" separator="," close=")">
             #{tableId}
         </foreach>

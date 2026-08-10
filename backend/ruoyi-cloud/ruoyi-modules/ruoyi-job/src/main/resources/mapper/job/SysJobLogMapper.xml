@@ -25,7 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectJobLogList" parameterType="SysJobLog" resultMap="SysJobLogResult">
 		<include refid="selectJobLogVo"/>
 		<where>
-			isdeleted = 0
+			is_delete = 0
 			<if test="jobName != null and jobName != ''">
 				AND job_name like concat('%', #{jobName}, '%')
 			</if>
@@ -50,27 +50,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 	<select id="selectJobLogAll" resultMap="SysJobLogResult">
 		<include refid="selectJobLogVo"/>
-		where isdeleted = 0
+		where is_delete = 0
 	</select>
 
 	<select id="selectJobLogById" parameterType="Long" resultMap="SysJobLogResult">
 		<include refid="selectJobLogVo"/>
-		where job_log_id = #{jobLogId} and isdeleted = 0
+		where job_log_id = #{jobLogId} and is_delete = 0
 	</select>
 
 	<update id="deleteJobLogById" parameterType="Long">
-        update sys_job_log set isdeleted = 1 where job_log_id = #{jobLogId}
+        update sys_job_log set is_delete = 1 where job_log_id = #{jobLogId}
         </update>
 
         <update id="deleteJobLogByIds" parameterType="Long">
-        update sys_job_log set isdeleted = 1 where job_log_id in
+        update sys_job_log set is_delete = 1 where job_log_id in
         <foreach collection="array" item="jobLogId" open="(" separator="," close=")">
         #{jobLogId}
         </foreach>
         </update>
 
         <update id="cleanJobLog">
-        update sys_job_log set isdeleted = 1 where isdeleted = 0
+        update sys_job_log set is_delete = 1 where is_delete = 0
     </update>
 
         <insert id="insertJobLog" parameterType="SysJobLog">

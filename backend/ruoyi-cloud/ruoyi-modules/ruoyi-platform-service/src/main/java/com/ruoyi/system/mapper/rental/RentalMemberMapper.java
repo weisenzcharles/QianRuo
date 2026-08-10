@@ -74,11 +74,4 @@ public interface RentalMemberMapper
      */
     public int deleteRentalMemberByIds(Long[] memberIds);
 
-    /**
-     * 校验商户编码
-     *
-     * @param memberCode 商户编码
-     * @return 租赁商户
-     */
-    public RentalMember checkMemberCodeUnique(String memberCode);
 }

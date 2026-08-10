@@ -62,6 +62,7 @@ public class MerchantProfileController
     @PutMapping
     public AjaxResult update(@RequestBody MerchantProfileUpdateCommand command)
     {
+        MerchantContextUtils.requireMerchantApproved();
         MerchantAccount current = requireCurrentAccount();
         MerchantAccount phoneAccount = StringUtils.isEmpty(command.getPhonenumber())
                 ? null : identityMapper.selectByPhone(command.getPhonenumber());
@@ -90,6 +91,7 @@ public class MerchantProfileController
     @PutMapping("/updatePwd")
     public AjaxResult updatePassword(@RequestBody MerchantPasswordCommand command)
     {
+        MerchantContextUtils.requireMerchantApproved();
         MerchantAccount account = requireCurrentAccount();
         if (!validPassword(command.getNewPassword()))
         {
@@ -126,6 +128,7 @@ public class MerchantProfileController
     @PostMapping("/avatar")
     public AjaxResult avatar(@RequestParam("avatarfile") MultipartFile file)
     {
+        MerchantContextUtils.requireMerchantApproved();
         if (file.isEmpty())
         {
             return AjaxResult.error("请选择头像文件");

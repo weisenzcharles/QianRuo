@@ -3,7 +3,7 @@ package com.ruoyi.common.core.enums;
 /**
  * 统一软删除状态。
  *
- * <p>该枚举只对应数据库 {@code isdeleted} 字段，不与账号启停等业务状态混用。</p>
+ * <p>该枚举只对应数据库 {@code is_delete} 字段，不与账号启停等业务状态混用。</p>
  */
 public enum SoftDeleteStatus
 {

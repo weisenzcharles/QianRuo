@@ -24,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 查询条件 -->
 	<sql id="sqlwhereSearch">
 		<where>
-			isdeleted = 0
+			is_delete = 0
 			<if test="configId !=null">
 				and config_id = #{configId}
 			</if>
@@ -42,7 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectConfigList" parameterType="SysConfig" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
         <where>
-            isdeleted = 0
+            is_delete = 0
 			<if test="configName != null and configName != ''">
 				AND config_name like concat('%', #{configName}, '%')
 			</if>
@@ -63,12 +63,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectConfigById" parameterType="Long" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
-        where config_id = #{configId} and isdeleted = 0
+        where config_id = #{configId} and is_delete = 0
     </select>
 
     <select id="checkConfigKeyUnique" parameterType="String" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
-        where config_key = #{configKey} and isdeleted = 0 limit 1
+        where config_key = #{configKey} and is_delete = 0 limit 1
     </select>
 
     <insert id="insertConfig" parameterType="SysConfig">
@@ -102,15 +102,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="remark != null">remark = #{remark},</if>
         update_time = sysdate()
         </set>
-        where config_id = #{configId} and isdeleted = 0
+        where config_id = #{configId} and is_delete = 0
     </update>
 
     <update id="deleteConfigById" parameterType="Long">
-        update sys_config set isdeleted = 1 where config_id = #{configId}
+        update sys_config set is_delete = 1 where config_id = #{configId}
     </update>
 
     <update id="deleteConfigByIds" parameterType="Long">
-        update sys_config set isdeleted = 1 where config_id in
+        update sys_config set is_delete = 1 where config_id in
         <foreach item="configId" collection="array" open="(" separator="," close=")">
         #{configId}
         </foreach>

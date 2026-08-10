@@ -8,8 +8,10 @@
 
 - 商家端：服务租赁商家及员工，覆盖订单录入、SN 绑定、仓库库存、发货归还、验机售后、套餐商品、联盟协作、周转市场和个人中心。
 - 平台后台：服务平台内部运营、客服、财务、风控和系统管理员，覆盖会员认证、平台财务、总库存、订单统计、市场风控、推广佣金、系统配置和日志监控。
-- 后端服务：基于 RuoYi-Cloud 微服务体系，提供网关、认证、系统基础、文件、任务调度、监控和后续租赁业务服务能力。
-- 数据库：独立维护租赁业务库 `ry_rental`，不直接修改 RuoYi-Cloud 原生系统库表。
+- 后端服务：基于 RuoYi-Cloud 微服务体系，提供网关、认证、平台治理、商户身份、独立租赁业务、文件、任务调度和监控服务。
+- 数据库：平台和商户身份数据使用 `ry-cloud`/`ry_rental`，租赁核心业务服务独立使用 `ry_business`，不直接修改 RuoYi-Cloud 原生系统库表。
+
+当前历史租赁 DDL 仍会在 `ry_rental` 中初始化部分业务表；`rental-business` 已完成独立服务和数据库边界，后续按领域迁移商品、库存、订单等核心表到 `ry_business`。
 
 ## 技术栈
 
@@ -49,7 +51,7 @@
 │       ├── ruoyi-auth/           # 认证中心
 │       ├── ruoyi-api/            # 远程接口定义
 │       ├── ruoyi-common/         # 通用能力
-│       ├── ruoyi-modules/        # platform/merchant/file/gen/job 等可执行模块
+│       ├── ruoyi-modules/        # platform/merchant/rental-business/file/gen/job 等可执行模块
 │       ├── ruoyi-visual/         # 监控模块
 │       ├── docker/               # Docker 部署参考
 │       └── sql/                  # RuoYi 原生 SQL
@@ -170,7 +172,8 @@ mvn clean install
 2. 启动 `ruoyi-gateway`。
 3. 启动 `ruoyi-auth`。
 4. 启动 `ruoyi-modules/ruoyi-platform-service`（运行时服务名仍为 `platform-service`）。
-5. 按需启动 `ruoyi-file`、`ruoyi-job`、`ruoyi-gen`、`ruoyi-visual/ruoyi-monitor`。
+5. 启动 `ruoyi-modules/ruoyi-rental-business`（运行时服务名 `rental-business`，端口 `9220`）。
+6. 按需启动 `ruoyi-file`、`ruoyi-job`、`ruoyi-gen`、`ruoyi-visual/ruoyi-monitor`。
 
 具体端口与注册配置以各模块 `bootstrap.yml` 和 Nacos 配置为准。
 

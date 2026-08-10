@@ -58,7 +58,7 @@ SET tenant_id = 0,
     update_by = 'migration',
     update_time = NOW(),
     remark = '当前商户操作日志',
-    isdeleted = '0'
+    is_delete = '0'
 WHERE menu_id = 2190;
 
 UPDATE `ry_rental_merchant_menu`
@@ -77,15 +77,15 @@ SET tenant_id = 0,
     update_by = 'migration',
     update_time = NOW(),
     remark = '导出当前商户操作日志',
-    isdeleted = '0'
+    is_delete = '0'
 WHERE menu_id = 2191;
 
 INSERT IGNORE INTO `ry_rental_merchant_role_menu` (tenant_id, member_id, role_id, menu_id)
 SELECT r.tenant_id, r.member_id, r.role_id, m.menu_id
 FROM `ry_rental_merchant_role` r
 INNER JOIN `ry_rental_merchant_menu` m ON m.menu_id IN (2190, 2191)
-WHERE r.role_key = 'merchant_admin' AND r.status = '0' AND r.isdeleted = '0'
-  AND m.tenant_id = 0 AND m.member_id = 0 AND m.status = '0' AND m.isdeleted = '0';
+WHERE r.role_key = 'merchant_admin' AND r.status = '0' AND r.is_delete = '0'
+  AND m.tenant_id = 0 AND m.member_id = 0 AND m.status = '0' AND m.is_delete = '0';
 
 INSERT IGNORE INTO `ry_rental_merchant_user_menu` (tenant_id, member_id, merchant_user_id, menu_id)
 SELECT ur.tenant_id, ur.member_id, ur.merchant_user_id, rm.menu_id
@@ -94,5 +94,5 @@ INNER JOIN `ry_rental_merchant_role` r
     ON r.tenant_id = ur.tenant_id AND r.member_id = ur.member_id AND r.role_id = ur.role_id
 INNER JOIN `ry_rental_merchant_role_menu` rm
     ON rm.tenant_id = ur.tenant_id AND rm.member_id = ur.member_id AND rm.role_id = ur.role_id
-WHERE r.role_key = 'merchant_admin' AND r.status = '0' AND r.isdeleted = '0'
+WHERE r.role_key = 'merchant_admin' AND r.status = '0' AND r.is_delete = '0'
   AND rm.menu_id IN (2190, 2191);

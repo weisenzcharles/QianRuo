@@ -24,10 +24,10 @@ public class RentalProductClass extends BaseEntity
     /** 祖先主键路径，由服务端维护。 */
     private String ancestors;
 
-    /** 类目编码。 */
-    @NotBlank(message = "类目编码不能为空")
+    /**
+     * 类目编码由平台统一编码规则服务在新增时生成，客户端只负责展示已有编码。
+     */
     @Size(max = 64, message = "类目编码长度不能超过64个字符")
-    @Pattern(regexp = "^[A-Za-z0-9_-]+$", message = "类目编码只能包含字母、数字、下划线和短横线")
     private String classCode;
 
     /** 类目名称。 */

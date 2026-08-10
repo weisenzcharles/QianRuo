@@ -35,6 +35,7 @@
 <script setup>
 import { constantRoutes } from "@/router"
 import { isHttp } from '@/utils/validate'
+import { resolveMerchantMenuTarget } from '@/utils/merchantMenu'
 import useAppStore from '@/store/modules/app'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'
@@ -82,7 +83,7 @@ const childrenMenus = computed(() => {
         if(router.path === "/") {
           router.children[item].path = "/" + router.children[item].path
         } else {
-          if(!isHttp(router.children[item].path)) {
+          if(!isHttp(router.children[item].path) && !router.children[item].path.startsWith('/')) {
             router.children[item].path = router.path + "/" + router.children[item].path
           }
         }
@@ -121,8 +122,8 @@ function handleSelect(key, keyPath) {
   currentIndex.value = key
   const route = routers.value.find(item => item.path === key)
   if (isHttp(key)) {
-    // http(s):// 路径新窗口打开
-    window.open(key, "_blank")
+    // 外部菜单统一转为当前内容区的内嵌路由，禁止顶部菜单打开新窗口。
+    router.push(resolveMerchantMenuTarget(key))
   } else if (!route || !route.children) {
     // 没有子路由路径内部打开
     const routeMenu = childrenMenus.value.find(item => item.path === key)

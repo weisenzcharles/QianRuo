@@ -17,7 +17,9 @@ const useUserStore = defineStore(
       avatar: '',
       roles: [],
       permissions: [],
-      mustChangePassword: false
+      mustChangePassword: false,
+      merchantAuthStatus: '',
+      featureEnabled: false
     }),
     actions: {
       // 登录
@@ -27,6 +29,8 @@ const useUserStore = defineStore(
         this.roles = []
         this.permissions = []
         this.mustChangePassword = false
+        this.merchantAuthStatus = ''
+        this.featureEnabled = false
         const loginType = userInfo.loginType || 'password'
         const username = (userInfo.username || '').trim()
         const password = userInfo.password
@@ -47,6 +51,8 @@ const useUserStore = defineStore(
             this.roles = []
             this.permissions = []
             this.mustChangePassword = false
+            this.merchantAuthStatus = ''
+            this.featureEnabled = false
             removeToken()
             reject(error)
           })
@@ -60,10 +66,12 @@ const useUserStore = defineStore(
             const avatar = (isEmpty(user.avatar)) ? defAva : user.avatar
             if (res.roles && res.roles.length > 0) { // 验证返回的roles是否是一个非空数组
               this.roles = res.roles
-              this.permissions = res.permissions
+            this.permissions = res.permissions
             } else {
               this.roles = ['ROLE_DEFAULT']
             }
+            this.merchantAuthStatus = res.merchantAuthStatus || ''
+            this.featureEnabled = res.featureEnabled === true
             this.id = user.userId
             this.name = user.userName
             this.nickName = user.nickName
@@ -81,6 +89,8 @@ const useUserStore = defineStore(
             this.roles = []
             this.permissions = []
             this.mustChangePassword = false
+            this.merchantAuthStatus = ''
+            this.featureEnabled = false
             removeToken()
             reject(error)
           })
@@ -94,6 +104,8 @@ const useUserStore = defineStore(
             this.roles = []
             this.permissions = []
             this.mustChangePassword = false
+            this.merchantAuthStatus = ''
+            this.featureEnabled = false
             removeToken()
             resolve()
           }).catch(error => {
@@ -101,6 +113,8 @@ const useUserStore = defineStore(
             this.roles = []
             this.permissions = []
             this.mustChangePassword = false
+            this.merchantAuthStatus = ''
+            this.featureEnabled = false
             removeToken()
             reject(error)
           })

@@ -15,7 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="avatar" column="avatar" />
         <result property="password" column="password" />
         <result property="status" column="status" />
-        <result property="isdeleted" column="isdeleted" />
+        <result property="isdeleted" column="is_delete" />
         <result property="loginIp" column="login_ip" />
         <result property="loginDate" column="login_date" />
         <result property="pwdUpdateDate" column="pwd_update_date" />
@@ -33,7 +33,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectMerchantUserVo">
         select u.merchant_user_id, u.tenant_id, u.member_id, u.user_name, u.nick_name, u.phone, u.email, u.avatar,
-               u.password, u.status, u.isdeleted, u.login_ip, u.login_date, u.pwd_update_date,
+               u.password, u.status, u.is_delete, u.login_ip, u.login_date, u.pwd_update_date,
                u.must_change_password,
                u.create_by, u.create_time, u.update_by, u.update_time, u.remark,
                m.legal_subject_name, m.nickname as member_nickname,
@@ -45,13 +45,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 and u.member_id = um.member_id
                 and u.merchant_user_id = um.merchant_user_id
                 and um.status = '0'
-                and um.isdeleted = '0'
+                and um.is_delete = '0'
     </sql>
 
     <select id="selectMerchantUserList" parameterType="RentalMerchantUser" resultMap="RentalMerchantUserResult">
         <include refid="selectMerchantUserVo" />
         <where>
-            u.isdeleted = '0'
+            u.is_delete = '0'
             <if test="tenantId != null">and u.tenant_id = #{tenantId}</if>
             <if test="memberId != null">and u.member_id = #{memberId}</if>
             <if test="userName != null and userName != ''">and u.user_name like concat('%', #{userName}, '%')</if>
@@ -71,31 +71,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectById" resultMap="RentalMerchantUserResult">
         <include refid="selectMerchantUserVo" />
         where u.merchant_user_id = #{merchantUserId}
-          and u.isdeleted = '0'
+          and u.is_delete = '0'
     </select>
 
     <select id="selectByUserName" parameterType="String" resultMap="RentalMerchantUserResult">
         <include refid="selectMerchantUserVo" />
         where u.user_name = #{userName}
-          and u.isdeleted = '0'
+          and u.is_delete = '0'
     </select>
 
     <select id="selectByPhone" parameterType="String" resultMap="RentalMerchantUserResult">
         <include refid="selectMerchantUserVo" />
         where u.phone = #{phone}
-          and u.isdeleted = '0'
+          and u.is_delete = '0'
     </select>
 
     <select id="selectByEmail" parameterType="String" resultMap="RentalMerchantUserResult">
         <include refid="selectMerchantUserVo" />
         where u.email = #{email}
-          and u.isdeleted = '0'
+          and u.is_delete = '0'
     </select>
 
     <insert id="insertMerchantUser" parameterType="RentalMerchantUser" useGeneratedKeys="true" keyProperty="merchantUserId">
         insert into `ry_rental`.`ry_rental_merchant_user`(
             tenant_id, member_id, user_name, nick_name, phone, email, avatar, password,
-            status, isdeleted, must_change_password, create_by, create_time, remark
+            status, is_delete, must_change_password, create_by, create_time, remark
         ) values (
             #{tenantId}, #{memberId}, #{userName}, #{nickName}, #{phone}, #{email}, #{avatar}, #{password},
             #{status}, '0', 1, #{createBy}, sysdate(), #{remark}
@@ -117,12 +117,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where merchant_user_id = #{merchantUserId}
           and tenant_id = #{tenantId}
           and member_id = #{memberId}
-          and isdeleted = '0'
+          and is_delete = '0'
     </update>
 
     <update id="deleteMerchantUserByIds">
         update `ry_rental`.`ry_rental_merchant_user`
-        set isdeleted = 1,
+        set is_delete = 1,
             update_time = sysdate()
         where merchant_user_id in
         <foreach collection="merchantUserIds" item="merchantUserId" open="(" separator="," close=")">

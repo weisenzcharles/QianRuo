@@ -310,6 +310,7 @@ public class SysLoginService
         loginUser.setClientType(Constants.CLIENT_TYPE_MERCHANT);
         loginUser.setTenantId(identity.getTenantId());
         loginUser.setMemberId(identity.getMerchantId());
+        loginUser.setMerchantAuthStatus(identity.getMerchantAuthStatus());
         loginUser.setMemberRole(identity.getMemberRole());
         loginUser.setWarehouseScopeType(identity.getWarehouseScopeType());
         loginUser.setWarehouseIds(identity.getWarehouseIds());

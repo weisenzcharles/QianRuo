@@ -77,6 +77,14 @@ function hasOneShowingChild(children = [], parent) {
 }
 
 function resolvePath(routePath, routeQuery) {
+  // 动态菜单保存的是完整商户路由；子菜单已经带有根路径时直接使用，避免重复拼接父路由。
+  if (typeof routePath === 'string' && routePath.startsWith('/')) {
+    if (routeQuery) {
+      const query = JSON.parse(routeQuery)
+      return { path: getNormalPath(routePath), query: query }
+    }
+    return getNormalPath(routePath)
+  }
   if (isExternal(routePath)) {
     return routePath
   }

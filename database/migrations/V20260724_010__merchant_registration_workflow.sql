@@ -27,7 +27,7 @@ SET @active_contact_phone_exists = (
 );
 SET @active_contact_phone_sql = IF(
     @active_contact_phone_exists = 0,
-    'ALTER TABLE `ry_rental`.`ry_rental_member` ADD COLUMN `active_contact_phone` VARCHAR(32) GENERATED ALWAYS AS (CASE WHEN `isdeleted` = 0 AND `contact_phone` IS NOT NULL AND `contact_phone` <> '''' THEN `contact_phone` ELSE NULL END) STORED COMMENT ''有效商户手机号唯一键'' AFTER `isdeleted`',
+    'ALTER TABLE `ry_rental`.`ry_rental_member` ADD COLUMN `active_contact_phone` VARCHAR(32) GENERATED ALWAYS AS (CASE WHEN `is_delete` = 0 AND `contact_phone` IS NOT NULL AND `contact_phone` <> '''' THEN `contact_phone` ELSE NULL END) STORED COMMENT ''有效商户手机号唯一键'' AFTER `is_delete`',
     'SELECT 1'
 );
 PREPARE active_contact_phone_stmt FROM @active_contact_phone_sql;
@@ -43,13 +43,13 @@ SELECT member_item.contact_phone,
                FROM `ry_rental`.`ry_rental_merchant_user` user_item
                WHERE user_item.tenant_id = member_item.tenant_id
                  AND user_item.member_id = member_item.member_id
-                 AND user_item.isdeleted = 0
+                 AND user_item.is_delete = 0
            ) THEN member_item.member_id END),
            MAX(CASE WHEN member_item.auth_status = 'verified' THEN member_item.member_id END),
            MAX(member_item.member_id)
        ) AS keep_member_id
 FROM `ry_rental`.`ry_rental_member` member_item
-WHERE member_item.isdeleted = 0
+WHERE member_item.is_delete = 0
   AND member_item.contact_phone IS NOT NULL
   AND member_item.contact_phone <> ''
 GROUP BY member_item.contact_phone
@@ -59,11 +59,11 @@ UPDATE `ry_rental`.`ry_rental_member` member_item
 INNER JOIN `qianruo_member_phone_keeper` keeper
         ON keeper.contact_phone = member_item.contact_phone
        AND keeper.keep_member_id <> member_item.member_id
-SET member_item.isdeleted = 1,
+SET member_item.is_delete = 1,
     member_item.update_by = 'migration',
     member_item.update_time = NOW(),
     member_item.remark = CONCAT_WS('; ', NULLIF(member_item.remark, ''), '重复手机号申请已归档')
-WHERE member_item.isdeleted = 0;
+WHERE member_item.is_delete = 0;
 
 DROP TEMPORARY TABLE IF EXISTS `qianruo_member_phone_keeper`;
 

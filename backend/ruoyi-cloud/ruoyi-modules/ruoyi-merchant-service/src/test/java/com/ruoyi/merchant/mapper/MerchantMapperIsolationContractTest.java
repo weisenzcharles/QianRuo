@@ -29,6 +29,9 @@ public class MerchantMapperIsolationContractTest
     {
         Document mapper = load("mapper/merchant/MerchantMenuMapper.xml");
         assertScoped(mapper, "selectByUser", "selectIdsByRole");
+        String previewSql = statement(mapper, "selectDefaultPreviewMenus").replaceAll("\\s+", " ").toLowerCase();
+        require(previewSql.contains("tenant_id = 0") && previewSql.contains("member_id = 0"),
+                "default preview menus must only read global merchant menu templates");
     }
 
     /** 验证个人资料与仓库范围操作始终包含租户及商户条件。 */
@@ -40,14 +43,23 @@ public class MerchantMapperIsolationContractTest
                 "updateProfile", "updateAvatar", "updatePassword");
     }
 
-    /** 验证登录必须关联已审核商户，且平台开户写操作带有商户归属约束。 */
+    /** 验证登录必须关联有效商户绑定，未审核账号使用默认只读权限，且平台开户写操作带有商户归属约束。 */
     @Test
-    public void loginRequiresVerifiedMerchantAndProvisioningIsScoped() throws Exception
+    public void loginBindingAndDefaultReadPermissionsAreScoped() throws Exception
     {
         Document mapper = load("mapper/merchant/MerchantIdentityMapper.xml");
         String bindingSql = statement(mapper, "selectActiveBinding").replaceAll("\\s+", " ").toLowerCase();
-        require(bindingSql.contains("m.auth_status = 'verified'"),
-                "merchant login binding must require platform approval");
+        require(bindingSql.contains("m.status = '0'"), "merchant login binding must require active member");
+        require(bindingSql.contains("m.is_delete = '0'"), "merchant login binding must exclude deleted member");
+        String defaultPermissionSql = statement(mapper, "selectDefaultReadPermissions")
+                .replaceAll("\\s+", " ").toLowerCase();
+        require(defaultPermissionSql.contains("perms like 'merchant:%:list'"),
+                "default merchant permissions must include list permissions");
+        require(defaultPermissionSql.contains("perms like 'merchant:%:query'"),
+                "default merchant permissions must include query permissions");
+        require(!defaultPermissionSql.contains(":edit") && !defaultPermissionSql.contains(":add")
+                && !defaultPermissionSql.contains(":remove") && !defaultPermissionSql.contains(":export"),
+                "default merchant permissions must not include write permissions");
         assertScoped(mapper, "countOwnerBinding", "insertOwnerBinding", "selectAdminRoleId",
                 "insertAdminRoleMenus", "insertAdminUserRole");
     }
@@ -66,6 +78,14 @@ public class MerchantMapperIsolationContractTest
     {
         Document mapper = load("mapper/merchant/MerchantProductClassMapper.xml");
         assertScoped(mapper, "selectClassIds", "countSelected", "softDeleteAll", "upsertSelections");
+    }
+
+    /** 验证商户常用型号关系的查询、删除和恢复操作始终包含租户及商户条件。 */
+    @Test
+    public void brandModelSelectionsAreMerchantScoped() throws Exception
+    {
+        Document mapper = load("mapper/merchant/MerchantBrandModelMapper.xml");
+        assertScoped(mapper, "selectSelectedModelIds", "countSelected", "softDeleteAll", "upsertSelections");
     }
 
     /**

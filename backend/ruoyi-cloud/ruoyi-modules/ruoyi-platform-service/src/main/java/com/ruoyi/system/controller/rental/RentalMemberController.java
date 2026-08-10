@@ -25,6 +25,7 @@ import com.ruoyi.common.security.utils.SecurityUtils;
 import com.ruoyi.system.domain.rental.RentalMember;
 import com.ruoyi.system.model.rental.RentalMemberAuditCommand;
 import com.ruoyi.system.service.rental.IRentalMemberService;
+import com.ruoyi.system.service.rental.RentalMemberCertificationService;
 
 /**
  * 租赁商户管理
@@ -39,6 +40,9 @@ public class RentalMemberController extends BaseController
 
     @Autowired
     private IRentalMemberService memberService;
+
+    @Autowired
+    private RentalMemberCertificationService certificationService;
 
     /**
      * 校验当前请求来自平台终端，防止商户令牌越权调用平台商户管理接口。
@@ -92,6 +96,62 @@ public class RentalMemberController extends BaseController
     }
 
     /**
+     * 查询平台商户全部认证版本及其材料明细，供平台审核人员查看历史提交内容。
+     *
+     * @param memberId 商户主键
+     * @return 认证版本历史
+     */
+    @RequiresPermissions("platform:member:query")
+    @GetMapping("/{memberId}/certification-history")
+    public AjaxResult certificationHistory(@PathVariable Long memberId)
+    {
+        assertAdminClient();
+        return success(certificationService.selectCertificationHistory(memberId));
+    }
+
+    /**
+     * 查询商户当前接单资格快照。
+     *
+     * @param memberId 商户主键
+     * @return 当前接单资格列表
+     */
+    @RequiresPermissions("platform:member:query")
+    @GetMapping("/{memberId}/qualifications")
+    public AjaxResult qualifications(@PathVariable Long memberId)
+    {
+        assertAdminClient();
+        return success(certificationService.selectQualifications(memberId));
+    }
+
+    /**
+     * 查询商户会员类型变更历史。
+     *
+     * @param memberId 商户主键
+     * @return 会员类型历史
+     */
+    @RequiresPermissions("platform:member:query")
+    @GetMapping("/{memberId}/membership-history")
+    public AjaxResult membershipHistory(@PathVariable Long memberId)
+    {
+        assertAdminClient();
+        return success(certificationService.selectMembershipHistory(memberId));
+    }
+
+    /**
+     * 查询商户接单资格变更历史。
+     *
+     * @param memberId 商户主键
+     * @return 接单资格历史
+     */
+    @RequiresPermissions("platform:member:query")
+    @GetMapping("/{memberId}/qualification-history")
+    public AjaxResult qualificationHistory(@PathVariable Long memberId)
+    {
+        assertAdminClient();
+        return success(certificationService.selectQualificationHistory(memberId));
+    }
+
+    /**
      * 新增租赁商户
      */
     @RequiresPermissions("platform:member:add")
@@ -101,10 +161,6 @@ public class RentalMemberController extends BaseController
     {
         assertAdminClient();
         setDefaultTenantId(member);
-        if (!memberService.checkMemberCodeUnique(member))
-        {
-            return error("新增商户'" + member.getMemberCode() + "'失败，商户编码已存在");
-        }
         member.setCreateBy(SecurityUtils.getUsername());
         return toAjax(memberService.insertRentalMember(member));
     }
@@ -119,10 +175,6 @@ public class RentalMemberController extends BaseController
     {
         assertAdminClient();
         setDefaultTenantId(member);
-        if (!memberService.checkMemberCodeUnique(member))
-        {
-            return error("修改商户'" + member.getMemberCode() + "'失败，商户编码已存在");
-        }
         member.setUpdateBy(SecurityUtils.getUsername());
         return toAjax(memberService.updateRentalMember(member));
     }

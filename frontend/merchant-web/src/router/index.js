@@ -77,6 +77,32 @@ export const constantRoutes = [
     meta: { title: '锁定屏幕' }
   },
   {
+    path: '/merchant/certification',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/merchant/profile/index.vue'),
+        name: 'MerchantCertification',
+        meta: { title: '商户认证资料', noCache: true }
+      }
+    ]
+  },
+  {
+    path: '/merchant/inner-link',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/merchant/innerLink/index.vue'),
+        name: 'MerchantInnerLink',
+        meta: { title: '内嵌页面', noCache: true }
+      }
+    ]
+  },
+  {
     path: '/user',
     component: Layout,
     hidden: true,

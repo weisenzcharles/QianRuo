@@ -1,6 +1,7 @@
 package com.ruoyi.merchant.application;
 
 import java.util.Date;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,8 @@ public class MerchantIdentityService
     private MerchantIdentityMapper identityMapper;
 
     /**
-     * 按用户名加载商户登录身份，并在组装登录上下文前确认所属商户已通过平台审核。
+     * 按用户名加载商户登录身份。待审核和已驳回商户也允许建立登录态，
+     * 但只组装默认只读权限，只有审核通过后才恢复完整业务权限。
      *
      * @param username 商户用户名
      * @return 包含可信租户、商户和权限信息的登录身份
@@ -34,19 +36,17 @@ public class MerchantIdentityService
         {
             throw new ServiceException("商户账号或密码错误");
         }
-        assertMerchantApproved(account.getPhone());
         return assemble(account);
     }
 
     /**
-     * 按手机号加载商户登录身份。待审核、已驳回或尚未开户的申请会返回对应业务提示。
+     * 按手机号加载商户登录身份。注册完成后账号会立即创建，因此待审核和已驳回状态都允许登录。
      *
      * @param phone 已在入驻申请中验证的手机号
      * @return 包含可信租户、商户和权限信息的登录身份
      */
     public MerchantLoginIdentity loadByPhone(String phone)
     {
-        assertMerchantApproved(phone);
         MerchantAccount account = identityMapper.selectByPhone(phone);
         if (account == null)
         {
@@ -185,14 +185,24 @@ public class MerchantIdentityService
         identity.setCreatedAt(account.getCreateTime() == null ? null : account.getCreateTime().getTime());
         identity.setTenantId(binding.getTenantId());
         identity.setMerchantId(binding.getMerchantId());
+        String authStatus = identityMapper.selectMemberAuthStatusByPhone(account.getPhone());
+        identity.setMerchantAuthStatus(authStatus);
         identity.setMemberRole(binding.getMemberRole());
         identity.setWarehouseScopeType(binding.getWarehouseScopeType());
         identity.setWarehouseIds(new LinkedHashSet<Long>(identityMapper.selectWarehouseIds(
                 binding.getTenantId(), binding.getMerchantId(), account.getUserId())));
-        identity.setRoles(new LinkedHashSet<String>(identityMapper.selectRoleKeys(
-                binding.getTenantId(), binding.getMerchantId(), account.getUserId())));
-        identity.setPermissions(new LinkedHashSet<String>(identityMapper.selectPermissions(
-                binding.getTenantId(), binding.getMerchantId(), account.getUserId())));
+        if ("verified".equals(authStatus))
+        {
+            identity.setRoles(new LinkedHashSet<String>(identityMapper.selectRoleKeys(
+                    binding.getTenantId(), binding.getMerchantId(), account.getUserId())));
+            identity.setPermissions(new LinkedHashSet<String>(identityMapper.selectPermissions(
+                    binding.getTenantId(), binding.getMerchantId(), account.getUserId())));
+        }
+        else
+        {
+            identity.setRoles(new LinkedHashSet<String>(Collections.singleton("merchant_default")));
+            identity.setPermissions(new LinkedHashSet<String>(identityMapper.selectDefaultReadPermissions()));
+        }
         return identity;
     }
 
@@ -218,7 +228,7 @@ public class MerchantIdentityService
     }
 
     /**
-     * 将商户审核状态转换为可指导用户下一步操作的登录失败提示。
+     * 将没有自动开通账号的历史申请转换为可指导用户下一步操作的登录失败提示。
      *
      * @param authStatus 平台商户审核状态
      * @return 商户登录不可用原因
@@ -227,11 +237,11 @@ public class MerchantIdentityService
     {
         if ("pending".equals(authStatus))
         {
-            return "商户资料正在审核中，暂时不能登录";
+            return "商户资料正在审核中，商户管理员账号尚未完成开通";
         }
         if ("rejected".equals(authStatus))
         {
-            return "商户资料审核未通过，请在注册页面修改后重新提交";
+            return "商户资料审核未通过，商户管理员账号尚未完成开通";
         }
         if ("verified".equals(authStatus))
         {
@@ -240,17 +250,4 @@ public class MerchantIdentityService
         return "手机号未提交商户申请";
     }
 
-    /**
-     * 校验手机号对应的商户主体已经通过平台审核，未通过时阻止生成商户登录身份。
-     *
-     * @param phone 商户账号绑定手机号
-     */
-    private void assertMerchantApproved(String phone)
-    {
-        String authStatus = identityMapper.selectMemberAuthStatusByPhone(phone);
-        if (!"verified".equals(authStatus))
-        {
-            throw new ServiceException(loginUnavailableMessage(authStatus));
-        }
-    }
 }

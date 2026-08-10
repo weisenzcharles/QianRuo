@@ -24,13 +24,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectNoticeById" parameterType="Long" resultMap="SysNoticeResult">
         <include refid="selectNoticeVo"/>
-        where notice_id = #{noticeId} and isdeleted = 0
+        where notice_id = #{noticeId} and is_delete = 0
     </select>
 
     <select id="selectNoticeList" parameterType="SysNotice" resultMap="SysNoticeResult">
         <include refid="selectNoticeVo"/>
         <where>
-            isdeleted = 0
+            is_delete = 0
 			<if test="noticeTitle != null and noticeTitle != ''">
 				AND notice_title like concat('%', #{noticeTitle}, '%')
 			</if>
@@ -74,15 +74,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
         update_time = sysdate()
         </set>
-        where notice_id = #{noticeId} and isdeleted = 0
+        where notice_id = #{noticeId} and is_delete = 0
     </update>
 
     <update id="deleteNoticeById" parameterType="Long">
-        update sys_notice set isdeleted = 1 where notice_id = #{noticeId}
+        update sys_notice set is_delete = 1 where notice_id = #{noticeId}
     </update>
 
     <update id="deleteNoticeByIds" parameterType="Long">
-        update sys_notice set isdeleted = 1 where notice_id in
+        update sys_notice set is_delete = 1 where notice_id in
         <foreach item="noticeId" collection="array" open="(" separator="," close=")">
             #{noticeId}
         </foreach>

@@ -37,7 +37,7 @@
           <registration-form ref="resubmitFormRef" v-model="application" :readonly="application.authStatus !== 'rejected'" lock-phone />
           <div class="page-actions">
             <el-button v-if="application.authStatus === 'rejected'" type="primary" size="large" icon="RefreshRight" :loading="resubmitting" @click="resubmitApplication">修改后重新提交</el-button>
-            <el-button v-if="application.authStatus === 'verified'" type="primary" size="large" icon="Right" @click="router.push('/login')">前往登录</el-button>
+            <el-button v-if="['pending', 'rejected', 'verified'].includes(application.authStatus)" type="primary" size="large" icon="Right" @click="router.push('/login')">前往登录</el-button>
           </div>
         </template>
       </template>
@@ -86,9 +86,7 @@ const statusTitle = computed(() => ({
 }[application.value?.authStatus] || '申请状态') )
 const statusDescription = computed(() => application.value?.authStatus === 'rejected'
   ? application.value.auditRemark || '请修改资料后重新提交'
-  : application.value?.authStatus === 'verified'
-    ? '可使用申请手机号和四位验证码首次登录'
-    : `申请编号：${application.value?.memberCode || '-'}`)
+  : '可使用申请手机号和四位验证码登录；平台审核通过前，商户业务功能暂不开放。')
 const statusType = computed(() => ({ pending: 'warning', rejected: 'error', verified: 'success' }[application.value?.authStatus] || 'info'))
 
 /**

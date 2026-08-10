@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantOrderMapper">
+    <resultMap id="merchantOrderRow" type="com.ruoyi.rentalbusiness.domain.MerchantOrderRow">
+        <id property="orderId" column="order_id" />
+        <result property="orderNo" column="order_no" />
+        <result property="channelCode" column="channel_code" />
+        <result property="shopName" column="shop_name" />
+        <result property="customerName" column="customer_name" />
+        <result property="customerNickname" column="customer_nickname" />
+        <result property="customerPhone" column="customer_phone" />
+        <result property="customerAddress" column="customer_address" />
+        <result property="customerNote" column="customer_note" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="warehouseCity" column="warehouse_city" />
+        <result property="leaseStartDate" column="lease_start_date" />
+        <result property="leaseEndDate" column="lease_end_date" />
+        <result property="shipDueTime" column="ship_due_time" />
+        <result property="returnDueTime" column="return_due_time" />
+        <result property="expectedArriveTime" column="expected_arrive_time" />
+        <result property="createTime" column="create_time" />
+        <result property="rentAmount" column="rent_amount" />
+        <result property="orderStatus" column="order_status" />
+        <result property="weatherRiskFlag" column="weather_risk_flag" />
+        <result property="modelName" column="model_name" />
+        <result property="packageName" column="package_name" />
+        <result property="productCode" column="product_code" />
+        <result property="shippingCarrier" column="shipping_carrier" />
+        <result property="shippingTrackingNo" column="shipping_tracking_no" />
+        <result property="returnCarrier" column="return_carrier" />
+        <result property="returnTrackingNo" column="return_tracking_no" />
+        <result property="shippingFee" column="shipping_fee" />
+        <result property="attention" column="attention" />
+        <result property="addonNames" column="addon_names" />
+        <result property="createBy" column="create_by" />
+    </resultMap>
+
+    <select id="selectMerchantOrderList" resultMap="merchantOrderRow">
+        select
+            o.order_id,
+            o.order_no,
+            o.channel_code,
+            o.shop_name,
+            o.customer_name,
+            coalesce(c.customer_nickname, '') as customer_nickname,
+            o.customer_phone,
+            o.customer_address,
+            coalesce(c.remark, '') as customer_note,
+            w.warehouse_name,
+            w.city as warehouse_city,
+            o.lease_start_date,
+            o.lease_end_date,
+            o.ship_due_time,
+            o.return_due_time,
+            o.create_time,
+            o.rent_amount,
+            o.order_status,
+            o.weather_risk_flag,
+            (
+                select p.model_name
+                from ry_business.ry_rental_order_item oi
+                left join ry_business.ry_rental_product p
+                    on p.product_id = oi.product_id
+                   and p.tenant_id = o.tenant_id
+                   and p.member_id = o.member_id
+                   and p.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                order by oi.order_item_id
+                limit 1
+            ) as model_name,
+            (
+                select pt.package_name
+                from ry_business.ry_rental_order_item oi
+                inner join ry_business.ry_rental_package_template pt
+                    on pt.package_id = oi.package_id
+                   and pt.tenant_id = o.tenant_id
+                   and pt.member_id = o.member_id
+                   and pt.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                  and oi.package_id is not null
+                order by oi.order_item_id
+                limit 1
+            ) as package_name,
+            (
+                select p.product_code
+                from ry_business.ry_rental_order_item oi
+                left join ry_business.ry_rental_product p
+                    on p.product_id = oi.product_id
+                   and p.tenant_id = o.tenant_id
+                   and p.member_id = o.member_id
+                   and p.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                order by oi.order_item_id
+                limit 1
+            ) as product_code,
+            (
+                select l.carrier
+                from ry_business.ry_rental_logistics_order l
+                where l.order_id = o.order_id
+                  and l.tenant_id = o.tenant_id
+                  and l.member_id = o.member_id
+                  and l.direction = 'ship'
+                  and l.is_delete = 0
+                order by l.create_time desc, l.logistics_id desc
+                limit 1
+            ) as shipping_carrier,
+            (
+                select l.tracking_no
+                from ry_business.ry_rental_logistics_order l
+                where l.order_id = o.order_id
+                  and l.tenant_id = o.tenant_id
+                  and l.member_id = o.member_id
+                  and l.direction = 'ship'
+                  and l.is_delete = 0
+                order by l.create_time desc, l.logistics_id desc
+                limit 1
+            ) as shipping_tracking_no,
+            (
+                select l.carrier
+                from ry_business.ry_rental_logistics_order l
+                where l.order_id = o.order_id
+                  and l.tenant_id = o.tenant_id
+                  and l.member_id = o.member_id
+                  and l.direction = 'return'
+                  and l.is_delete = 0
+                order by l.create_time desc, l.logistics_id desc
+                limit 1
+            ) as return_carrier,
+            (
+                select l.tracking_no
+                from ry_business.ry_rental_logistics_order l
+                where l.order_id = o.order_id
+                  and l.tenant_id = o.tenant_id
+                  and l.member_id = o.member_id
+                  and l.direction = 'return'
+                  and l.is_delete = 0
+                order by l.create_time desc, l.logistics_id desc
+                limit 1
+            ) as return_tracking_no,
+            (
+                select l.fee_amount
+                from ry_business.ry_rental_logistics_order l
+                where l.order_id = o.order_id
+                  and l.tenant_id = o.tenant_id
+                  and l.member_id = o.member_id
+                  and l.direction = 'ship'
+                  and l.is_delete = 0
+                order by l.create_time desc, l.logistics_id desc
+                limit 1
+            ) as shipping_fee,
+            (
+                select l.estimated_arrive_time
+                from ry_business.ry_rental_logistics_order l
+                where l.order_id = o.order_id
+                  and l.tenant_id = o.tenant_id
+                  and l.member_id = o.member_id
+                  and l.direction = 'ship'
+                  and l.is_delete = 0
+                order by l.create_time desc, l.logistics_id desc
+                limit 1
+            ) as expected_arrive_time,
+            (
+                select n.note_content
+                from ry_business.ry_rental_order_note n
+                where n.order_id = o.order_id
+                  and n.tenant_id = o.tenant_id
+                  and n.member_id = o.member_id
+                  and n.is_delete = 0
+                order by n.pinned_flag desc, n.create_time desc, n.note_id desc
+                limit 1
+            ) as attention,
+            (
+                select group_concat(distinct p.product_name order by p.product_name separator '、')
+                from ry_business.ry_rental_order_item oi
+                inner join ry_business.ry_rental_product p
+                    on p.product_id = oi.product_id
+                   and p.tenant_id = o.tenant_id
+                   and p.member_id = o.member_id
+                   and p.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+            ) as addon_names,
+            o.create_by
+        from ry_business.ry_rental_order o
+        left join ry_business.ry_rental_customer c
+            on c.customer_id = o.customer_id
+           and c.tenant_id = o.tenant_id
+           and c.member_id = o.member_id
+           and c.is_delete = 0
+        left join ry_business.ry_rental_warehouse w
+            on w.warehouse_id = o.warehouse_id
+           and w.tenant_id = o.tenant_id
+           and w.member_id = o.member_id
+           and w.is_delete = 0
+        where o.tenant_id = #{tenantId}
+          and o.member_id = #{merchantId}
+          and o.is_delete = 0
+        <choose>
+            <when test="query.allWarehouseAccess">
+                <!-- 当前用户可访问商户全部仓库，不追加仓库条件。 -->
+            </when>
+            <when test="query.warehouseIds != null and query.warehouseIds.size() > 0">
+                and o.warehouse_id in
+                <foreach collection="query.warehouseIds" item="warehouseId" open="(" separator="," close=")">
+                    #{warehouseId}
+                </foreach>
+            </when>
+            <otherwise>
+                and 1 = 0
+            </otherwise>
+        </choose>
+        <if test="query.keyword != null and query.keyword != ''">
+            and (
+                o.order_no like concat('%', #{query.keyword}, '%')
+                or o.external_order_no like concat('%', #{query.keyword}, '%')
+                or o.channel_code like concat('%', #{query.keyword}, '%')
+                or o.shop_name like concat('%', #{query.keyword}, '%')
+                or o.customer_name like concat('%', #{query.keyword}, '%')
+                or o.customer_phone like concat('%', #{query.keyword}, '%')
+                or c.customer_nickname like concat('%', #{query.keyword}, '%')
+                or exists (
+                    select 1
+                    from ry_business.ry_rental_order_item koi
+                    left join ry_business.ry_rental_product kp
+                        on kp.product_id = koi.product_id
+                       and kp.tenant_id = o.tenant_id
+                       and kp.member_id = o.member_id
+                       and kp.is_delete = 0
+                    left join ry_business.ry_rental_package_template kpt
+                        on kpt.package_id = koi.package_id
+                       and kpt.tenant_id = o.tenant_id
+                       and kpt.member_id = o.member_id
+                       and kpt.is_delete = 0
+                    where koi.order_id = o.order_id
+                      and koi.tenant_id = o.tenant_id
+                      and koi.member_id = o.member_id
+                      and koi.is_delete = 0
+                      and (
+                          kp.product_name like concat('%', #{query.keyword}, '%')
+                          or kp.model_name like concat('%', #{query.keyword}, '%')
+                          or kpt.package_name like concat('%', #{query.keyword}, '%')
+                      )
+                )
+            )
+        </if>
+        <if test="query.status != null and query.status != ''">
+            and o.order_status = #{query.status}
+        </if>
+        <if test="query.channel != null and query.channel != ''">
+            and o.channel_code = #{query.channel}
+        </if>
+        <if test="query.shipDate != null and query.shipDate != ''">
+            and date(coalesce(o.ship_due_time, o.create_time)) = #{query.shipDate}
+        </if>
+        order by o.priority_flag desc, o.create_time desc, o.order_id desc
+    </select>
+</mapper>

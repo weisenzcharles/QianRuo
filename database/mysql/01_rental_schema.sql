@@ -3,7 +3,7 @@
 -- 1. tenant_id/member_id 用于租户/商户隔离，后端查询必须强制带租户条件。
 -- 2. 金额字段统一 DECIMAL(18,2)，数量字段统一 INT 或 DECIMAL(18,4)。
 -- 3. status 字段使用业务字典值，避免数据库 enum 后期扩展困难。
--- 4. RuoYi 通用审计字段：create_by/create_time/update_by/update_time/remark/isdeleted。
+-- 4. RuoYi 通用审计字段：create_by/create_time/update_by/update_time/remark/is_delete。
 -- 5. 敏感信息字段如 customer_phone/customer_address 支持后续应用层加密或脱敏展示。
 
 USE `ry_rental`;
@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member` (
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_code` VARCHAR(64) NOT NULL COMMENT '商户编码',
   `member_type` VARCHAR(20) NOT NULL DEFAULT 'personal' COMMENT '商户类型：personal个人 enterprise企业',
+  `membership_type` VARCHAR(32) NOT NULL DEFAULT 'personal_member' COMMENT '会员类型：personal_member个人 ordinary_enterprise_member普通企业 settled_member入驻会员',
   `auth_status` VARCHAR(20) NOT NULL DEFAULT 'unverified' COMMENT '认证状态',
   `legal_subject_name` VARCHAR(128) DEFAULT NULL COMMENT '主体名称',
   `license_no` VARCHAR(64) DEFAULT NULL COMMENT '营业执照/主体编号',
@@ -61,9 +62,9 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member` (
   `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   `active_contact_phone` VARCHAR(32) GENERATED ALWAYS AS (
-    CASE WHEN `isdeleted` = 0 AND `contact_phone` IS NOT NULL AND `contact_phone` <> ''
+    CASE WHEN `is_delete` = 0 AND `contact_phone` IS NOT NULL AND `contact_phone` <> ''
       THEN `contact_phone` ELSE NULL END
   ) STORED COMMENT '有效商户手机号唯一键',
   PRIMARY KEY (`member_id`),
@@ -72,6 +73,124 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member` (
   KEY `idx_rental_member_tenant` (`tenant_id`),
   KEY `idx_rental_member_auth_status` (`auth_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁商户/会员主体';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_member_certification` (
+  `certification_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '认证记录ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `version_no` INT NOT NULL COMMENT '认证资料版本号',
+  `certification_type` VARCHAR(32) NOT NULL COMMENT '认证类型：personal个人 enterprise企业',
+  `certification_status` VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '认证状态：pending待审核 approved已通过 rejected已驳回 expired已过期',
+  `legal_subject_name` VARCHAR(128) DEFAULT NULL COMMENT '认证主体名称',
+  `license_no` VARCHAR(64) DEFAULT NULL COMMENT '营业执照/主体编号',
+  `registered_capital` DECIMAL(18,2) DEFAULT NULL COMMENT '注册资本',
+  `business_scope` VARCHAR(2000) DEFAULT NULL COMMENT '经营范围',
+  `license_address` VARCHAR(500) DEFAULT NULL COMMENT '执照登记地址',
+  `license_valid_from` DATE DEFAULT NULL COMMENT '执照有效期开始',
+  `license_valid_to` DATE DEFAULT NULL COMMENT '执照有效期结束',
+  `license_long_term` TINYINT NOT NULL DEFAULT 0 COMMENT '执照是否长期有效：0否 1是',
+  `legal_representative_name` VARCHAR(64) DEFAULT NULL COMMENT '法人姓名',
+  `legal_representative_id_no` VARCHAR(64) DEFAULT NULL COMMENT '法人身份证号',
+  `submitted_by` VARCHAR(64) DEFAULT NULL COMMENT '提交人',
+  `submitted_time` DATETIME DEFAULT NULL COMMENT '提交时间',
+  `reviewed_by` VARCHAR(64) DEFAULT NULL COMMENT '审核人',
+  `reviewed_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `review_remark` VARCHAR(500) DEFAULT NULL COMMENT '审核意见',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `remark` VARCHAR(500) DEFAULT NULL,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`certification_id`),
+  UNIQUE KEY `uk_rental_member_certification_version` (`member_id`, `version_no`),
+  KEY `idx_rental_member_certification_scope` (`tenant_id`, `member_id`, `certification_status`),
+  KEY `idx_rental_member_certification_submitted` (`member_id`, `submitted_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户认证资料版本与审核历史';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_certification_material` (
+  `material_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '认证材料ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `certification_id` BIGINT NOT NULL COMMENT '认证版本ID',
+  `material_type` VARCHAR(32) NOT NULL COMMENT '材料类型：license营业执照 legal_id_front身份证人像面 legal_id_back身份证国徽面 contract合同 other其他',
+  `material_name` VARCHAR(128) NOT NULL COMMENT '材料名称',
+  `file_id` BIGINT DEFAULT NULL COMMENT '文件ID',
+  `file_url` VARCHAR(500) NOT NULL COMMENT '文件地址',
+  `material_status` VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '材料状态：pending待审核 approved已通过 rejected已驳回',
+  `review_remark` VARCHAR(500) DEFAULT NULL COMMENT '材料审核意见',
+  `sort_no` INT NOT NULL DEFAULT 0 COMMENT '显示排序',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `remark` VARCHAR(500) DEFAULT NULL,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`material_id`),
+  UNIQUE KEY `uk_rental_certification_material` (`certification_id`, `material_type`, `file_url`),
+  KEY `idx_rental_certification_material_scope` (`tenant_id`, `member_id`, `certification_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户认证材料明细';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_member_membership_history` (
+  `history_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '会员类型历史ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `previous_type` VARCHAR(32) DEFAULT NULL COMMENT '变更前会员类型',
+  `membership_type` VARCHAR(32) NOT NULL COMMENT '变更后会员类型',
+  `reason` VARCHAR(500) DEFAULT NULL COMMENT '变更原因',
+  `operator_name` VARCHAR(64) NOT NULL COMMENT '操作人',
+  `operated_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`history_id`),
+  KEY `idx_rental_membership_history_scope` (`tenant_id`, `member_id`, `operated_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户会员类型变更历史';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_member_qualification` (
+  `qualification_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '接单资格ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `qualification_code` VARCHAR(32) NOT NULL COMMENT '资格编码：external_accept对外接单 alliance_accept联盟接单 mini_program_accept小程序接单',
+  `qualification_status` VARCHAR(32) NOT NULL DEFAULT 'disabled' COMMENT '资格状态：disabled未开通 pending待审核 enabled已开通 rejected已驳回',
+  `certification_id` BIGINT DEFAULT NULL COMMENT '关联认证版本ID',
+  `effective_from` DATETIME DEFAULT NULL COMMENT '生效时间',
+  `effective_to` DATETIME DEFAULT NULL COMMENT '失效时间',
+  `reviewed_by` VARCHAR(64) DEFAULT NULL COMMENT '审核人',
+  `reviewed_time` DATETIME DEFAULT NULL COMMENT '审核时间',
+  `review_remark` VARCHAR(500) DEFAULT NULL COMMENT '审核意见',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `remark` VARCHAR(500) DEFAULT NULL,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`qualification_id`),
+  UNIQUE KEY `uk_rental_member_qualification` (`member_id`, `qualification_code`, `is_delete`),
+  KEY `idx_rental_member_qualification_scope` (`tenant_id`, `member_id`, `qualification_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户当前接单资格';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_member_qualification_history` (
+  `history_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '接单资格历史ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `qualification_id` BIGINT DEFAULT NULL COMMENT '当前资格ID',
+  `qualification_code` VARCHAR(32) NOT NULL COMMENT '资格编码',
+  `previous_status` VARCHAR(32) DEFAULT NULL COMMENT '变更前状态',
+  `qualification_status` VARCHAR(32) NOT NULL COMMENT '变更后状态',
+  `certification_id` BIGINT DEFAULT NULL COMMENT '关联认证版本ID',
+  `reason` VARCHAR(500) DEFAULT NULL COMMENT '变更原因',
+  `operator_name` VARCHAR(64) NOT NULL COMMENT '操作人',
+  `operated_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`history_id`),
+  KEY `idx_rental_qualification_history_scope` (`tenant_id`, `member_id`, `operated_time`),
+  KEY `idx_rental_qualification_history_code` (`member_id`, `qualification_code`, `operated_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户接单资格变更历史';
 
 CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user` (
   `merchant_user_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商户用户ID',
@@ -84,7 +203,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user` (
   `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像',
   `password` VARCHAR(100) DEFAULT NULL COMMENT '登录密码',
   `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '账号状态：0正常 1停用',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   `login_ip` VARCHAR(128) DEFAULT NULL COMMENT '最后登录IP',
   `login_date` DATETIME DEFAULT NULL COMMENT '最后登录时间',
   `pwd_update_date` DATETIME DEFAULT NULL COMMENT '密码最后更新时间',
@@ -98,7 +217,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user` (
   UNIQUE KEY `uk_rental_merchant_user_name` (`user_name`),
   UNIQUE KEY `uk_rental_merchant_user_phone` (`phone`),
   KEY `idx_rental_merchant_user_member` (`tenant_id`, `member_id`),
-  KEY `idx_rental_merchant_user_status` (`status`, `isdeleted`)
+  KEY `idx_rental_merchant_user_status` (`status`, `is_delete`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端用户';
 
 CREATE TABLE IF NOT EXISTS `ry_rental_user_member` (
@@ -115,7 +234,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_user_member` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_rental_user_member` (`member_id`, `merchant_user_id`),
   KEY `idx_rental_user_member_user` (`merchant_user_id`),
@@ -130,7 +249,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_user_warehouse_scope` (
   `warehouse_id` BIGINT NOT NULL COMMENT '仓库ID',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_rental_user_warehouse` (`member_id`, `merchant_user_id`, `warehouse_id`),
@@ -160,7 +279,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_menu` (
   `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT '' COMMENT '备注',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   PRIMARY KEY (`menu_id`),
   UNIQUE KEY `uk_rental_merchant_menu_path` (`member_id`, `parent_id`, `path`),
   KEY `idx_rental_merchant_menu_member` (`tenant_id`, `member_id`),
@@ -188,7 +307,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_oper_log` (
   `cost_time` BIGINT NOT NULL DEFAULT 0 COMMENT '消耗时间（毫秒）',
   `trace_id` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '请求链路ID',
   `http_status` INT DEFAULT NULL COMMENT 'HTTP响应状态码',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`oper_id`),
   KEY `idx_merchant_oper_log_scope_time` (`tenant_id`, `member_id`, `oper_time`),
@@ -206,15 +325,15 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role` (
   `role_sort` INT NOT NULL COMMENT '显示顺序',
   `menu_check_strictly` TINYINT NOT NULL DEFAULT 1 COMMENT '菜单树选择项是否父子联动',
   `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '角色状态：0正常 1停用',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建者',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
   PRIMARY KEY (`role_id`),
-  UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `isdeleted`),
-  UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `isdeleted`),
+  UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `is_delete`),
+  UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `is_delete`),
   KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端角色';
 
@@ -223,7 +342,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role_menu` (
   `menu_id` BIGINT NOT NULL COMMENT '商户菜单ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`role_id`, `menu_id`),
   KEY `idx_rental_merchant_role_menu_member` (`tenant_id`, `member_id`),
@@ -235,7 +354,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user_role` (
   `role_id` BIGINT NOT NULL COMMENT '商户角色ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`merchant_user_id`, `role_id`),
   KEY `idx_rental_merchant_user_role_member` (`tenant_id`, `member_id`),
@@ -247,7 +366,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_user_menu` (
   `menu_id` BIGINT NOT NULL COMMENT '商户菜单ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`merchant_user_id`, `menu_id`),
   KEY `idx_rental_merchant_user_menu_member` (`tenant_id`, `member_id`),
@@ -268,17 +387,17 @@ CREATE TABLE IF NOT EXISTS `ry_rental_product_class` (
   `update_by` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
   `active_class_code` VARCHAR(64) GENERATED ALWAYS AS (
-    CASE WHEN `isdeleted` = 0 THEN `class_code` ELSE NULL END
+    CASE WHEN `is_delete` = 0 THEN `class_code` ELSE NULL END
   ) STORED COMMENT '有效类目编码唯一键',
   `active_class_name` VARCHAR(128) GENERATED ALWAYS AS (
-    CASE WHEN `isdeleted` = 0 THEN `class_name` ELSE NULL END
+    CASE WHEN `is_delete` = 0 THEN `class_name` ELSE NULL END
   ) STORED COMMENT '有效同级类目名称唯一键',
   PRIMARY KEY (`class_id`),
   UNIQUE KEY `uk_rental_product_class_active_code` (`active_class_code`),
   UNIQUE KEY `uk_rental_product_class_active_parent_name` (`parent_id`, `active_class_name`),
-  KEY `idx_rental_product_class_parent` (`parent_id`, `status`, `isdeleted`),
+  KEY `idx_rental_product_class_parent` (`parent_id`, `status`, `is_delete`),
   KEY `idx_rental_product_class_ancestors` (`ancestors`(191))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台产品类目';
 
@@ -290,10 +409,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member_product_class` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
   PRIMARY KEY (`tenant_id`, `member_id`, `class_id`),
-  KEY `idx_rental_member_class_member` (`member_id`, `isdeleted`),
-  KEY `idx_rental_member_class_class` (`class_id`, `isdeleted`)
+  KEY `idx_rental_member_class_member` (`member_id`, `is_delete`),
+  KEY `idx_rental_member_class_class` (`class_id`, `is_delete`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户经营产品类目';
 
 -- ----------------------------
@@ -323,7 +442,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_warehouse` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`warehouse_id`),
   UNIQUE KEY `uk_rental_warehouse_code` (`member_id`, `warehouse_code`),
   KEY `idx_rental_warehouse_tenant_member` (`tenant_id`, `member_id`),
@@ -346,10 +465,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_brand_model` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`model_id`),
   KEY `idx_rental_brand_model_brand` (`brand`, `model_name`),
-  KEY `idx_rental_brand_model_class` (`class_id`, `status`, `isdeleted`),
+  KEY `idx_rental_brand_model_class` (`class_id`, `status`, `is_delete`),
   KEY `idx_rental_brand_model_category` (`category_level1`, `category_level2`, `category_level3`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统标准品牌型号';
 
@@ -361,7 +480,9 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member_common_model` (
   `sort_no` INT NOT NULL DEFAULT 0 COMMENT '排序',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_rental_member_model` (`member_id`, `model_id`),
@@ -400,11 +521,11 @@ CREATE TABLE IF NOT EXISTS `ry_rental_product` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`product_id`),
   UNIQUE KEY `uk_rental_product_code` (`member_id`, `product_code`),
   KEY `idx_rental_product_tenant_member` (`tenant_id`, `member_id`),
-  KEY `idx_rental_product_member_class` (`member_id`, `class_id`, `status`, `isdeleted`),
+  KEY `idx_rental_product_member_class` (`member_id`, `class_id`, `status`, `is_delete`),
   KEY `idx_rental_product_model` (`model_id`),
   KEY `idx_rental_product_type` (`product_type`, `stock_mode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品';
@@ -435,7 +556,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_asset_sn` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`sn_id`),
   UNIQUE KEY `uk_rental_asset_sn` (`member_id`, `sn_code`),
   KEY `idx_rental_asset_tenant_member` (`tenant_id`, `member_id`),
@@ -453,7 +574,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_asset_photo` (
   `photo_type` VARCHAR(32) NOT NULL DEFAULT 'device' COMMENT '照片类型',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`photo_id`),
   KEY `idx_rental_asset_photo_sn` (`sn_id`, `create_time`),
@@ -477,7 +598,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_accessory_item` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`accessory_item_id`),
   UNIQUE KEY `uk_rental_accessory_item` (`member_id`, `item_code`),
   KEY `idx_rental_accessory_product` (`product_id`),
@@ -499,7 +620,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_package_template` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`package_id`),
   UNIQUE KEY `uk_rental_package_code` (`member_id`, `package_code`),
   KEY `idx_rental_package_tenant_member` (`tenant_id`, `member_id`)
@@ -516,7 +637,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_package_item` (
   `required_flag` TINYINT NOT NULL DEFAULT 1 COMMENT '是否必选',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`id`),
   KEY `idx_rental_package_item_package` (`package_id`),
@@ -547,7 +668,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_customer` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`customer_id`),
   KEY `idx_rental_customer_member_phone` (`member_id`, `phone`),
   KEY `idx_rental_customer_tenant` (`tenant_id`, `member_id`),
@@ -588,7 +709,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`order_id`),
   UNIQUE KEY `uk_rental_order_no` (`member_id`, `order_no`),
   KEY `idx_rental_order_tenant_member` (`tenant_id`, `member_id`),
@@ -615,7 +736,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order_item` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`order_item_id`),
   KEY `idx_rental_order_item_order` (`order_id`),
   KEY `idx_rental_order_item_sn` (`sn_id`),
@@ -635,7 +756,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order_edit_log` (
   `operator_name` VARCHAR(64) DEFAULT NULL COMMENT '操作人',
   `operator_ip` VARCHAR(64) DEFAULT NULL COMMENT '操作IP',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`log_id`),
   KEY `idx_rental_order_edit_order` (`order_id`, `create_time`),
@@ -654,7 +775,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order_note` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`note_id`),
   KEY `idx_rental_order_note_order` (`order_id`, `pinned_flag`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单批注';
@@ -679,7 +800,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_inventory_reservation` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`reservation_id`),
   KEY `idx_rental_reservation_order` (`order_id`),
@@ -705,7 +826,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_inventory_ledger` (
   `operator_id` BIGINT DEFAULT NULL COMMENT '操作人ID',
   `operator_name` VARCHAR(64) DEFAULT NULL COMMENT '操作人',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`ledger_id`),
   KEY `idx_rental_inventory_ledger_tenant` (`tenant_id`, `member_id`),
@@ -731,7 +852,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_inventory_snapshot` (
   `expected_in_qty` INT NOT NULL DEFAULT 0 COMMENT '预计到库',
   `available_order_qty` INT NOT NULL DEFAULT 0 COMMENT '可接单数量',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`snapshot_id`),
   UNIQUE KEY `uk_rental_inventory_snapshot` (`snapshot_date`, `member_id`, `warehouse_id`, `product_id`, `package_id`),
@@ -755,7 +876,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_transfer_order` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`transfer_id`),
   UNIQUE KEY `uk_rental_transfer_no` (`member_id`, `transfer_no`),
   KEY `idx_rental_transfer_wh` (`from_warehouse_id`, `to_warehouse_id`),
@@ -776,7 +897,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_stocktaking` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`stocktaking_id`),
   UNIQUE KEY `uk_rental_stocktaking_no` (`member_id`, `stocktaking_no`),
@@ -796,7 +917,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_stocktaking_item` (
   `matched_ref_id` BIGINT DEFAULT NULL COMMENT '匹配对象ID',
   `remark` VARCHAR(500) DEFAULT NULL,
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`item_id`),
   KEY `idx_rental_stocktaking_item_main` (`stocktaking_id`),
@@ -829,7 +950,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_logistics_order` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`logistics_id`),
   UNIQUE KEY `uk_rental_tracking_no` (`carrier`, `tracking_no`),
   KEY `idx_rental_logistics_order` (`order_id`, `direction`),
@@ -848,7 +969,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_logistics_route` (
   `city` VARCHAR(64) DEFAULT NULL COMMENT '市',
   `raw_json` JSON COMMENT '原始节点',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`route_id`),
   KEY `idx_rental_logistics_route_main` (`logistics_id`, `route_time`)
@@ -875,7 +996,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_media_asset` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`media_id`),
   KEY `idx_rental_media_order` (`order_id`, `media_type`),
   KEY `idx_rental_media_sn` (`sn_id`),
@@ -902,7 +1023,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_after_sales_case` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`case_id`),
   UNIQUE KEY `uk_rental_after_sales_no` (`member_id`, `case_no`),
   KEY `idx_rental_after_sales_order` (`order_id`),
@@ -932,7 +1053,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_finance_ledger` (
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`ledger_id`),
   UNIQUE KEY `uk_rental_finance_ledger_no` (`ledger_no`),
@@ -958,7 +1079,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_service_subscription` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`subscription_id`),
   KEY `idx_rental_subscription_member` (`member_id`, `service_code`, `subscription_status`)
@@ -976,7 +1097,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_promotion_invite` (
   `reward_amount` DECIMAL(18,2) DEFAULT NULL COMMENT '奖励金额',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `effective_time` DATETIME DEFAULT NULL COMMENT '成为有效用户时间',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`invite_id`),
   UNIQUE KEY `uk_rental_promotion_invitee` (`promoter_member_id`, `invitee_member_id`),
@@ -998,7 +1119,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_alliance` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`alliance_id`),
   KEY `idx_rental_alliance_owner` (`owner_member_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='多仓联盟';
@@ -1012,7 +1133,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_alliance_member` (
   `share_stock_enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '是否共享库存',
   `member_status` VARCHAR(32) NOT NULL DEFAULT 'active' COMMENT '状态',
   `join_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_rental_alliance_member` (`alliance_id`, `member_id`),
@@ -1035,7 +1156,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_alliance_order` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`alliance_order_id`),
   KEY `idx_rental_alliance_order_receiver` (`receiver_member_id`, `alliance_order_status`),
@@ -1072,7 +1193,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_market_post` (
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`post_id`),
   UNIQUE KEY `uk_rental_market_post_no` (`member_id`, `post_no`),
   KEY `idx_rental_market_list` (`board_type`, `post_status`, `city`, `recent_30d_turnover`, `idle_qty`, `create_time`),
@@ -1089,7 +1210,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_market_message` (
   `read_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否已读',
   `risk_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '风险标记',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`message_id`),
   KEY `idx_rental_market_msg_post` (`post_id`, `create_time`),
@@ -1109,7 +1230,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_market_report` (
   `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核人',
   `review_time` DATETIME DEFAULT NULL COMMENT '审核时间',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`report_id`),
   KEY `idx_rental_market_report_post` (`post_id`, `report_status`),
@@ -1128,7 +1249,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_market_deposit_ledger` (
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`deposit_ledger_id`),
   KEY `idx_rental_market_deposit_member` (`member_id`, `create_time`)
@@ -1149,7 +1270,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_miniapp_auth` (
   `consent_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否勾选协议',
   `last_auth_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最近授权时间',
   `expire_time` DATETIME DEFAULT NULL COMMENT '会话过期时间',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`auth_id`),
   KEY `idx_rental_miniapp_openid` (`openid`),
@@ -1167,7 +1288,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_share_log` (
   `snapshot_json` JSON COMMENT '转发快照',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`share_id`),
   KEY `idx_rental_share_member_time` (`member_id`, `create_time`),
@@ -1190,7 +1311,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_deposit_free_code` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`code_id`),
   UNIQUE KEY `uk_rental_deposit_free_code` (`deposit_free_code`),
@@ -1213,7 +1334,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_idempotent_request` (
   `request_status` VARCHAR(32) NOT NULL DEFAULT 'processing' COMMENT '状态',
   `expire_time` DATETIME DEFAULT NULL COMMENT '过期时间',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`request_id`),
   UNIQUE KEY `uk_rental_idempotent_key` (`idempotent_key`),
@@ -1236,7 +1357,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_audit_log` (
   `client_ip` VARCHAR(64) DEFAULT NULL COMMENT 'IP',
   `user_agent` VARCHAR(500) DEFAULT NULL COMMENT 'UA',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
 
   PRIMARY KEY (`audit_id`),
   KEY `idx_rental_audit_actor` (`actor_id`, `create_time`),

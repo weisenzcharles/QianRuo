@@ -16,7 +16,7 @@ import com.ruoyi.common.core.exception.ServiceException;
 /**
  * MyBatis 物理删除保护拦截器。
  *
- * <p>项目统一使用 {@code isdeleted} 软删除，任何运行时 {@code DELETE} 或 {@code TRUNCATE} SQL 都会被拒绝。</p>
+ * <p>项目统一使用 {@code is_delete} 软删除，任何运行时 {@code DELETE} 或 {@code TRUNCATE} SQL 都会被拒绝。</p>
  */
 @Component
 @Intercepts({
@@ -39,7 +39,7 @@ public class PhysicalDeleteGuardInterceptor implements Interceptor
         String sql = normalize(boundSql.getSql());
         if (sql.startsWith("delete ") || sql.startsWith("truncate "))
         {
-            throw new ServiceException("检测到物理删除SQL，所有数据必须通过isdeleted字段软删除");
+            throw new ServiceException("检测到物理删除SQL，所有数据必须通过is_delete字段软删除");
         }
         return invocation.proceed();
     }

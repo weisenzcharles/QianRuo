@@ -65,6 +65,7 @@ com.ruoyi
 ├── ruoyi-modules         // 业务模块
 │       └── ruoyi-platform-service                     // 平台服务 [9201]，运行名 platform-service
 │       └── ruoyi-merchant-service                     // 商户服务 [9210]，运行名 merchant-service
+│       └── ruoyi-rental-business                      // 租赁核心业务 [9220]，运行名 rental-business
 │       └── ruoyi-gen                                 // 代码生成 [9202]
 │       └── ruoyi-job                                 // 定时任务 [9203]
 │       └── ruoyi-file                                // 文件服务 [9300]

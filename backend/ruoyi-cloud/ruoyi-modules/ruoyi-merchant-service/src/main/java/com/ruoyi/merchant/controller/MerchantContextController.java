@@ -25,12 +25,19 @@ public class MerchantContextController
     {
         AjaxResult result = AjaxResult.success();
         result.put("memberId", MerchantContextUtils.getMemberId());
+        result.put("merchantAuthStatus", MerchantContextUtils.getMerchantAuthStatus());
+        result.put("featureEnabled", MerchantContextUtils.isMerchantApproved());
         result.put("memberRole", MerchantContextUtils.getMemberRole());
         result.put("warehouseScopeType", MerchantContextUtils.getWarehouseScopeType());
         result.put("warehouseIds", MerchantContextUtils.getWarehouseIds());
         return result;
     }
 
+    /**
+     * 查询当前商户启用仓库并按当前用户仓库范围过滤。未审核商户允许查看仓库页面数据，但不能修改业务数据。
+     *
+     * @return 当前用户可查看的仓库列表
+     */
     @GetMapping("/warehouses")
     public AjaxResult warehouses()
     {

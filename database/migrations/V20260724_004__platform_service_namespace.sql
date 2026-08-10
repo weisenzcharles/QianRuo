@@ -103,18 +103,18 @@ WHERE `perms` LIKE 'system:%'
 -- 商户菜单和角色只保留在 ry_rental 独立表，清除平台表中的历史副本。
 UPDATE `ry-cloud`.`sys_role_menu` role_menu
 INNER JOIN `ry-cloud`.`sys_menu` menu ON menu.`menu_id` = role_menu.`menu_id`
-SET role_menu.`isdeleted` = 1
-WHERE menu.`client_type` = 'merchant' AND role_menu.`isdeleted` = 0;
+SET role_menu.`is_delete` = 1
+WHERE menu.`client_type` = 'merchant' AND role_menu.`is_delete` = 0;
 
 UPDATE `ry-cloud`.`sys_menu`
-SET `isdeleted` = 1
-WHERE `client_type` = 'merchant' AND `isdeleted` = 0;
+SET `is_delete` = 1
+WHERE `client_type` = 'merchant' AND `is_delete` = 0;
 
 UPDATE `ry-cloud`.`sys_user_role` user_role
 INNER JOIN `ry-cloud`.`sys_role` role ON role.`role_id` = user_role.`role_id`
-SET user_role.`isdeleted` = 1
-WHERE role.`role_key` = 'merchant_admin' AND user_role.`isdeleted` = 0;
+SET user_role.`is_delete` = 1
+WHERE role.`role_key` = 'merchant_admin' AND user_role.`is_delete` = 0;
 
 UPDATE `ry-cloud`.`sys_role`
-SET `isdeleted` = 1
-WHERE `role_key` = 'merchant_admin' AND `isdeleted` = 0;
+SET `is_delete` = 1
+WHERE `role_key` = 'merchant_admin' AND `is_delete` = 0;

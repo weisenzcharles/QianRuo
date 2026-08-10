@@ -22,6 +22,7 @@ coverage/
 .env.*.local
 deploy/.env
 deploy/.generated/
+.workbuddy/
 
 # IDE/editor
 .idea/

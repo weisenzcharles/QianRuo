@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantBrandModelMapper">
+    <select id="selectSelectedModelIds" resultType="long">
+        select model_id
+        from `ry_rental`.`ry_rental_member_common_model`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
+        order by sort_no, model_id
+    </select>
+
+    <select id="countSelected" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_member_common_model`
+        where tenant_id = #{tenantId} and member_id = #{merchantId}
+          and model_id = #{modelId} and is_delete = 0
+    </select>
+
+    <update id="softDeleteAll">
+        update `ry_rental`.`ry_rental_member_common_model`
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
+    </update>
+
+    <insert id="upsertSelections">
+        insert into `ry_rental`.`ry_rental_member_common_model`(
+            tenant_id, member_id, model_id, sort_no, is_delete, create_by, create_time
+        ) values
+        <foreach collection="modelIds" item="modelId" index="index" separator=",">
+            (#{tenantId}, #{merchantId}, #{modelId}, #{index}, 0, #{operator}, sysdate())
+        </foreach>
+        on duplicate key update
+            sort_no = values(sort_no),
+            is_delete = 0,
+            update_by = values(create_by),
+            update_time = sysdate()
+    </insert>
+</mapper>

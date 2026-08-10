@@ -1,0 +1,646 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.RentalBusinessMapper">
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <sql id="warehouseScope">
+        <choose>
+            <when test="allWarehouseAccess">
+                <!-- 当前登录用户拥有全部仓库权限。 -->
+            </when>
+            <when test="warehouseIds != null and warehouseIds.size() > 0">
+                and w.warehouse_id in
+                <foreach collection="warehouseIds" item="warehouseId" open="(" separator="," close=")">
+                    #{warehouseId}
+                </foreach>
+            </when>
+            <otherwise>
+                and 1 = 0
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectWarehouses" resultType="map">
+        select warehouse_id as id, warehouse_code as code, warehouse_name as name,
+               contact_name as contactName, contact_phone as contactPhone,
+               province, city, district, address, status, remark, create_time as createTime,
+               update_time as updateTime
+        from ry_business.ry_rental_warehouse w
+        where w.tenant_id = #{tenantId} and w.member_id = #{memberId} and w.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (w.warehouse_code like concat('%', #{keyword}, '%')
+                 or w.warehouse_name like concat('%', #{keyword}, '%')
+                 or w.city like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">
+            and w.status = #{status}
+        </if>
+        <include refid="warehouseScope" />
+        order by w.status, w.warehouse_id desc
+    </select>
+
+    <select id="selectWarehouse" resultType="map">
+        select warehouse_id as id, warehouse_code as code, warehouse_name as name,
+               contact_name as contactName, contact_phone as contactPhone,
+               province, city, district, address, status, remark, create_time as createTime,
+               update_time as updateTime
+        from ry_business.ry_rental_warehouse
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and warehouse_id = #{warehouseId} and is_delete = 0
+    </select>
+
+    <insert id="insertWarehouse" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_warehouse(
+            tenant_id, member_id, warehouse_code, warehouse_name, contact_name, contact_phone,
+            province, city, district, address, status, create_by, create_time, update_by, update_time, remark, is_delete
+        ) values (
+            #{tenantId}, #{memberId}, #{code}, #{name}, #{contactName}, #{contactPhone},
+            #{province}, #{city}, #{district}, #{address}, #{status}, #{operator}, now(), #{operator}, now(), #{remark}, 0
+        )
+    </insert>
+
+    <update id="updateWarehouse">
+        update ry_business.ry_rental_warehouse
+        set warehouse_code = #{code}, warehouse_name = #{name}, contact_name = #{contactName},
+            contact_phone = #{contactPhone}, province = #{province}, city = #{city}, district = #{district},
+            address = #{address}, status = #{status}, remark = #{remark}, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and warehouse_id = #{warehouseId} and is_delete = 0
+    </update>
+
+    <update id="softDeleteWarehouse">
+        update ry_business.ry_rental_warehouse
+        set is_delete = 1, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and warehouse_id = #{warehouseId} and is_delete = 0
+    </update>
+
+    <select id="countWarehouseReferences" resultType="int">
+        select
+          (select count(1) from ry_business.ry_rental_asset_sn
+            where tenant_id = #{tenantId} and member_id = #{memberId} and warehouse_id = #{warehouseId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_accessory_item
+            where tenant_id = #{tenantId} and member_id = #{memberId} and warehouse_id = #{warehouseId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_inventory_balance
+            where tenant_id = #{tenantId} and member_id = #{memberId} and warehouse_id = #{warehouseId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_order
+            where tenant_id = #{tenantId} and member_id = #{memberId}
+              and (warehouse_id = #{warehouseId} or return_warehouse_id = #{warehouseId}) and is_delete = 0)
+    </select>
+
+    <select id="selectPools" resultType="map">
+        select pool_id as id, pool_code as poolCode, pool_name as poolName,
+               resource_type as resourceType, substitutable_flag as substitutableFlag,
+               status, remark, create_time as createTime, update_time as updateTime
+        from ry_business.ry_rental_stock_pool
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (pool_code like concat('%', #{keyword}, '%') or pool_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">and status = #{status}</if>
+        order by status, pool_id desc
+    </select>
+
+    <select id="selectPool" resultType="map">
+        select pool_id as id, pool_code as poolCode, pool_name as poolName,
+               resource_type as resourceType, substitutable_flag as substitutableFlag,
+               status, remark, create_time as createTime, update_time as updateTime
+        from ry_business.ry_rental_stock_pool
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and pool_id = #{poolId} and is_delete = 0
+    </select>
+
+    <insert id="insertPool" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_stock_pool(
+            tenant_id, member_id, pool_code, pool_name, resource_type, substitutable_flag,
+            status, create_by, create_time, update_by, update_time, remark, is_delete
+        ) values (#{tenantId}, #{memberId}, #{code}, #{name}, #{resourceType}, #{substitutableFlag},
+                  #{status}, #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updatePool">
+        update ry_business.ry_rental_stock_pool
+        set pool_code = #{code}, pool_name = #{name}, resource_type = #{resourceType},
+            substitutable_flag = #{substitutableFlag}, status = #{status}, remark = #{remark},
+            update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and pool_id = #{poolId} and is_delete = 0
+    </update>
+
+    <update id="softDeletePool">
+        update ry_business.ry_rental_stock_pool
+        set is_delete = 1, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and pool_id = #{poolId} and is_delete = 0
+    </update>
+
+    <select id="countPoolReferences" resultType="int">
+        select
+          (select count(1) from ry_business.ry_rental_product
+            where tenant_id = #{tenantId} and member_id = #{memberId} and stock_pool_id = #{poolId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_package_component
+            where tenant_id = #{tenantId} and member_id = #{memberId} and pool_id = #{poolId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_inventory_reservation_item
+            where tenant_id = #{tenantId} and member_id = #{memberId} and pool_id = #{poolId} and is_delete = 0)
+    </select>
+
+    <select id="selectPoolModelIds" resultType="long">
+        select model_id from ry_business.ry_rental_stock_pool_compatibility
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and pool_id = #{poolId} and is_delete = 0 order by model_id
+    </select>
+
+    <update id="softDeletePoolCompatibility">
+        update ry_business.ry_rental_stock_pool_compatibility
+        set is_delete = 1, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and pool_id = #{poolId} and is_delete = 0
+    </update>
+
+    <insert id="insertPoolCompatibility">
+        insert into ry_business.ry_rental_stock_pool_compatibility(
+            tenant_id, member_id, pool_id, model_id, compatibility_type,
+            create_by, create_time, update_by, update_time, is_delete
+        ) values
+        <foreach collection="modelIds" item="modelId" separator=",">
+            (#{tenantId}, #{memberId}, #{poolId}, #{modelId}, 'full', #{operator}, now(), #{operator}, now(), 0)
+        </foreach>
+    </insert>
+
+    <select id="selectProducts" resultType="map">
+        select p.product_id as id, p.class_id as classId, p.model_id as modelId,
+               p.stock_pool_id as poolId, p.product_code as productCode, p.product_name as productName,
+               p.product_type as productType, p.stock_mode as stockMode, p.brand, p.model_name as modelName,
+               p.memory_spec as memorySpec, p.purchase_cost as purchaseCost, p.sale_price as salePrice,
+               p.status, p.remark, p.create_time as createTime, p.update_time as updateTime,
+               sp.pool_code as poolCode, sp.pool_name as poolName
+        from ry_business.ry_rental_product p
+        left join ry_business.ry_rental_stock_pool sp on sp.pool_id = p.stock_pool_id
+            and sp.tenant_id = p.tenant_id and sp.member_id = p.member_id and sp.is_delete = 0
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (p.product_code like concat('%', #{keyword}, '%')
+                 or p.product_name like concat('%', #{keyword}, '%')
+                 or p.brand like concat('%', #{keyword}, '%')
+                 or p.model_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="productType != null and productType != ''">and p.product_type = #{productType}</if>
+        <if test="stockMode != null and stockMode != ''">and p.stock_mode = #{stockMode}</if>
+        <if test="classId != null">and p.class_id = #{classId}</if>
+        <if test="status != null">and p.status = #{status}</if>
+        <choose>
+            <when test="allowedClassIds != null and allowedClassIds.size() > 0">
+                and p.class_id in
+                <foreach collection="allowedClassIds" item="allowedClassId" open="(" separator="," close=")">
+                    #{allowedClassId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+        order by p.status, p.product_id desc
+    </select>
+
+    <select id="selectProduct" resultType="map">
+        select p.product_id as id, p.class_id as classId, p.model_id as modelId,
+               p.stock_pool_id as poolId, p.product_code as productCode, p.product_name as productName,
+               p.product_type as productType, p.stock_mode as stockMode, p.brand, p.model_name as modelName,
+               p.memory_spec as memorySpec, p.purchase_cost as purchaseCost, p.sale_price as salePrice,
+               p.status, p.remark, p.create_time as createTime, p.update_time as updateTime,
+               sp.pool_code as poolCode, sp.pool_name as poolName
+        from ry_business.ry_rental_product p
+        left join ry_business.ry_rental_stock_pool sp on sp.pool_id = p.stock_pool_id
+            and sp.tenant_id = p.tenant_id and sp.member_id = p.member_id and sp.is_delete = 0
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId}
+          and p.product_id = #{productId} and p.is_delete = 0
+    </select>
+
+    <insert id="insertProduct" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_product(
+            tenant_id, member_id, class_id, model_id, stock_pool_id, product_code, product_name,
+            category_level1, category_level2, category_level3, brand, model_name, memory_spec,
+            product_type, stock_mode, purchase_cost, sale_price, status, create_by, create_time,
+            update_by, update_time, remark, is_delete
+        ) values (
+            #{tenantId}, #{memberId}, #{classId}, #{modelId}, #{stockPoolId}, #{productCode}, #{productName},
+            '', '', '', #{brand}, #{modelName}, #{memorySpec}, #{productType}, #{stockMode},
+            #{purchaseCost}, #{salePrice}, #{status}, #{operator}, now(), #{operator}, now(), #{remark}, 0
+        )
+    </insert>
+
+    <update id="updateProduct">
+        update ry_business.ry_rental_product
+        set class_id = #{classId}, model_id = #{modelId}, stock_pool_id = #{stockPoolId},
+            product_code = #{productCode}, product_name = #{productName}, product_type = #{productType},
+            stock_mode = #{stockMode}, brand = #{brand}, model_name = #{modelName}, memory_spec = #{memorySpec},
+            purchase_cost = #{purchaseCost}, sale_price = #{salePrice}, status = #{status}, remark = #{remark},
+            update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and product_id = #{productId} and is_delete = 0
+    </update>
+
+    <update id="softDeleteProduct">
+        update ry_business.ry_rental_product
+        set is_delete = 1, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and product_id = #{productId} and is_delete = 0
+    </update>
+
+    <select id="countProductReferences" resultType="int">
+        select
+          (select count(1) from ry_business.ry_rental_asset_sn where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_accessory_item where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_inventory_balance where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_order_item where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
+    </select>
+
+    <select id="selectSns" resultType="map">
+        select s.sn_id as id, s.product_id as productId, s.warehouse_id as warehouseId,
+               s.sn_code as snCode, s.barcode, s.asset_status as assetStatus, s.condition_level as conditionLevel,
+               s.remark, p.product_code as productCode, p.product_name as productName,
+               w.warehouse_name as warehouseName, w.city as warehouseCity
+        from ry_business.ry_rental_asset_sn s
+        inner join ry_business.ry_rental_product p on p.product_id = s.product_id
+            and p.tenant_id = s.tenant_id and p.member_id = s.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = s.warehouse_id
+            and w.tenant_id = s.tenant_id and w.member_id = s.member_id and w.is_delete = 0
+        where s.tenant_id = #{tenantId} and s.member_id = #{memberId} and s.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (s.sn_code like concat('%', #{keyword}, '%') or s.barcode like concat('%', #{keyword}, '%')
+                 or p.product_code like concat('%', #{keyword}, '%') or p.product_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="productId != null">and s.product_id = #{productId}</if>
+        <if test="warehouseId != null">and s.warehouse_id = #{warehouseId}</if>
+        <if test="assetStatus != null and assetStatus != ''">and s.asset_status = #{assetStatus}</if>
+        <choose>
+            <when test="allowedClassIds != null and allowedClassIds.size() > 0">
+                and p.class_id in
+                <foreach collection="allowedClassIds" item="allowedClassId" open="(" separator="," close=")">
+                    #{allowedClassId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+        <include refid="warehouseScope" />
+        order by s.asset_status, s.sn_id desc
+    </select>
+
+    <select id="selectSn" resultType="map">
+        select s.sn_id as id, s.product_id as productId, s.warehouse_id as warehouseId,
+               s.sn_code as snCode, s.barcode, s.asset_status as assetStatus, s.condition_level as conditionLevel,
+               s.remark, p.product_code as productCode, p.product_name as productName,
+               w.warehouse_name as warehouseName, w.city as warehouseCity
+        from ry_business.ry_rental_asset_sn s
+        inner join ry_business.ry_rental_product p on p.product_id = s.product_id
+            and p.tenant_id = s.tenant_id and p.member_id = s.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = s.warehouse_id
+            and w.tenant_id = s.tenant_id and w.member_id = s.member_id and w.is_delete = 0
+        where s.tenant_id = #{tenantId} and s.member_id = #{memberId}
+          and s.sn_id = #{snId} and s.is_delete = 0
+    </select>
+
+    <select id="countSnCode" resultType="int">
+        select count(1) from ry_business.ry_rental_asset_sn
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and sn_code = #{snCode} and is_delete = 0
+          <if test="snId != null">and sn_id != #{snId}</if>
+    </select>
+
+    <insert id="insertSn" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_asset_sn(
+            tenant_id, member_id, product_id, warehouse_id, sn_code, barcode, asset_status,
+            condition_level, create_by, create_time, update_by, update_time, remark, is_delete
+        ) values (#{tenantId}, #{memberId}, #{productId}, #{warehouseId}, #{snCode}, #{barcode}, #{assetStatus},
+                  #{conditionLevel}, #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updateSn">
+        update ry_business.ry_rental_asset_sn
+        set warehouse_id = #{warehouseId}, sn_code = #{snCode}, barcode = #{barcode}, asset_status = #{assetStatus},
+            condition_level = #{conditionLevel}, update_by = #{operator}, update_time = now(), remark = #{remark}
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and sn_id = #{snId} and is_delete = 0
+    </update>
+
+    <update id="softDeleteSn">
+        update ry_business.ry_rental_asset_sn
+        set is_delete = 1, asset_status = 'retired', update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and sn_id = #{snId} and is_delete = 0
+    </update>
+
+    <select id="selectAccessories" resultType="map">
+        select a.accessory_item_id as id, a.product_id as productId, a.warehouse_id as warehouseId,
+               a.item_code as itemCode, a.stock_mode as stockMode, a.item_status as itemStatus,
+               a.remark, p.product_code as productCode, p.product_name as productName,
+               w.warehouse_name as warehouseName, w.city as warehouseCity
+        from ry_business.ry_rental_accessory_item a
+        inner join ry_business.ry_rental_product p on p.product_id = a.product_id
+            and p.tenant_id = a.tenant_id and p.member_id = a.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = a.warehouse_id
+            and w.tenant_id = a.tenant_id and w.member_id = a.member_id and w.is_delete = 0
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId} and a.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (a.item_code like concat('%', #{keyword}, '%') or p.product_code like concat('%', #{keyword}, '%')
+                 or p.product_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="productId != null">and a.product_id = #{productId}</if>
+        <if test="warehouseId != null">and a.warehouse_id = #{warehouseId}</if>
+        <if test="itemStatus != null and itemStatus != ''">and a.item_status = #{itemStatus}</if>
+        <choose>
+            <when test="allowedClassIds != null and allowedClassIds.size() > 0">
+                and p.class_id in
+                <foreach collection="allowedClassIds" item="allowedClassId" open="(" separator="," close=")">
+                    #{allowedClassId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+        <include refid="warehouseScope" />
+        order by a.item_status, a.accessory_item_id desc
+    </select>
+
+    <select id="selectAccessory" resultType="map">
+        select a.accessory_item_id as id, a.product_id as productId, a.warehouse_id as warehouseId,
+               a.item_code as itemCode, a.stock_mode as stockMode, a.item_status as itemStatus,
+               a.remark, p.product_code as productCode, p.product_name as productName,
+               w.warehouse_name as warehouseName, w.city as warehouseCity
+        from ry_business.ry_rental_accessory_item a
+        inner join ry_business.ry_rental_product p on p.product_id = a.product_id
+            and p.tenant_id = a.tenant_id and p.member_id = a.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = a.warehouse_id
+            and w.tenant_id = a.tenant_id and w.member_id = a.member_id and w.is_delete = 0
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+          and a.accessory_item_id = #{accessoryItemId} and a.is_delete = 0
+    </select>
+
+    <insert id="insertAccessory" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_accessory_item(
+            tenant_id, member_id, product_id, warehouse_id, item_code, stock_mode, item_status,
+            create_by, create_time, update_by, update_time, remark, is_delete
+        ) values (#{tenantId}, #{memberId}, #{productId}, #{warehouseId}, #{itemCode}, #{stockMode}, #{itemStatus},
+                  #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updateAccessory">
+        update ry_business.ry_rental_accessory_item
+        set warehouse_id = #{warehouseId}, item_code = #{itemCode}, item_status = #{itemStatus},
+            update_by = #{operator}, update_time = now(), remark = #{remark}
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and accessory_item_id = #{accessoryItemId} and is_delete = 0
+    </update>
+
+    <update id="softDeleteAccessory">
+        update ry_business.ry_rental_accessory_item
+        set is_delete = 1, item_status = 'retired', update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and accessory_item_id = #{accessoryItemId} and is_delete = 0
+    </update>
+
+    <select id="selectPackages" resultType="map">
+        select p.package_id as id, p.package_code as packageCode, p.package_name as packageName,
+               p.platform_code as platformCode, p.enabled, p.sort_no as sortNo, p.remark,
+               p.create_time as createTime, p.update_time as updateTime,
+               v.package_version_id as packageVersionId, v.version_no as versionNo,
+               v.version_status as versionStatus, v.bom_hash as bomHash
+        from ry_business.ry_rental_package_template p
+        left join ry_business.ry_rental_package_version v on v.package_id = p.package_id
+            and v.tenant_id = p.tenant_id and v.member_id = p.member_id
+            and v.version_status = 'active' and v.is_delete = 0
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (p.package_code like concat('%', #{keyword}, '%') or p.package_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="enabled != null">and p.enabled = #{enabled}</if>
+        order by p.enabled desc, p.sort_no, p.package_id desc
+    </select>
+
+    <select id="selectPackage" resultType="map">
+        select package_id as id, package_code as packageCode, package_name as packageName,
+               platform_code as platformCode, enabled, sort_no as sortNo, remark,
+               create_time as createTime, update_time as updateTime
+        from ry_business.ry_rental_package_template
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and package_id = #{packageId} and is_delete = 0
+    </select>
+
+    <select id="selectActivePackageVersion" resultType="map">
+        select package_version_id as packageVersionId, package_id as packageId,
+               version_no as versionNo, version_status as versionStatus, bom_hash as bomHash,
+               effective_time as effectiveTime
+        from ry_business.ry_rental_package_version
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and package_id = #{packageId} and version_status = 'active' and is_delete = 0
+        order by version_no desc limit 1
+    </select>
+
+    <select id="selectPackageComponents" resultType="map">
+        select c.component_id as componentId, c.pool_id as poolId, c.component_role as componentRole,
+               c.required_qty as requiredQty, c.allocation_policy as allocationPolicy, c.sort_no as sortNo,
+               p.pool_code as poolCode, p.pool_name as poolName
+        from ry_business.ry_rental_package_component c
+        inner join ry_business.ry_rental_stock_pool p on p.pool_id = c.pool_id
+            and p.tenant_id = c.tenant_id and p.member_id = c.member_id and p.is_delete = 0
+        where c.tenant_id = #{tenantId} and c.member_id = #{memberId}
+          and c.package_version_id = #{packageVersionId} and c.is_delete = 0
+        order by c.sort_no, c.component_id
+    </select>
+
+    <insert id="insertPackage" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_package_template(
+            tenant_id, member_id, platform_code, package_code, package_name, enabled, sort_no,
+            create_by, create_time, update_by, update_time, remark, is_delete
+        ) values (#{tenantId}, #{memberId}, #{platformCode}, #{packageCode}, #{packageName}, #{enabled}, #{sortNo},
+                  #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updatePackage">
+        update ry_business.ry_rental_package_template
+        set platform_code = #{platformCode}, package_code = #{packageCode}, package_name = #{packageName},
+            enabled = #{enabled}, sort_no = #{sortNo}, remark = #{remark}, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and package_id = #{packageId} and is_delete = 0
+    </update>
+
+    <update id="softDeletePackage">
+        update ry_business.ry_rental_package_template
+        set is_delete = 1, enabled = 0, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and package_id = #{packageId} and is_delete = 0
+    </update>
+
+    <select id="countPackageReferences" resultType="int">
+        select count(1) from ry_business.ry_rental_order_item
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and package_id = #{packageId} and is_delete = 0
+    </select>
+
+    <select id="nextPackageVersionNo" resultType="int">
+        select coalesce(max(version_no), 0) + 1 from ry_business.ry_rental_package_version
+        where tenant_id = #{tenantId} and member_id = #{memberId} and package_id = #{packageId}
+    </select>
+
+    <update id="retireActivePackageVersion">
+        update ry_business.ry_rental_package_version
+        set version_status = 'retired', update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and package_id = #{packageId} and version_status = 'active' and is_delete = 0
+    </update>
+
+    <insert id="insertPackageVersion" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_package_version(
+            tenant_id, member_id, package_id, version_no, version_status, effective_time,
+            bom_hash, create_by, create_time, update_by, update_time, is_delete
+        ) values (#{tenantId}, #{memberId}, #{packageId}, #{versionNo}, #{versionStatus}, now(),
+                  #{bomHash}, #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <insert id="insertPackageComponents">
+        insert into ry_business.ry_rental_package_component(
+            tenant_id, member_id, package_version_id, pool_id, component_role, required_qty,
+            allocation_policy, sort_no, create_by, create_time, update_by, update_time, is_delete
+        ) values
+        <foreach collection="components" item="component" separator=",">
+            (#{tenantId}, #{memberId}, #{packageVersionId}, #{component.poolId}, #{component.componentRole},
+             #{component.requiredQty}, #{component.allocationPolicy}, #{component.sortNo},
+             #{operator}, now(), #{operator}, now(), 0)
+        </foreach>
+    </insert>
+
+    <update id="softDeletePackageVersions">
+        update ry_business.ry_rental_package_version
+        set is_delete = 1, version_status = 'retired', update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and package_id = #{packageId} and is_delete = 0
+    </update>
+
+    <update id="softDeletePackageComponentsByPackage">
+        update ry_business.ry_rental_package_component c
+        inner join ry_business.ry_rental_package_version v on v.package_version_id = c.package_version_id
+            and v.tenant_id = c.tenant_id and v.member_id = c.member_id
+        set c.is_delete = 1, c.update_by = #{operator}, c.update_time = now()
+        where c.tenant_id = #{tenantId} and c.member_id = #{memberId}
+          and v.package_id = #{packageId} and c.is_delete = 0
+    </update>
+
+    <select id="selectInventory" resultType="map">
+        select p.product_id as productId, p.product_code as productCode, p.product_name as productName,
+               p.product_type as productType, p.stock_mode as stockMode, p.stock_pool_id as poolId,
+               w.warehouse_id as warehouseId, w.warehouse_name as warehouseName, w.city as warehouseCity,
+               case when p.stock_mode = 'serial' then
+                   (select count(1) from ry_business.ry_rental_asset_sn s
+                    where s.tenant_id = p.tenant_id and s.member_id = p.member_id
+                      and s.product_id = p.product_id and s.warehouse_id = w.warehouse_id
+                      and s.asset_status not in ('lost', 'retired') and s.is_delete = 0)
+                   else coalesce((select sum(b.on_hand_qty) from ry_business.ry_rental_inventory_balance b
+                    where b.tenant_id = p.tenant_id and b.member_id = p.member_id
+                      and b.product_id = p.product_id and b.warehouse_id = w.warehouse_id
+                      and b.stock_status = 'available' and b.is_delete = 0), 0)
+               end as onHandQty,
+               coalesce((select sum(ri.required_qty) from ry_business.ry_rental_inventory_reservation_item ri
+                    where ri.tenant_id = p.tenant_id and ri.member_id = p.member_id
+                      and ri.pool_id = p.stock_pool_id and ri.warehouse_id = w.warehouse_id
+                      and ri.reservation_status = 'reserved' and ri.is_delete = 0), 0) as reservedQty
+        from ry_business.ry_rental_product p
+        inner join ry_business.ry_rental_warehouse w on w.tenant_id = p.tenant_id
+            and w.member_id = p.member_id and w.is_delete = 0
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.is_delete = 0
+          and ((p.stock_mode = 'serial' and exists (select 1 from ry_business.ry_rental_asset_sn s
+                where s.tenant_id = p.tenant_id and s.member_id = p.member_id
+                  and s.product_id = p.product_id and s.warehouse_id = w.warehouse_id and s.is_delete = 0))
+               or (p.stock_mode = 'quantity' and exists (select 1 from ry_business.ry_rental_inventory_balance b
+                where b.tenant_id = p.tenant_id and b.member_id = p.member_id
+                  and b.product_id = p.product_id and b.warehouse_id = w.warehouse_id and b.is_delete = 0)))
+        <if test="keyword != null and keyword != ''">
+            and (p.product_code like concat('%', #{keyword}, '%') or p.product_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="warehouseId != null">and w.warehouse_id = #{warehouseId}</if>
+        <if test="productType != null and productType != ''">and p.product_type = #{productType}</if>
+        <choose>
+            <when test="allowedClassIds != null and allowedClassIds.size() > 0">
+                and p.class_id in
+                <foreach collection="allowedClassIds" item="allowedClassId" open="(" separator="," close=")">
+                    #{allowedClassId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+        <include refid="warehouseScope" />
+        order by w.warehouse_id, p.product_id
+    </select>
+
+    <select id="selectBalanceForUpdate" resultType="map">
+        select balance_id as id, on_hand_qty as onHandQty, version, stock_status as stockStatus
+        from ry_business.ry_rental_inventory_balance
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and product_id = #{productId} and warehouse_id = #{warehouseId}
+          and stock_status = #{stockStatus} and is_delete = 0
+        for update
+    </select>
+
+    <insert id="insertBalance" useGeneratedKeys="true" keyProperty="id">
+        insert into ry_business.ry_rental_inventory_balance(
+            tenant_id, member_id, product_id, warehouse_id, stock_status, on_hand_qty, version,
+            create_by, create_time, update_by, update_time, remark, is_delete
+        ) values (#{tenantId}, #{memberId}, #{productId}, #{warehouseId}, #{stockStatus}, #{quantity}, 0,
+                  #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updateBalance">
+        update ry_business.ry_rental_inventory_balance
+        set on_hand_qty = #{quantity}, version = version + 1, update_by = #{operator}, update_time = now(), remark = #{remark}
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and balance_id = #{balanceId} and is_delete = 0
+    </update>
+
+    <update id="softDeleteInventoryBalance">
+        update ry_business.ry_rental_inventory_balance
+        set is_delete = 1, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and product_id = #{productId} and warehouse_id = #{warehouseId}
+          and stock_status = 'available' and on_hand_qty = 0 and is_delete = 0
+    </update>
+
+    <insert id="insertInventoryLedger">
+        insert into ry_business.ry_rental_inventory_ledger(
+            tenant_id, member_id, warehouse_id, product_id, change_type, change_qty,
+            reason, operator_name, create_time, is_delete
+        ) values (#{tenantId}, #{memberId}, #{warehouseId}, #{productId}, #{changeType}, #{changeQty},
+                  #{reason}, #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectPoolAvailability" resultType="map">
+        select #{poolId} as poolId, #{warehouseId} as warehouseId,
+          coalesce((select sum(b.on_hand_qty) from ry_business.ry_rental_inventory_balance b
+            inner join ry_business.ry_rental_product p on p.product_id = b.product_id
+              and p.tenant_id = b.tenant_id and p.member_id = b.member_id and p.stock_pool_id = #{poolId}
+              and p.stock_mode = 'quantity' and p.is_delete = 0
+              and (not exists (select 1 from ry_business.ry_rental_stock_pool_compatibility c
+                    where c.tenant_id = p.tenant_id and c.member_id = p.member_id
+                      and c.pool_id = p.stock_pool_id and c.is_delete = 0)
+                   or exists (select 1 from ry_business.ry_rental_stock_pool_compatibility c
+                    where c.tenant_id = p.tenant_id and c.member_id = p.member_id
+                      and c.pool_id = p.stock_pool_id and c.model_id = p.model_id and c.is_delete = 0))
+            where b.tenant_id = #{tenantId} and b.member_id = #{memberId} and b.warehouse_id = #{warehouseId}
+              and b.stock_status = 'available' and b.is_delete = 0), 0)
+          + coalesce((select count(1) from ry_business.ry_rental_asset_sn s
+            inner join ry_business.ry_rental_product p on p.product_id = s.product_id
+              and p.tenant_id = s.tenant_id and p.member_id = s.member_id and p.stock_pool_id = #{poolId}
+              and p.stock_mode = 'serial' and p.is_delete = 0
+              and (not exists (select 1 from ry_business.ry_rental_stock_pool_compatibility c
+                    where c.tenant_id = p.tenant_id and c.member_id = p.member_id
+                      and c.pool_id = p.stock_pool_id and c.is_delete = 0)
+                   or exists (select 1 from ry_business.ry_rental_stock_pool_compatibility c
+                    where c.tenant_id = p.tenant_id and c.member_id = p.member_id
+                      and c.pool_id = p.stock_pool_id and c.model_id = p.model_id and c.is_delete = 0))
+            where s.tenant_id = #{tenantId} and s.member_id = #{memberId} and s.warehouse_id = #{warehouseId}
+              and s.asset_status = 'available' and s.is_delete = 0), 0) as availableQty
+    </select>
+
+    <select id="selectReservedPoolQuantity" resultType="int">
+        select coalesce(sum(required_qty), 0)
+        from ry_business.ry_rental_inventory_reservation_item
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and pool_id = #{poolId} and warehouse_id = #{warehouseId}
+          and reservation_status = 'reserved' and is_delete = 0
+    </select>
+</mapper>

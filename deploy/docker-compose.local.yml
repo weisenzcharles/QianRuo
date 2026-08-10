@@ -17,6 +17,8 @@ services:
       PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD}
       MERCHANT_DB_USERNAME: ${MERCHANT_DB_USERNAME}
       MERCHANT_DB_PASSWORD: ${MERCHANT_DB_PASSWORD}
+      BUSINESS_DB_USERNAME: ${BUSINESS_DB_USERNAME}
+      BUSINESS_DB_PASSWORD: ${BUSINESS_DB_PASSWORD}
       TZ: Asia/Shanghai
     ports:
       - "3306:3306"
@@ -153,6 +155,28 @@ services:
       MERCHANT_DB_PASSWORD: ${MERCHANT_DB_PASSWORD}
     ports:
       - "9210:9210"
+    networks:
+      - qianruo
+
+  rental-business:
+    image: ${REGISTRY}/${IMAGE_NAMESPACE}/rental-business:${IMAGE_TAG}
+    pull_policy: missing
+    container_name: qianruo-rental-business
+    depends_on:
+      ruoyi-nacos:
+        condition: service_started
+      ruoyi-mysql:
+        condition: service_healthy
+      ruoyi-redis:
+        condition: service_healthy
+    environment:
+      <<: *ruoyi-common-env
+      NACOS_ADDR: ruoyi-nacos:8848
+      BUSINESS_DB_URL: jdbc:mysql://ruoyi-mysql:3306/ry_business?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
+      BUSINESS_DB_USERNAME: ${BUSINESS_DB_USERNAME}
+      BUSINESS_DB_PASSWORD: ${BUSINESS_DB_PASSWORD}
+    ports:
+      - "9220:9220"
     networks:
       - qianruo
 

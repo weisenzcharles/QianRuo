@@ -38,6 +38,9 @@ public class LoginUser implements Serializable
     /** 当前商户ID，仅商户端登录态存在 */
     private Long memberId;
 
+    /** 当前商户认证状态，非 verified 时业务权限必须为空 */
+    private String merchantAuthStatus;
+
     /** 当前用户在商户内的身份 */
     private String memberRole;
 
@@ -135,6 +138,18 @@ public class LoginUser implements Serializable
     public void setMemberId(Long memberId)
     {
         this.memberId = memberId;
+    }
+
+    /** @return 当前商户认证状态。 */
+    public String getMerchantAuthStatus()
+    {
+        return merchantAuthStatus;
+    }
+
+    /** @param merchantAuthStatus 设置当前商户认证状态。 */
+    public void setMerchantAuthStatus(String merchantAuthStatus)
+    {
+        this.merchantAuthStatus = merchantAuthStatus;
     }
 
     public String getMemberRole()

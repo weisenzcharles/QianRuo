@@ -1,5 +1,5 @@
 -- 全库软删除前置迁移。
--- 本脚本必须先于所有引用 isdeleted 的业务迁移执行；迁移完成后不再保留 del_flag。
+-- 本脚本必须先于所有引用 is_delete 的业务迁移执行；迁移完成后不再保留 del_flag。
 
 USE `ry-cloud`;
 
@@ -88,12 +88,12 @@ BEGIN
         FROM information_schema.columns
         WHERE table_schema = current_schema
           AND table_name = current_table
-          AND column_name = 'isdeleted';
+          AND column_name = 'is_delete';
 
         IF has_isdeleted = 0 THEN
             SET @add_isdeleted_sql = CONCAT(
                 'ALTER TABLE `', current_schema, '`.`', current_table,
-                '` ADD COLUMN `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 ',
+                '` ADD COLUMN `is_delete` TINYINT(1) NOT NULL DEFAULT 0 ',
                 'COMMENT ''软删除标识：0正常 1删除'''
             );
             PREPARE add_isdeleted_statement FROM @add_isdeleted_sql;
@@ -111,9 +111,9 @@ BEGIN
         IF has_del_flag > 0 THEN
             SET @backfill_isdeleted_sql = CONCAT(
                 'UPDATE `', current_schema, '`.`', current_table,
-                '` SET `isdeleted` = CASE ',
+                '` SET `is_delete` = CASE ',
                 'WHEN CAST(COALESCE(`del_flag`, ''0'') AS CHAR) IN (''1'', ''2'') ',
-                'OR COALESCE(`isdeleted`, 0) <> 0 THEN 1 ELSE 0 END'
+                'OR COALESCE(`is_delete`, 0) <> 0 THEN 1 ELSE 0 END'
             );
             PREPARE backfill_isdeleted_statement FROM @backfill_isdeleted_sql;
             EXECUTE backfill_isdeleted_statement;
@@ -130,7 +130,7 @@ BEGIN
 
         SET @normalize_isdeleted_sql = CONCAT(
             'UPDATE `', current_schema, '`.`', current_table,
-            '` SET `isdeleted` = CASE WHEN COALESCE(`isdeleted`, 0) = 0 THEN 0 ELSE 1 END'
+            '` SET `is_delete` = CASE WHEN COALESCE(`is_delete`, 0) = 0 THEN 0 ELSE 1 END'
         );
         PREPARE normalize_isdeleted_statement FROM @normalize_isdeleted_sql;
         EXECUTE normalize_isdeleted_statement;
@@ -138,7 +138,7 @@ BEGIN
 
         SET @normalize_isdeleted_type_sql = CONCAT(
             'ALTER TABLE `', current_schema, '`.`', current_table,
-            '` MODIFY COLUMN `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 ',
+            '` MODIFY COLUMN `is_delete` TINYINT(1) NOT NULL DEFAULT 0 ',
             'COMMENT ''软删除标识：0正常 1删除'''
         );
         PREPARE normalize_isdeleted_type_statement FROM @normalize_isdeleted_type_sql;
@@ -157,15 +157,15 @@ CALL `qianruo_migrate_isdeleted`()$$
 
 CALL `qianruo_add_index_if_missing`(
     'ry_rental', 'ry_rental_merchant_user', 'idx_rental_merchant_user_status',
-    'INDEX `idx_rental_merchant_user_status` (`status`, `isdeleted`)'
+    'INDEX `idx_rental_merchant_user_status` (`status`, `is_delete`)'
 )$$
 CALL `qianruo_add_index_if_missing`(
     'ry_rental', 'ry_rental_merchant_role', 'uk_rental_merchant_role_name',
-    'UNIQUE INDEX `uk_rental_merchant_role_name` (`member_id`, `role_name`, `isdeleted`)'
+    'UNIQUE INDEX `uk_rental_merchant_role_name` (`member_id`, `role_name`, `is_delete`)'
 )$$
 CALL `qianruo_add_index_if_missing`(
     'ry_rental', 'ry_rental_merchant_role', 'uk_rental_merchant_role_key',
-    'UNIQUE INDEX `uk_rental_merchant_role_key` (`member_id`, `role_key`, `isdeleted`)'
+    'UNIQUE INDEX `uk_rental_merchant_role_key` (`member_id`, `role_key`, `is_delete`)'
 )$$
 
 DROP PROCEDURE IF EXISTS `qianruo_migrate_isdeleted`$$

@@ -108,8 +108,8 @@
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="类目编码" prop="classCode">
-              <el-input v-model="form.classCode" maxlength="64" placeholder="请输入类目编码" />
+            <el-form-item label="类目编码">
+              <el-input v-model="form.classCode" maxlength="64" disabled placeholder="保存后由系统自动生成" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -174,7 +174,6 @@ const data = reactive({
   form: {},
   rules: {
     parentId: [{ required: true, message: '上级类目不能为空', trigger: 'change' }],
-    classCode: [{ required: true, message: '类目编码不能为空', trigger: 'blur' }],
     className: [{ required: true, message: '类目名称不能为空', trigger: 'blur' }],
     sortNo: [{ required: true, message: '显示排序不能为空', trigger: 'blur' }],
     status: [{ required: true, message: '类目状态不能为空', trigger: 'change' }]

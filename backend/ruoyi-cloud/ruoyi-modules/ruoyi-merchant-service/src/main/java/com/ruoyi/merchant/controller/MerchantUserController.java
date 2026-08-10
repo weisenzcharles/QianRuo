@@ -37,6 +37,8 @@ public class MerchantUserController
         result.put("user", sessionService.toProfile(identity));
         result.put("roles", identity.getRoles());
         result.put("permissions", identity.getPermissions());
+        result.put("merchantAuthStatus", identity.getMerchantAuthStatus());
+        result.put("featureEnabled", "verified".equals(identity.getMerchantAuthStatus()));
         result.put("mustChangePassword", Boolean.TRUE.equals(identity.getMustChangePassword()));
         result.put("isPasswordExpired", passwordExpired(identity.getPasswordUpdatedAt()));
         return result;

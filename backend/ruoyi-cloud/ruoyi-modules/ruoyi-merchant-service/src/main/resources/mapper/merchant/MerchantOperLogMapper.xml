@@ -31,7 +31,7 @@
         insert into `ry_rental`.`ry_rental_merchant_oper_log`(
           tenant_id, member_id, operator_user_id, title, business_type, method, request_method,
           operator_type, oper_name, oper_url, oper_ip, oper_param, json_result, status,
-          error_msg, oper_time, cost_time, trace_id, http_status, isdeleted
+          error_msg, oper_time, cost_time, trace_id, http_status, is_delete
         ) values (
           #{record.tenantId}, #{record.merchantId}, #{record.operatorUserId}, coalesce(#{record.title}, ''),
           #{record.businessType}, #{record.method}, #{record.requestMethod}, #{record.operatorType},
@@ -45,7 +45,7 @@
     <select id="selectList" resultMap="operLog">
         select <include refid="columns" />
         from `ry_rental`.`ry_rental_merchant_oper_log`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and isdeleted = 0
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
         <if test="query.operIp != null and query.operIp != ''">
           and oper_ip like concat('%', #{query.operIp}, '%')
         </if>

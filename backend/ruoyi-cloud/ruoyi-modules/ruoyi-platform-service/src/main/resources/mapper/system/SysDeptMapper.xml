@@ -14,7 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="phone"      column="phone"       />
 		<result property="email"      column="email"       />
 		<result property="status"     column="status"      />
-		<result property="isdeleted"    column="isdeleted"    />
+		<result property="isdeleted"    column="is_delete"    />
 		<result property="parentName" column="parent_name" />
 		<result property="createBy"   column="create_by"   />
 		<result property="createTime" column="create_time" />
@@ -23,13 +23,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</resultMap>
 
 	<sql id="selectDeptVo">
-        select d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.phone, d.email, d.status, d.isdeleted, d.create_by, d.create_time
+        select d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.phone, d.email, d.status, d.is_delete, d.create_by, d.create_time
         from sys_dept d
     </sql>
 
 	<select id="selectDeptList" parameterType="SysDept" resultMap="SysDeptResult">
         <include refid="selectDeptVo"/>
-        where d.isdeleted = '0'
+        where d.is_delete = '0'
 		<if test="deptId != null and deptId != 0">
 			AND dept_id = #{deptId}
 		</if>
@@ -50,11 +50,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectDeptListByRoleId" resultType="Long">
 		select d.dept_id
 		from sys_dept d
-	            left join sys_role_dept rd on d.dept_id = rd.dept_id and rd.isdeleted = 0
-	        where rd.role_id = #{roleId} and d.isdeleted = 0
+	            left join sys_role_dept rd on d.dept_id = rd.dept_id and rd.is_delete = 0
+	        where rd.role_id = #{roleId} and d.is_delete = 0
             <if test="deptCheckStrictly">
 	              and d.dept_id not in (select d.parent_id from sys_dept d inner join sys_role_dept rd
-	                on d.dept_id = rd.dept_id and rd.role_id = #{roleId} and rd.isdeleted = 0 where d.isdeleted = 0)
+	                on d.dept_id = rd.dept_id and rd.role_id = #{roleId} and rd.is_delete = 0 where d.is_delete = 0)
             </if>
 		order by d.parent_id, d.order_num
 	</select>
@@ -65,12 +65,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</select>
 
     <select id="checkDeptExistUser" parameterType="Long" resultType="int">
-		select count(1) from sys_user where dept_id = #{deptId} and isdeleted = '0'
+		select count(1) from sys_user where dept_id = #{deptId} and is_delete = '0'
 	</select>
 
 	<select id="hasChildByDeptId" parameterType="Long" resultType="int">
 		select count(1) from sys_dept
-		where isdeleted = '0' and parent_id = #{deptId} limit 1
+		where is_delete = '0' and parent_id = #{deptId} limit 1
 	</select>
 
 	<select id="selectChildrenDeptById" parameterType="Long" resultMap="SysDeptResult">
@@ -78,12 +78,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</select>
 
 	<select id="selectNormalChildrenDeptById" parameterType="Long" resultType="int">
-		select count(*) from sys_dept where status = 0 and isdeleted = '0' and find_in_set(#{deptId}, ancestors)
+		select count(*) from sys_dept where status = 0 and is_delete = '0' and find_in_set(#{deptId}, ancestors)
 	</select>
 
 	<select id="checkDeptNameUnique" resultMap="SysDeptResult">
 	    <include refid="selectDeptVo"/>
-		where dept_name=#{deptName} and parent_id = #{parentId} and isdeleted = '0' limit 1
+		where dept_name=#{deptName} and parent_id = #{parentId} and is_delete = '0' limit 1
 	</select>
 
     <insert id="insertDept" parameterType="SysDept">
@@ -156,7 +156,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</update>
 
 	<update id="deleteDeptById" parameterType="Long">
-		update sys_dept set isdeleted = 1 where dept_id = #{deptId}
+		update sys_dept set is_delete = 1 where dept_id = #{deptId}
 	</update>
 
 </mapper>

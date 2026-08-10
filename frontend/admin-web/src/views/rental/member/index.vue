@@ -131,6 +131,16 @@
             <el-radio value="rejected">审核驳回</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="会员类型" prop="membershipType">
+          <el-select v-model="auditForm.membershipType" style="width: 100%" placeholder="请选择审核通过后的会员类型">
+            <el-option v-for="item in rentalMembershipTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="接单资格" prop="qualificationCodes">
+          <el-checkbox-group v-model="auditForm.qualificationCodes">
+            <el-checkbox v-for="item in rentalQualificationOptions" :key="item.value" :label="item.value">{{ item.label }}</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
         <el-form-item label="审核意见" prop="auditRemark">
           <el-input v-model="auditForm.auditRemark" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="驳回时必须填写具体原因" />
         </el-form-item>
@@ -144,10 +154,10 @@
 </template>
 
 <script setup name="RentalMember">
-import { addMember, auditMember, delMember, getMember, listMember, updateMember } from '@/api/rental/member'
+import { addMember, auditMember, delMember, getCertificationHistory, getMember, getMemberQualifications, getMembershipHistory, getQualificationHistory, listMember, updateMember } from '@/api/rental/member'
 import MemberDetailDrawer from './components/MemberDetailDrawer.vue'
 import MemberEditor from './components/MemberEditor.vue'
-import { findRentalOption, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalVipLevelOptions } from '@/utils/rental/options'
+import { findRentalOption, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalMembershipTypeOptions, rentalQualificationOptions, rentalVipLevelOptions } from '@/utils/rental/options'
 
 const { proxy } = getCurrentInstance()
 const memberEditorRef = ref()
@@ -159,7 +169,7 @@ const auditOpen = ref(false)
 const auditing = ref(false)
 const auditTarget = ref(null)
 const auditFormRef = ref()
-const auditForm = reactive({ authStatus: 'verified', auditRemark: '' })
+const auditForm = reactive({ authStatus: 'verified', auditRemark: '', membershipType: '', qualificationCodes: [] })
 const auditRules = {
   authStatus: [{ required: true, message: '请选择审核结果', trigger: 'change' }],
   auditRemark: [{ validator: validateAuditRemark, trigger: 'blur' }]
@@ -207,6 +217,7 @@ function defaultForm() {
     memberCode: undefined,
     mainAccount: undefined,
     memberType: 'personal',
+    membershipType: 'personal_member',
     authStatus: 'pending',
     legalSubjectName: undefined,
     licenseNo: undefined,
@@ -308,8 +319,20 @@ async function handleUpdate(row = {}) {
  * @param {object} row 当前商户行
  */
 async function handleDetail(row) {
-  const response = await getMember(row.memberId)
-  detail.value = response.data
+  const [memberResponse, certificationResponse, qualificationResponse, membershipHistoryResponse, qualificationHistoryResponse] = await Promise.all([
+    getMember(row.memberId),
+    getCertificationHistory(row.memberId),
+    getMemberQualifications(row.memberId),
+    getMembershipHistory(row.memberId),
+    getQualificationHistory(row.memberId)
+  ])
+  detail.value = {
+    ...memberResponse.data,
+    certificationHistory: certificationResponse.data || [],
+    qualifications: qualificationResponse.data || [],
+    membershipHistory: membershipHistoryResponse.data || [],
+    qualificationHistory: qualificationHistoryResponse.data || []
+  }
   detailOpen.value = true
 }
 
@@ -356,10 +379,15 @@ function handleExport() {
  *
  * @param {object} row 待审核商户行
  */
-function handleAudit(row) {
+async function handleAudit(row) {
   auditTarget.value = row
   auditForm.authStatus = 'verified'
   auditForm.auditRemark = ''
+  auditForm.membershipType = row.membershipType || (row.memberType === 'enterprise' ? 'ordinary_enterprise_member' : 'personal_member')
+  const response = await getMemberQualifications(row.memberId)
+  auditForm.qualificationCodes = (response.data || [])
+    .filter(item => item.qualificationStatus === 'enabled')
+    .map(item => item.qualificationCode)
   auditOpen.value = true
   nextTick(() => auditFormRef.value?.clearValidate())
 }

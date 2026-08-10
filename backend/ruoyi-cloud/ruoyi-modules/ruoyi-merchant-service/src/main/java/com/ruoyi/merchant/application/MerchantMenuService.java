@@ -24,6 +24,9 @@ public class MerchantMenuService
 {
     private static final long ROOT_ID = 0L;
 
+    /** 商户端内嵌外链的本地路由前缀，确保菜单始终在当前应用内容区打开。 */
+    private static final String INNER_LINK_PATH_PREFIX = "/merchant/inner-link/";
+
     @Autowired
     private MerchantMenuMapper menuMapper;
 
@@ -53,10 +56,18 @@ public class MerchantMenuService
         return buildTree(menus).stream().map(this::toTreeSelect).collect(Collectors.toList());
     }
 
+    /**
+     * 根据当前商户认证状态装配动态路由。已审核商户读取自身角色和直接授权，未审核商户读取全局页面模板，
+     * 从而保留页面预览能力，同时由权限注解阻止新增、修改、删除、导出和授权操作。
+     *
+     * @return 当前商户可见的动态路由
+     */
     public List<MerchantRouterVO> currentRouters()
     {
-        List<MerchantMenu> menus = menuMapper.selectByUser(MerchantContextUtils.getTenantId(),
-                MerchantContextUtils.getMemberId(), SecurityUtils.getUserId());
+        List<MerchantMenu> menus = MerchantContextUtils.isMerchantApproved()
+                ? menuMapper.selectByUser(MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId(),
+                        SecurityUtils.getUserId())
+                : menuMapper.selectDefaultPreviewMenus();
         return buildRouters(buildTree(menus));
     }
 
@@ -140,21 +151,63 @@ public class MerchantMenuService
         meta.setTitle(menu.getMenuName());
         meta.setIcon(menu.getIcon());
         meta.setNoCache("1".equals(menu.getIsCache()));
-        if (StringUtils.ishttp(menu.getPath()))
+        if (isExternalMenu(menu))
         {
             meta.setLink(menu.getPath());
         }
         return meta;
     }
 
+    /**
+     * 判断菜单是否需要以内嵌页面方式打开。
+     *
+     * <p>商户端不允许菜单把浏览器带离当前后台。对于明确配置为 HTTP/HTTPS 地址的菜单，
+     * 服务端保留原始地址到路由元数据中，同时把路由地址改成本地的 InnerLink 路径，
+     * 由商户端内容区 iframe 承载。这样侧边栏、顶部菜单和菜单搜索都能复用同一套站内导航规则，
+     * 不会因为菜单的 is_frame 配置差异再次退化为新窗口打开。</p>
+     *
+     * @param menu 待判断的商户菜单
+     * @return true 表示该菜单应以内嵌页面方式打开
+     */
+    private boolean isExternalMenu(MerchantMenu menu)
+    {
+        return StringUtils.ishttp(menu.getPath());
+    }
+
+    /**
+     * 获取菜单路由名称。
+     *
+     * <p>外链菜单使用菜单主键生成稳定且唯一的路由名称，避免直接使用 URL 中的协议、
+     * 端口或特殊字符造成 Vue Router 路由名称不合法或重复。</p>
+     *
+     * @param menu 菜单信息
+     * @return 前端路由名称
+     */
     private String routeName(MerchantMenu menu)
     {
+        if (isExternalMenu(menu))
+        {
+            return "MerchantInnerLink" + menu.getMenuId();
+        }
         String name = StringUtils.isNotEmpty(menu.getRouteName()) ? menu.getRouteName() : menu.getPath();
         return StringUtils.capitalize(name);
     }
 
+    /**
+     * 获取菜单实际注册到 Vue Router 的路径。
+     *
+     * <p>外链菜单不能直接把 HTTP 地址作为 Vue Router 路径，否则前端菜单组件会把它识别成
+     * 浏览器外链并调用 window.open。这里使用菜单主键生成站内路径，原始地址由 meta.link 保存。</p>
+     *
+     * @param menu 菜单信息
+     * @return 前端路由路径
+     */
     private String routerPath(MerchantMenu menu)
     {
+        if (isExternalMenu(menu))
+        {
+            return INNER_LINK_PATH_PREFIX + menu.getMenuId();
+        }
         if (isRootMenu(menu))
         {
             return "/";
@@ -167,13 +220,46 @@ public class MerchantMenuService
         return menu.getPath();
     }
 
+    /**
+     * 获取菜单对应的前端组件。
+     *
+     * <p>外链菜单统一使用 InnerLink 组件，由当前后台的右侧内容区加载页面；普通菜单继续
+     * 使用菜单配置的业务组件。</p>
+     *
+     * @param menu 菜单信息
+     * @return 前端组件标识
+     */
     private String component(MerchantMenu menu)
     {
+        if (isExternalMenu(menu))
+        {
+            return UserConstants.INNER_LINK;
+        }
+        // 一级商户菜单必须作为独立的后台布局入口注册，保证其下所有业务页面共享左侧菜单、顶部导航和标签页。
+        // 只有挂载在一级菜单下面的目录节点才使用 ParentView，否则直接访问订单等深层地址时会脱离 Layout。
+        if (isTopLevelMenu(menu))
+        {
+            return UserConstants.LAYOUT;
+        }
         if (StringUtils.isNotEmpty(menu.getComponent()) && !isRootMenu(menu))
         {
             return menu.getComponent();
         }
         return UserConstants.LAYOUT;
+    }
+
+    /**
+     * 判断菜单是否为商户端一级菜单。
+     *
+     * <p>一级菜单是动态路由树的挂载入口，必须承载统一后台布局；如果将一级目录直接配置为
+     * ParentView，Vue Router 会直接渲染其子页面，导致订单、仓库等页面缺少左侧菜单和顶部导航。</p>
+     *
+     * @param menu 待判断的菜单
+     * @return true 表示菜单位于商户菜单根节点
+     */
+    private boolean isTopLevelMenu(MerchantMenu menu)
+    {
+        return menu.getParentId() != null && menu.getParentId() == ROOT_ID;
     }
 
     private boolean isRootMenu(MerchantMenu menu)

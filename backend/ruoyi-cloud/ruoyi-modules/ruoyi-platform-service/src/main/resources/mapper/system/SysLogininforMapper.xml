@@ -21,7 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectLogininforList" parameterType="SysLogininfor" resultMap="SysLogininforResult">
 		select info_id, user_name, ipaddr, status, msg, access_time from sys_logininfor
 		<where>
-			isdeleted = 0
+			is_delete = 0
 			<if test="ipaddr != null and ipaddr != ''">
 				AND ipaddr like concat('%', #{ipaddr}, '%')
 			</if>
@@ -42,14 +42,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</select>
 
 	<update id="deleteLogininforByIds" parameterType="Long">
-        update sys_logininfor set isdeleted = 1 where info_id in
+        update sys_logininfor set is_delete = 1 where info_id in
         <foreach collection="array" item="infoId" open="(" separator="," close=")">
         #{infoId}
         </foreach>
         </update>
 
     <update id="cleanLogininfor">
-        update sys_logininfor set isdeleted = 1 where isdeleted = 0
+        update sys_logininfor set is_delete = 1 where is_delete = 0
     </update>
 
 </mapper>

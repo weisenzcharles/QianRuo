@@ -36,6 +36,39 @@ public final class MerchantContextUtils
         return requireMerchantContext().getMemberId();
     }
 
+    /**
+     * 获取当前商户主体认证状态，供商户服务统一判断是否已经开放业务功能。
+     *
+     * @return 商户认证状态
+     */
+    public static String getMerchantAuthStatus()
+    {
+        return requireMerchantContext().getMerchantAuthStatus();
+    }
+
+    /**
+     * 判断当前商户是否已通过平台认证，未通过时只能使用默认只读预览功能。
+     *
+     * @return 认证通过返回 true，否则返回 false
+     */
+    public static boolean isMerchantApproved()
+    {
+        return "verified".equals(getMerchantAuthStatus());
+    }
+
+    /**
+     * 强制要求当前商户已经通过平台认证，用于保护新增、修改、删除、导出和授权等业务操作。
+     *
+     * @throws ServiceException 当前商户尚未通过认证时抛出
+     */
+    public static void requireMerchantApproved()
+    {
+        if (!isMerchantApproved())
+        {
+            throw new ServiceException("商户资料尚未审核通过，当前功能暂不可用");
+        }
+    }
+
     public static String getMemberRole()
     {
         return requireMerchantContext().getMemberRole();

@@ -10,7 +10,7 @@
         <result property="classLevel" column="class_level" />
         <result property="sortNo" column="sort_no" />
         <result property="status" column="status" />
-        <result property="isdeleted" column="isdeleted" />
+        <result property="isdeleted" column="is_delete" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
         <result property="updateBy" column="update_by" />
@@ -20,13 +20,13 @@
 
     <sql id="columns">
         class_id, parent_id, ancestors, class_code, class_name, class_level, sort_no,
-        status, isdeleted, create_by, create_time, update_by, update_time, remark
+        status, is_delete, create_by, create_time, update_by, update_time, remark
     </sql>
 
     <select id="selectList" resultMap="productClassResult">
         select <include refid="columns" />
         from `ry_rental`.`ry_rental_product_class`
-        where isdeleted = 0
+        where is_delete = 0
         <if test="className != null and className != ''">
             and class_name like concat('%', #{className}, '%')
         </if>
@@ -37,37 +37,37 @@
     <select id="selectActiveList" resultMap="productClassResult">
         select <include refid="columns" />
         from `ry_rental`.`ry_rental_product_class`
-        where status = '0' and isdeleted = 0
+        where status = '0' and is_delete = 0
         order by parent_id, sort_no, class_id
     </select>
 
     <select id="selectById" resultMap="productClassResult">
         select <include refid="columns" />
         from `ry_rental`.`ry_rental_product_class`
-        where class_id = #{classId} and isdeleted = 0
+        where class_id = #{classId} and is_delete = 0
     </select>
 
     <select id="countByCode" resultType="int">
         select count(1) from `ry_rental`.`ry_rental_product_class`
-        where class_code = #{classCode} and isdeleted = 0
+        where class_code = #{classCode} and is_delete = 0
         <if test="excludeClassId != null">and class_id != #{excludeClassId}</if>
     </select>
 
     <select id="countByName" resultType="int">
         select count(1) from `ry_rental`.`ry_rental_product_class`
-        where parent_id = #{parentId} and class_name = #{className} and isdeleted = 0
+        where parent_id = #{parentId} and class_name = #{className} and is_delete = 0
         <if test="excludeClassId != null">and class_id != #{excludeClassId}</if>
     </select>
 
     <select id="countChildren" resultType="int">
         select count(1) from `ry_rental`.`ry_rental_product_class`
-        where parent_id = #{classId} and isdeleted = 0
+        where parent_id = #{classId} and is_delete = 0
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="classId">
         insert into `ry_rental`.`ry_rental_product_class`(
             parent_id, ancestors, class_code, class_name, class_level, sort_no, status,
-            isdeleted, create_by, create_time, remark
+            is_delete, create_by, create_time, remark
         ) values (
             #{parentId}, #{ancestors}, #{classCode}, #{className}, #{classLevel}, #{sortNo},
             #{status}, 0, #{createBy}, sysdate(), #{remark}
@@ -79,7 +79,7 @@
         set parent_id = #{parentId}, ancestors = #{ancestors}, class_code = #{classCode},
             class_name = #{className}, class_level = #{classLevel}, sort_no = #{sortNo},
             status = #{status}, update_by = #{updateBy}, update_time = sysdate(), remark = #{remark}
-        where class_id = #{classId} and isdeleted = 0
+        where class_id = #{classId} and is_delete = 0
     </update>
 
     <update id="updateDescendantHierarchy">
@@ -93,12 +93,12 @@
             update_time = sysdate()
         where (ancestors = #{oldAncestorPrefix}
                or ancestors like concat(#{oldAncestorPrefix}, ',%'))
-          and isdeleted = 0
+          and is_delete = 0
     </update>
 
     <update id="softDelete">
         update `ry_rental`.`ry_rental_product_class`
-        set isdeleted = 1, update_by = #{operator}, update_time = sysdate()
-        where class_id = #{classId} and isdeleted = 0
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where class_id = #{classId} and is_delete = 0
     </update>
 </mapper>

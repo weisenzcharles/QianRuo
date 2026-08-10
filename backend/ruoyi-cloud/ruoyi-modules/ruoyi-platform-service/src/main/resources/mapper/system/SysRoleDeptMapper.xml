@@ -10,26 +10,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</resultMap>
 
 	<update id="deleteRoleDeptByRoleId" parameterType="Long">
-		update sys_role_dept set isdeleted = 1 where role_id=#{roleId}
+		update sys_role_dept set is_delete = 1 where role_id=#{roleId}
 	</update>
 
 	<select id="selectCountRoleDeptByDeptId" resultType="Integer">
-	    select count(1) from sys_role_dept where dept_id=#{deptId} and isdeleted = 0
+	    select count(1) from sys_role_dept where dept_id=#{deptId} and is_delete = 0
 	</select>
 
 	<update id="deleteRoleDept" parameterType="Long">
-        update sys_role_dept set isdeleted = 1 where role_id in
+        update sys_role_dept set is_delete = 1 where role_id in
         <foreach collection="array" item="roleId" open="(" separator="," close=")">
         #{roleId}
         </foreach>
         </update>
 
 	<insert id="batchRoleDept">
-		insert into sys_role_dept(role_id, dept_id, isdeleted) values
+		insert into sys_role_dept(role_id, dept_id, is_delete) values
 		<foreach item="item" index="index" collection="list" separator=",">
 			(#{item.roleId},#{item.deptId},0)
 		</foreach>
-		on duplicate key update isdeleted = 0
+		on duplicate key update is_delete = 0
 	</insert>
 
 </mapper>

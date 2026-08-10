@@ -24,17 +24,17 @@
     </sql>
     <select id="selectCatalog" resultMap="menu">
         select <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
-        where m.tenant_id = 0 and m.member_id = 0 and m.isdeleted = '0'
+        where m.tenant_id = 0 and m.member_id = 0 and m.is_delete = '0'
         order by m.parent_id, m.order_num, m.menu_id
     </select>
     <select id="selectByUser" resultMap="menu">
         select distinct <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
-        where m.tenant_id = 0 and m.member_id = 0 and m.isdeleted = '0'
+        where m.tenant_id = 0 and m.member_id = 0 and m.is_delete = '0'
           and m.status = '0' and m.menu_type in ('M', 'C') and (
             exists (select 1 from `ry_rental`.`ry_rental_merchant_user_menu` um
                 where um.tenant_id = #{tenantId} and um.member_id = #{merchantId}
                   and um.merchant_user_id = #{userId} and um.menu_id = m.menu_id
-                  and um.isdeleted = 0)
+                  and um.is_delete = 0)
             or exists (select 1 from `ry_rental`.`ry_rental_merchant_user_role` ur
                 inner join `ry_rental`.`ry_rental_merchant_role` r
                     on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id and r.role_id = ur.role_id
@@ -42,33 +42,39 @@
                     on rm.tenant_id = ur.tenant_id and rm.member_id = ur.member_id and rm.role_id = ur.role_id
                 where ur.tenant_id = #{tenantId} and ur.member_id = #{merchantId}
                   and ur.merchant_user_id = #{userId} and rm.menu_id = m.menu_id
-                  and ur.isdeleted = 0 and rm.isdeleted = 0
-                  and r.status = '0' and r.isdeleted = '0')
+                  and ur.is_delete = 0 and rm.is_delete = 0
+                  and r.status = '0' and r.is_delete = '0')
           )
+        order by m.parent_id, m.order_num, m.menu_id
+    </select>
+    <select id="selectDefaultPreviewMenus" resultMap="menu">
+        select <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
+        where m.tenant_id = 0 and m.member_id = 0 and m.is_delete = '0'
+          and m.status = '0' and m.menu_type in ('M', 'C')
         order by m.parent_id, m.order_num, m.menu_id
     </select>
     <select id="selectById" resultMap="menu">
         select <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
-        where m.tenant_id = 0 and m.member_id = 0 and m.menu_id = #{menuId} and m.isdeleted = '0'
+        where m.tenant_id = 0 and m.member_id = 0 and m.menu_id = #{menuId} and m.is_delete = '0'
     </select>
     <select id="selectIdsByRole" resultType="Long">
         select m.menu_id from `ry_rental`.`ry_rental_merchant_menu` m
         inner join `ry_rental`.`ry_rental_merchant_role_menu` rm on rm.menu_id = m.menu_id
         where rm.tenant_id = #{tenantId} and rm.member_id = #{merchantId} and rm.role_id = #{roleId}
-          and rm.isdeleted = 0 and m.tenant_id = 0 and m.member_id = 0 and m.isdeleted = '0'
+          and rm.is_delete = 0 and m.tenant_id = 0 and m.member_id = 0 and m.is_delete = '0'
         <if test="strict">
           and m.menu_id not in (
             select child.parent_id from `ry_rental`.`ry_rental_merchant_menu` child
             inner join `ry_rental`.`ry_rental_merchant_role_menu` child_rm on child_rm.menu_id = child.menu_id
             where child_rm.tenant_id = #{tenantId} and child_rm.member_id = #{merchantId}
               and child_rm.role_id = #{roleId} and child.tenant_id = 0 and child.member_id = 0
-              and child_rm.isdeleted = 0 and child.isdeleted = '0')
+              and child_rm.is_delete = 0 and child.is_delete = '0')
         </if>
         order by m.parent_id, m.order_num, m.menu_id
     </select>
     <select id="countValidMenuIds" resultType="Integer">
         select count(1) from `ry_rental`.`ry_rental_merchant_menu`
-        where tenant_id = 0 and member_id = 0 and isdeleted = '0'
+        where tenant_id = 0 and member_id = 0 and is_delete = '0'
           and (perms is null or perms = '' or perms like 'merchant:%')
           and menu_id in
         <foreach collection="menuIds" item="menuId" open="(" separator="," close=")">#{menuId}</foreach>

@@ -4,7 +4,7 @@
     <select id="selectClassIds" resultType="long">
         select class_id
         from `ry_rental`.`ry_rental_member_product_class`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and isdeleted = 0
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
         order by class_id
     </select>
 
@@ -12,24 +12,24 @@
         select count(1)
         from `ry_rental`.`ry_rental_member_product_class`
         where tenant_id = #{tenantId} and member_id = #{merchantId}
-          and class_id = #{classId} and isdeleted = 0
+          and class_id = #{classId} and is_delete = 0
     </select>
 
     <update id="softDeleteAll">
         update `ry_rental`.`ry_rental_member_product_class`
-        set isdeleted = 1, update_by = #{operator}, update_time = sysdate()
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and isdeleted = 0
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
     </update>
 
     <insert id="upsertSelections">
         insert into `ry_rental`.`ry_rental_member_product_class`(
-            tenant_id, member_id, class_id, isdeleted, create_by, create_time, update_by, update_time
+            tenant_id, member_id, class_id, is_delete, create_by, create_time, update_by, update_time
         ) values
         <foreach collection="classIds" item="classId" separator=",">
             (#{tenantId}, #{merchantId}, #{classId}, 0, #{operator}, sysdate(), #{operator}, sysdate())
         </foreach>
         on duplicate key update
-            isdeleted = 0,
+            is_delete = 0,
             update_by = values(update_by),
             update_time = values(update_time)
     </insert>

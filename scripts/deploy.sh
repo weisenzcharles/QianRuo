@@ -27,6 +27,8 @@ PLATFORM_DB_USERNAME="${PLATFORM_DB_USERNAME:-qianruo_platform}"
 PLATFORM_DB_PASSWORD="${PLATFORM_DB_PASSWORD:-}"
 MERCHANT_DB_USERNAME="${MERCHANT_DB_USERNAME:-qianruo_merchant}"
 MERCHANT_DB_PASSWORD="${MERCHANT_DB_PASSWORD:-}"
+BUSINESS_DB_USERNAME="${BUSINESS_DB_USERNAME:-qianruo_business}"
+BUSINESS_DB_PASSWORD="${BUSINESS_DB_PASSWORD:-}"
 NACOS_AUTH_TOKEN="${NACOS_AUTH_TOKEN:-}"
 NACOS_AUTH_IDENTITY_KEY="${NACOS_AUTH_IDENTITY_KEY:-serverIdentity}"
 NACOS_AUTH_IDENTITY_VALUE="${NACOS_AUTH_IDENTITY_VALUE:-}"
@@ -46,6 +48,7 @@ NACOS_IMAGE="${NACOS_IMAGE:-nacos/nacos-server:v3.0.2}"
 
 export REGISTRY IMAGE_NAMESPACE IMAGE_TAG K8S_NAMESPACE ADMIN_HOST MERCHANT_HOST
 export MYSQL_ROOT_PASSWORD PLATFORM_DB_USERNAME PLATFORM_DB_PASSWORD MERCHANT_DB_USERNAME MERCHANT_DB_PASSWORD
+export BUSINESS_DB_USERNAME BUSINESS_DB_PASSWORD
 export NACOS_AUTH_TOKEN NACOS_AUTH_IDENTITY_KEY NACOS_AUTH_IDENTITY_VALUE JAVA_OPTS
 export JAVA_BASE_IMAGE NGINX_BASE_IMAGE MYSQL_IMAGE REDIS_IMAGE NACOS_IMAGE
 
@@ -54,6 +57,7 @@ BACKEND_IMAGES=(
   "ruoyi-auth:backend/ruoyi-cloud/ruoyi-auth/target/ruoyi-auth.jar:ruoyi-auth"
   "platform-service:backend/ruoyi-cloud/ruoyi-modules/ruoyi-platform-service/target/ruoyi-platform-service.jar:platform-service"
   "merchant-service:backend/ruoyi-cloud/ruoyi-modules/ruoyi-merchant-service/target/ruoyi-merchant-service.jar:merchant-service"
+  "rental-business:backend/ruoyi-cloud/ruoyi-modules/ruoyi-rental-business/target/ruoyi-rental-business.jar:rental-business"
   "ruoyi-modules-gen:backend/ruoyi-cloud/ruoyi-modules/ruoyi-gen/target/ruoyi-modules-gen.jar:ruoyi-gen"
   "ruoyi-modules-job:backend/ruoyi-cloud/ruoyi-modules/ruoyi-job/target/ruoyi-modules-job.jar:ruoyi-job"
   "ruoyi-modules-file:backend/ruoyi-cloud/ruoyi-modules/ruoyi-file/target/ruoyi-modules-file.jar:ruoyi-file"
@@ -78,6 +82,16 @@ DATABASE_MIGRATIONS=(
   "database/migrations/V20260724_009__complete_merchant_profile.sql"
   "database/migrations/V20260724_010__merchant_registration_workflow.sql"
   "database/migrations/V20260730_001__product_class_audit_soft_delete.sql"
+  "database/migrations/V20260730_002__rename_isdeleted_to_is_delete.sql"
+  "database/migrations/V20260731_001__merchant_menu_restructure.sql"
+  "database/migrations/V20260802_001__merchant_certification_membership_qualification.sql"
+  "database/migrations/V20260802_002__brand_model_common_model.sql"
+  "database/migrations/V20260802_003__rental_business_service.sql"
+  "database/migrations/V20260803_001__rental_business_order_tables.sql"
+  "database/migrations/V20260804_001__rental_business_master_data.sql"
+  "database/migrations/V20260804_002__rental_business_master_data_menu.sql"
+  "database/migrations/V20260803_002__repair_merchant_menu_encoding_and_internal_routes.sql"
+  "database/migrations/V20260805_001__unified_code_rule.sql"
 )
 
 usage() {
@@ -130,7 +144,7 @@ require_registry() {
 
 require_secret_vars() {
   local missing=0
-  for key in MYSQL_ROOT_PASSWORD PLATFORM_DB_PASSWORD MERCHANT_DB_PASSWORD NACOS_AUTH_TOKEN NACOS_AUTH_IDENTITY_KEY NACOS_AUTH_IDENTITY_VALUE; do
+  for key in MYSQL_ROOT_PASSWORD PLATFORM_DB_PASSWORD MERCHANT_DB_PASSWORD BUSINESS_DB_PASSWORD NACOS_AUTH_TOKEN NACOS_AUTH_IDENTITY_KEY NACOS_AUTH_IDENTITY_VALUE; do
     local value="${!key:-}"
     if [[ -z "$value" || "$value" == CHANGE_ME* ]]; then
       echo "Please set $key in deploy/.env." >&2
@@ -148,6 +162,8 @@ prepare_local_env() {
   PLATFORM_DB_PASSWORD="${PLATFORM_DB_PASSWORD:-qianruo_platform_local_2026}"
   MERCHANT_DB_USERNAME="${MERCHANT_DB_USERNAME:-qianruo_merchant}"
   MERCHANT_DB_PASSWORD="${MERCHANT_DB_PASSWORD:-qianruo_merchant_local_2026}"
+  BUSINESS_DB_USERNAME="${BUSINESS_DB_USERNAME:-qianruo_business}"
+  BUSINESS_DB_PASSWORD="${BUSINESS_DB_PASSWORD:-qianruo_business_local_2026}"
   NACOS_AUTH_TOKEN="${NACOS_AUTH_TOKEN:-cWlhbnJ1by1sb2NhbC1uYWNvcy10b2tlbi1zZWNyZXQtMjAyNg==}"
   NACOS_AUTH_IDENTITY_KEY="${NACOS_AUTH_IDENTITY_KEY:-serverIdentity}"
   NACOS_AUTH_IDENTITY_VALUE="${NACOS_AUTH_IDENTITY_VALUE:-qianruo-local-identity}"
@@ -157,7 +173,8 @@ prepare_local_env() {
   PUSH_IMAGES=false
   APPLY_MANIFESTS=false
   export REGISTRY IMAGE_NAMESPACE MYSQL_ROOT_PASSWORD PLATFORM_DB_USERNAME PLATFORM_DB_PASSWORD
-  export MERCHANT_DB_USERNAME MERCHANT_DB_PASSWORD NACOS_AUTH_TOKEN NACOS_AUTH_IDENTITY_KEY NACOS_AUTH_IDENTITY_VALUE
+  export MERCHANT_DB_USERNAME MERCHANT_DB_PASSWORD BUSINESS_DB_USERNAME BUSINESS_DB_PASSWORD
+  export NACOS_AUTH_TOKEN NACOS_AUTH_IDENTITY_KEY NACOS_AUTH_IDENTITY_VALUE
   export MYSQL_IMAGE REDIS_IMAGE NACOS_IMAGE
   ensure_local_nacos_token
 }
@@ -209,12 +226,14 @@ require_backend_jar() {
 # 校验平台端、商户端和网关的关键类与资源均已写入最终 JAR，防止部署不完整的服务镜像。
 verify_backend_artifacts() {
   local merchant_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-modules/ruoyi-merchant-service/target/ruoyi-merchant-service.jar"
+  local business_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-modules/ruoyi-rental-business/target/ruoyi-rental-business.jar"
   local platform_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-modules/ruoyi-platform-service/target/ruoyi-platform-service.jar"
   local gateway_jar="$ROOT_DIR/backend/ruoyi-cloud/ruoyi-gateway/target/ruoyi-gateway.jar"
   need_cmd jar
 
   require_backend_jar "Platform service" "$platform_jar"
   require_backend_jar "Merchant service" "$merchant_jar"
+  require_backend_jar "Rental business service" "$business_jar"
   require_backend_jar "Gateway" "$gateway_jar"
 
   if ! jar tf "$platform_jar" | grep 'com/ruoyi/system/PlatformServiceApplication.class' >/dev/null; then
@@ -235,6 +254,10 @@ verify_backend_artifacts() {
   fi
   if ! jar tf "$merchant_jar" | grep 'BOOT-INF/classes/com/ruoyi/merchant/model/MerchantRoleVO.class' >/dev/null; then
     echo "Merchant service JAR does not contain MerchantRoleVO; refusing to deploy an incomplete image." >&2
+    exit 1
+  fi
+  if ! jar tf "$business_jar" | grep 'com/ruoyi/rentalbusiness/RentalBusinessApplication.class' >/dev/null; then
+    echo "Rental business JAR does not contain RentalBusinessApplication; refusing to deploy an incomplete image." >&2
     exit 1
   fi
   if ! jar tf "$gateway_jar" | grep 'com/ruoyi/gateway/config/MerchantRouteConfiguration.class' >/dev/null; then
@@ -356,7 +379,7 @@ apply_manifests() {
   kubectl -n "$K8S_NAMESPACE" delete job qianruo-db-access --ignore-not-found
   kubectl apply -f "$GENERATED_MANIFEST"
   kubectl -n "$K8S_NAMESPACE" wait --for=condition=complete job/qianruo-db-access --timeout=180s
-  kubectl -n "$K8S_NAMESPACE" rollout restart deployment/platform-service deployment/merchant-service
+  kubectl -n "$K8S_NAMESPACE" rollout restart deployment/platform-service deployment/merchant-service deployment/rental-business
   if [[ -f "$GENERATED_INGRESS" ]]; then
     kubectl apply -f "$GENERATED_INGRESS"
   fi
@@ -413,10 +436,11 @@ migrate_db() {
     run_sql_file "$migration"
   done
   log "Reloading Nacos, gateway and platform configuration"
-  kubectl -n "$K8S_NAMESPACE" rollout restart deployment/ruoyi-nacos deployment/ruoyi-gateway deployment/platform-service
+  kubectl -n "$K8S_NAMESPACE" rollout restart deployment/ruoyi-nacos deployment/ruoyi-gateway deployment/platform-service deployment/rental-business
   wait_deployment ruoyi-nacos
   wait_deployment ruoyi-gateway
   wait_deployment platform-service
+  wait_deployment rental-business
 }
 
 show_status() {
@@ -500,11 +524,16 @@ local_up() {
   fi
   local_wait_nacos
 
-  log "Starting local application services"
-  compose up -d --force-recreate --remove-orphans ruoyi-gateway ruoyi-auth platform-service merchant-service ruoyi-gen ruoyi-job ruoyi-file ruoyi-monitor rental-admin-web rental-merchant-web
+  # 分批启动：先起网关和认证服务，避免 9 个 JVM 同时冷启动争抢 CPU 导致 nacos 注册超时崩溃
+  log "Starting local gateway and authentication services"
+  compose up -d --force-recreate --remove-orphans ruoyi-gateway ruoyi-auth
   local_wait_auth_service
+
+  log "Starting remaining local application services"
+  compose up -d --force-recreate --remove-orphans platform-service merchant-service rental-business ruoyi-gen ruoyi-job ruoyi-file ruoyi-monitor rental-admin-web rental-merchant-web
   local_wait_platform_service
   local_wait_merchant_service
+  local_wait_rental_business_service
   local_wait_job_service
   local_wait_file_service
   local_verify_merchant_routes
@@ -608,6 +637,11 @@ local_reload_gateway_config() {
     compose restart merchant-service
     local_wait_merchant_service
   fi
+  if docker inspect qianruo-rental-business --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
+    log "Reloading local rental business configuration"
+    compose restart rental-business
+    local_wait_rental_business_service
+  fi
   if docker inspect qianruo-gateway --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
     local_verify_merchant_routes
   fi
@@ -616,7 +650,7 @@ local_reload_gateway_config() {
 local_wait_nacos() {
   need_cmd curl
   log "Waiting for local Nacos"
-  for _ in {1..90}; do
+  for _ in {1..240}; do
     if curl --fail --silent --max-time 3 \
       http://127.0.0.1:18080/v3/console/health/readiness 2>/dev/null \
       | grep -Eq '"data"[[:space:]]*:[[:space:]]*"ok"'; then
@@ -647,7 +681,7 @@ PY
 local_wait_admin_api() {
   need_cmd curl
   log "Waiting for local admin API"
-  for _ in {1..90}; do
+  for _ in {1..240}; do
     if curl --fail --silent --max-time 3 http://127.0.0.1:8088/prod-api/code >/dev/null 2>&1; then
       return 0
     fi
@@ -662,7 +696,7 @@ local_wait_admin_api() {
 local_wait_platform_service() {
   need_cmd curl
   log "Waiting for local platform service"
-  for _ in {1..120}; do
+  for _ in {1..360}; do
     if curl --silent --max-time 3 http://127.0.0.1:9201/actuator/health 2>/dev/null \
       | grep '"status":"UP"' >/dev/null; then
       return 0
@@ -682,7 +716,7 @@ local_wait_platform_service() {
 local_wait_auth_service() {
   need_cmd curl
   log "Waiting for local authentication service"
-  for _ in {1..120}; do
+  for _ in {1..360}; do
     if curl --silent --max-time 3 http://127.0.0.1:9200/actuator/health 2>/dev/null \
       | grep '"status":"UP"' >/dev/null; then
       return 0
@@ -702,7 +736,7 @@ local_wait_auth_service() {
 local_wait_merchant_service() {
   need_cmd curl
   log "Waiting for local merchant service"
-  for _ in {1..120}; do
+  for _ in {1..360}; do
     if curl --silent --max-time 3 http://127.0.0.1:9210/actuator/health 2>/dev/null \
       | grep '"status":"UP"' >/dev/null; then
       return 0
@@ -717,6 +751,11 @@ local_wait_merchant_service() {
   echo "Timed out waiting for merchant service registration. Recent logs:" >&2
   docker logs qianruo-merchant-service --tail 160 >&2 || true
   exit 1
+}
+
+local_wait_rental_business_service() {
+  local_wait_application_service \
+    "rental business service" "qianruo-rental-business" "http://127.0.0.1:9220/actuator/health"
 }
 
 local_wait_job_service() {
@@ -736,7 +775,7 @@ local_wait_application_service() {
   local health_url="$3"
 
   log "Waiting for local $service_name"
-  for _ in {1..120}; do
+  for _ in {1..360}; do
     if curl --silent --max-time 3 "$health_url" 2>/dev/null \
       | grep '"status":"UP"' >/dev/null; then
       return 0
@@ -804,7 +843,7 @@ case "$cmd" in
     apply_manifests
     if [[ "$INIT_DB" == "true" ]]; then
       init_db
-      kubectl -n "$K8S_NAMESPACE" rollout restart deployment/ruoyi-nacos deployment/ruoyi-gateway deployment/ruoyi-auth deployment/platform-service deployment/merchant-service deployment/ruoyi-gen deployment/ruoyi-job deployment/ruoyi-file deployment/ruoyi-monitor
+      kubectl -n "$K8S_NAMESPACE" rollout restart deployment/ruoyi-nacos deployment/ruoyi-gateway deployment/ruoyi-auth deployment/platform-service deployment/merchant-service deployment/rental-business deployment/ruoyi-gen deployment/ruoyi-job deployment/ruoyi-file deployment/ruoyi-monitor
     fi
     if [[ "$MIGRATE_DB" == "true" ]]; then
       migrate_db

@@ -71,6 +71,58 @@ export function auditMember(memberId, data) {
 }
 
 /**
+ * 查询商户全部认证版本和认证材料。
+ *
+ * @param {number|string} memberId 商户主键
+ * @returns {Promise} 认证版本历史
+ */
+export function getCertificationHistory(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/certification-history',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询商户当前接单资格快照。
+ *
+ * @param {number|string} memberId 商户主键
+ * @returns {Promise} 接单资格列表
+ */
+export function getMemberQualifications(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/qualifications',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询商户会员类型变更历史。
+ *
+ * @param {number|string} memberId 商户主键
+ * @returns {Promise} 会员类型历史
+ */
+export function getMembershipHistory(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/membership-history',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询商户接单资格变更历史。
+ *
+ * @param {number|string} memberId 商户主键
+ * @returns {Promise} 接单资格历史
+ */
+export function getQualificationHistory(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/qualification-history',
+    method: 'get'
+  })
+}
+
+/**
  * 删除一个或多个平台商户记录。
  *
  * @param {number|string|Array} memberId 商户主键或主键集合

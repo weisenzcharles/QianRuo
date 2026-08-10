@@ -12,7 +12,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="merchantId"     column="member_id" />
 		<result property="traceId"        column="trace_id" />
 		<result property="httpStatus"     column="http_status" />
-		<result property="isdeleted"      column="isdeleted" />
+		<result property="isdeleted"      column="is_delete" />
 		<result property="title"          column="title"          />
 		<result property="businessType"   column="business_type"  />
 		<result property="method"         column="method"         />
@@ -33,14 +33,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<sql id="selectOperLogVo">
         select oper_id, operator_user_id, client_type, tenant_id, member_id, trace_id, http_status,
                title, business_type, method, request_method, operator_type, oper_name, dept_name,
-               oper_url, oper_ip, oper_param, json_result, status, error_msg, oper_time, cost_time, isdeleted
+               oper_url, oper_ip, oper_param, json_result, status, error_msg, oper_time, cost_time, is_delete
         from sys_oper_log
     </sql>
 
 	<insert id="insertOperlog" parameterType="SysOperLog">
 		insert into sys_oper_log(operator_user_id, client_type, tenant_id, member_id, trace_id, http_status,
             title, business_type, method, request_method, operator_type, oper_name, dept_name, oper_url,
-            oper_ip, oper_param, json_result, status, error_msg, cost_time, oper_time, isdeleted)
+            oper_ip, oper_param, json_result, status, error_msg, cost_time, oper_time, is_delete)
         values (#{operatorUserId}, #{clientType}, #{tenantId}, #{merchantId}, #{traceId}, #{httpStatus},
             #{title}, #{businessType}, #{method}, #{requestMethod}, #{operatorType}, #{operName}, #{deptName},
             #{operUrl}, #{operIp}, #{operParam}, #{jsonResult}, #{status}, #{errorMsg}, #{costTime}, sysdate(), 0)
@@ -49,7 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectOperLogList" parameterType="SysOperLog" resultMap="SysOperLogResult">
 		<include refid="selectOperLogVo"/>
 		<where>
-			isdeleted = 0
+			is_delete = 0
 			<if test="operIp != null and operIp != ''">
 				AND oper_ip like concat('%', #{operIp}, '%')
 			</if>
@@ -82,7 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</select>
 
 	<update id="deleteOperLogByIds" parameterType="Long">
-		 update sys_oper_log set isdeleted = 1 where oper_id in
+		 update sys_oper_log set is_delete = 1 where oper_id in
         <foreach collection="array" item="operId" open="(" separator="," close=")">
         #{operId}
         </foreach>
@@ -90,11 +90,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
         <select id="selectOperLogById" parameterType="Long" resultMap="SysOperLogResult">
 		<include refid="selectOperLogVo"/>
-		where oper_id = #{operId} and isdeleted = 0
+		where oper_id = #{operId} and is_delete = 0
 	</select>
 
     <update id="cleanOperLog">
-        update sys_oper_log set isdeleted = 1 where isdeleted = 0
+        update sys_oper_log set is_delete = 1 where is_delete = 0
     </update>
 
 </mapper>

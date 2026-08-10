@@ -53,6 +53,7 @@ public class MerchantSessionService
         session.setClientType(Constants.CLIENT_TYPE_MERCHANT);
         session.setTenantId(identity.getTenantId());
         session.setMemberId(identity.getMerchantId());
+        session.setMerchantAuthStatus(identity.getMerchantAuthStatus());
         session.setMemberRole(identity.getMemberRole());
         session.setWarehouseScopeType(identity.getWarehouseScopeType());
         session.setWarehouseIds(identity.getWarehouseIds());

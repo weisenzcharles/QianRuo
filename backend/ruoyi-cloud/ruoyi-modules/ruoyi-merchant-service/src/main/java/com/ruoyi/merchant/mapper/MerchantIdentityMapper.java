@@ -44,7 +44,7 @@ public interface MerchantIdentityMapper
     MerchantAccount selectByEmail(String email);
 
     /**
-     * 按申请手机号查询平台商户审核状态，用于在认证前阻止未审核主体登录。
+     * 按申请手机号查询平台商户审核状态，用于在商户登录态中确定当前功能模式。
      *
      * @param phone 商户申请手机号
      * @return 商户审核状态，不存在申请时返回 {@code null}
@@ -52,7 +52,7 @@ public interface MerchantIdentityMapper
     String selectMemberAuthStatusByPhone(@Param("phone") String phone);
 
     /**
-     * 查询账号唯一有效且已审核通过的商户主体绑定。
+     * 查询账号唯一有效的商户主体绑定。绑定有效不等于审核通过，审核状态单独控制功能权限。
      *
      * @param userId 商户用户主键
      * @return 有效主体绑定，不存在时返回 {@code null}
@@ -60,7 +60,7 @@ public interface MerchantIdentityMapper
     MerchantBinding selectActiveBinding(@Param("userId") Long userId);
 
     /**
-     * 统计账号关联的有效且已审核通过的商户主体数量。
+     * 统计账号关联的唯一有效商户主体数量。待审核和驳回状态也必须保留登录绑定。
      *
      * @param userId 商户用户主键
      * @return 有效主体绑定数量
@@ -99,6 +99,13 @@ public interface MerchantIdentityMapper
      */
     List<String> selectPermissions(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
             @Param("userId") Long userId);
+
+    /**
+     * 查询未通过认证商户的默认只读权限。该集合只包含列表和查询权限，严禁包含写入、删除、导出及授权权限。
+     *
+     * @return 全局商户页面默认只读权限集合
+     */
+    List<String> selectDefaultReadPermissions();
 
     /**
      * 查询当前商户下可供登录用户使用的仓库资料。

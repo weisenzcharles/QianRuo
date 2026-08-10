@@ -25,6 +25,8 @@ public class MerchantLoginIdentity implements Serializable
     private Long createdAt;
     private Long tenantId;
     private Long merchantId;
+    /** 平台商户认证状态：pending、rejected 或 verified。 */
+    private String merchantAuthStatus;
     private String memberRole;
     private String warehouseScopeType;
     private Set<Long> warehouseIds = new LinkedHashSet<Long>();
@@ -59,6 +61,10 @@ public class MerchantLoginIdentity implements Serializable
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
     public Long getMerchantId() { return merchantId; }
     public void setMerchantId(Long merchantId) { this.merchantId = merchantId; }
+    /** @return 当前商户认证状态。 */
+    public String getMerchantAuthStatus() { return merchantAuthStatus; }
+    /** @param merchantAuthStatus 设置当前商户认证状态。 */
+    public void setMerchantAuthStatus(String merchantAuthStatus) { this.merchantAuthStatus = merchantAuthStatus; }
     public String getMemberRole() { return memberRole; }
     public void setMemberRole(String memberRole) { this.memberRole = memberRole; }
     public String getWarehouseScopeType() { return warehouseScopeType; }

@@ -2,9 +2,12 @@ package com.ruoyi.system;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Import;
+
 import java.util.TimeZone;
 import com.ruoyi.common.security.annotation.EnableCustomConfig;
 import com.ruoyi.common.security.annotation.EnableRyFeignClients;
+import com.ruoyi.merchant.api.factory.RemoteMerchantUserFallbackFactory;
 
 /**
  * 系统模块
@@ -13,6 +16,7 @@ import com.ruoyi.common.security.annotation.EnableRyFeignClients;
  */
 @EnableCustomConfig
 @EnableRyFeignClients
+@Import({ RemoteMerchantUserFallbackFactory.class })
 @SpringBootApplication
 public class PlatformServiceApplication
 {

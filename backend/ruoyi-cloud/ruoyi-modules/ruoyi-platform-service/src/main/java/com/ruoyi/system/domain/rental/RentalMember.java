@@ -34,6 +34,9 @@ public class RentalMember extends BaseEntity
     @Excel(name = "商户类型", readConverterExp = "personal=个人,enterprise=企业")
     private String memberType;
 
+    @Excel(name = "会员类型", readConverterExp = "personal_member=个人会员,ordinary_enterprise_member=普通企业会员,settled_member=入驻会员")
+    private String membershipType;
+
     @Excel(name = "认证状态", readConverterExp = "unverified=未认证,pending=待审核,verified=已认证,rejected=已驳回")
     private String authStatus;
 
@@ -136,7 +139,14 @@ public class RentalMember extends BaseEntity
     public Long getTenantId() { return tenantId; }
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 
-    @NotBlank(message = "商户编码不能为空")
+    /**
+     * 获取商户编码。
+     *
+     * <p>商户编码由平台统一编码规则服务在新增时生成，公开注册端和平台管理端都不再
+     * 要求客户端提交该字段；保留长度校验是为了保护数据库边界和历史数据回显。</p>
+     *
+     * @return 服务端生成的商户编码
+     */
     @Size(max = 64, message = "商户编码长度不能超过64个字符")
     public String getMemberCode() { return memberCode; }
     public void setMemberCode(String memberCode) { this.memberCode = memberCode; }
@@ -146,6 +156,20 @@ public class RentalMember extends BaseEntity
     @NotBlank(message = "商户类型不能为空")
     public String getMemberType() { return memberType; }
     public void setMemberType(String memberType) { this.memberType = memberType; }
+
+    /**
+     * 获取商户当前会员类型。该字段是当前有效快照，历史变更保存在会员类型历史表。
+     *
+     * @return 当前会员类型编码
+     */
+    public String getMembershipType() { return membershipType; }
+
+    /**
+     * 设置商户当前会员类型。调用方必须同时由服务层写入会员类型变更历史。
+     *
+     * @param membershipType 当前会员类型编码
+     */
+    public void setMembershipType(String membershipType) { this.membershipType = membershipType; }
 
     @NotBlank(message = "认证状态不能为空")
     public String getAuthStatus() { return authStatus; }
@@ -286,7 +310,8 @@ public class RentalMember extends BaseEntity
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
             .append("memberId", memberId).append("tenantId", tenantId)
             .append("memberCode", memberCode).append("mainAccount", mainAccount)
-            .append("memberType", memberType).append("authStatus", authStatus)
+            .append("memberType", memberType).append("membershipType", membershipType)
+            .append("authStatus", authStatus)
             .append("legalSubjectName", legalSubjectName).append("licenseNo", licenseNo)
             .append("nickname", nickname).append("contactName", contactName)
             .append("storeDescription", storeDescription).append("registeredCapital", registeredCapital)

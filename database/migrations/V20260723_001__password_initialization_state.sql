@@ -24,8 +24,8 @@ SET `must_change_password` = 0
 WHERE @admin_password_state_missing = 1;
 
 UPDATE `sys_config`
-SET `isdeleted` = 1
-WHERE `config_key` = 'sys.account.initPasswordModify' AND `isdeleted` = 0;
+SET `is_delete` = 1
+WHERE `config_key` = 'sys.account.initPasswordModify' AND `is_delete` = 0;
 
 USE `ry_rental`;
 

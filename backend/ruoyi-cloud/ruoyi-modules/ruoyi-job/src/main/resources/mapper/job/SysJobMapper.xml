@@ -28,7 +28,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectJobList" parameterType="SysJob" resultMap="SysJobResult">
 		<include refid="selectJobVo"/>
 		<where>
-			isdeleted = 0
+			is_delete = 0
 			<if test="jobName != null and jobName != ''">
 				AND job_name like concat('%', #{jobName}, '%')
 			</if>
@@ -46,20 +46,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 	<select id="selectJobAll" resultMap="SysJobResult">
 		<include refid="selectJobVo"/>
-		where isdeleted = 0
+		where is_delete = 0
 	</select>
 
 	<select id="selectJobById" parameterType="Long" resultMap="SysJobResult">
 		<include refid="selectJobVo"/>
-		where job_id = #{jobId} and isdeleted = 0
+		where job_id = #{jobId} and is_delete = 0
 	</select>
 
 	<update id="deleteJobById" parameterType="Long">
-        update sys_job set isdeleted = 1 where job_id = #{jobId}
+        update sys_job set is_delete = 1 where job_id = #{jobId}
         </update>
 
         <update id="deleteJobByIds" parameterType="Long">
-        update sys_job set isdeleted = 1 where job_id in
+        update sys_job set is_delete = 1 where job_id in
         <foreach collection="array" item="jobId" open="(" separator="," close=")">
         #{jobId}
         </foreach>
@@ -79,7 +79,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
         update_time = sysdate()
         </set>
-		where job_id = #{jobId} and isdeleted = 0
+		where job_id = #{jobId} and is_delete = 0
 	</update>
 
         <insert id="insertJob" parameterType="SysJob" useGeneratedKeys="true" keyProperty="jobId">

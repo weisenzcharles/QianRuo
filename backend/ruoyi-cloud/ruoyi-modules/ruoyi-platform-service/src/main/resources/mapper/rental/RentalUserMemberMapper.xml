@@ -13,7 +13,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="warehouseScopeType" column="warehouse_scope_type" />
         <result property="sensitiveScope" column="sensitive_scope" />
         <result property="status" column="status" />
-        <result property="isdeleted" column="isdeleted" />
+        <result property="isdeleted" column="is_delete" />
         <result property="createBy" column="create_by" />
         <result property="createTime" column="create_time" />
         <result property="updateBy" column="update_by" />
@@ -24,14 +24,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectActiveByUserId" parameterType="Long" resultMap="RentalUserMemberResult">
         select um.id, um.tenant_id, um.member_id, um.merchant_user_id, um.member_role,
                um.warehouse_scope_type, um.sensitive_scope,
-               um.status, um.isdeleted, um.create_by, um.create_time, um.update_by, um.update_time, um.remark
+               um.status, um.is_delete, um.create_by, um.create_time, um.update_by, um.update_time, um.remark
         from `ry_rental`.`ry_rental_user_member` um
             inner join `ry_rental`.`ry_rental_member` m on um.member_id = m.member_id
         where um.merchant_user_id = #{merchantUserId}
           and um.status = '0'
-          and um.isdeleted = '0'
+          and um.is_delete = '0'
           and m.status = '0'
-          and m.isdeleted = '0'
+          and m.is_delete = '0'
         order by um.id
     </select>
 
@@ -41,9 +41,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             inner join `ry_rental`.`ry_rental_member` m on um.member_id = m.member_id
         where um.merchant_user_id = #{merchantUserId}
           and um.status = '0'
-          and um.isdeleted = '0'
+          and um.is_delete = '0'
           and m.status = '0'
-          and m.isdeleted = '0'
+          and m.is_delete = '0'
     </select>
 
     <select id="countByMemberIdAndUserId" resultType="Integer">
@@ -51,7 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from `ry_rental`.`ry_rental_user_member`
         where member_id = #{memberId}
           and merchant_user_id = #{merchantUserId}
-          and isdeleted = '0'
+          and is_delete = '0'
     </select>
 
     <insert id="insertOwnerBinding">
@@ -83,7 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and merchant_user_id = #{merchantUserId}
-          and isdeleted = '0'
+          and is_delete = '0'
     </update>
 
 </mapper>

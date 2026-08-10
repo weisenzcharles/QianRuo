@@ -6,6 +6,7 @@
 
 - MySQL、Redis、Nacos 基础服务
 - RuoYi-Cloud 网关、认证、系统、代码生成、任务、文件、监控服务
+- 独立租赁核心业务服务 `rental-business`
 - 平台后台 `rental-admin-web`
 - 商家端 `rental-merchant-web`
 - 可选 Ingress 域名入口
@@ -34,6 +35,7 @@ cp deploy/.env.example deploy/.env
 - `MYSQL_ROOT_PASSWORD`、`NACOS_AUTH_*`：生产环境必须替换为强密码或随机密钥。
 - `PLATFORM_DB_USERNAME`、`PLATFORM_DB_PASSWORD`：平台服务专用数据库账号；脚本会自动创建并授予 `ry-cloud` 和平台治理所需的 `ry_rental` 数据权限。
 - `MERCHANT_DB_USERNAME`、`MERCHANT_DB_PASSWORD`：商户服务专用数据库账号；只授予 `ry_rental` 数据权限。两个服务账号密码至少 12 位，不能包含单引号或反斜杠。
+- `BUSINESS_DB_USERNAME`、`BUSINESS_DB_PASSWORD`：租赁核心业务服务专用数据库账号；只授予 `ry_business` 数据权限。密码至少 12 位，不能包含单引号或反斜杠。
 - `JAVA_BASE_IMAGE`：后端 Java 17 基础镜像，默认使用微软 MCR，避免依赖 Docker Hub。
 - `NGINX_BASE_IMAGE`：前端非 Alpine Nginx 基础镜像，默认通过 DaoCloud 国内镜像加速地址拉取。
 - `MYSQL_IMAGE`、`REDIS_IMAGE`、`NACOS_IMAGE`：本地 Docker 基础镜像；Docker Hub 拉取失败时可换成国内镜像源或私有仓库镜像。
@@ -116,6 +118,12 @@ Redis 7.2 会因无法读取 RDB v12 而启动失败。
 商户身份服务使用端口 `9210`。构建产物缺少商户 Controller 或固定商户网关路由时，
 部署会立即终止，避免继续运行旧镜像。
 
+租赁核心业务服务使用端口 `9220`、Nacos 服务名 `rental-business` 和独立数据库
+`ry_business`，提供 `/actuator/health`、内部探活接口
+`/internal/rental-business/ping` 及商户订单列表接口 `/merchant/orders`。
+订单请求通过网关精确路由到 `rental-business`，订单、商品、套餐、客户、仓库、物流和
+批注查询表由该服务维护，不得重新写入 `platform-service` 或 `merchant-service`。
+
 默认部署未包含 Sentinel Dashboard，因此网关不会连接
 `127.0.0.1:8718`，并关闭 Sentinel 健康检查以避免周期性无效告警。
 需要接入控制台时，为网关设置 `SENTINEL_DASHBOARD`、
@@ -185,7 +193,7 @@ INIT_DB=true CONFIRM_INIT_DB=yes ./scripts/deploy.sh all
 ./scripts/deploy.sh migrate-db
 ```
 
-部署脚本会按版本顺序执行 `database/migrations/` 中登记的幂等迁移。目前包括密码初始化状态、商户权限命名空间、Nacos 双服务网关路由、平台服务命名空间和商户独立配置；重复部署不会覆盖用户后续业务状态。已有 Nacos 配置会自动切换为 `/admin/** -> platform-service` 和 `/merchant/** -> merchant-service`，迁移完成后脚本会刷新 Nacos 与网关运行态。
+部署脚本会按版本顺序执行 `database/migrations/` 中登记的幂等迁移。目前包括密码初始化状态、商户权限命名空间、Nacos 双服务网关路由、平台服务命名空间和商户独立配置；重复部署不会覆盖用户后续业务状态。已有 Nacos 配置会自动切换为 `/admin/** -> platform-service` 和 `/merchant/** -> merchant-service`，迁移完成后脚本会刷新 Nacos、网关和租赁业务服务运行态。
 
 平台和商户服务的 Nacos 独立配置如果缺失或内容为空，迁移会自动补齐最低运行配置。两个服务也在各自的 `bootstrap.yml` 中保留数据源和 MyBatis mapper 扫描兜底，因此配置中心的单条空记录不会再导致 `Invalid bound statement` 启动失败；数据库密码仍只通过环境变量或 Secret 注入，不写入 Nacos。
 

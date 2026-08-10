@@ -8,6 +8,7 @@
         <result property="memberCode" column="member_code" />
         <result property="mainAccount" column="main_account" />
         <result property="memberType" column="member_type" />
+        <result property="membershipType" column="membership_type" />
         <result property="authStatus" column="auth_status" />
         <result property="legalSubjectName" column="legal_subject_name" />
         <result property="licenseNo" column="license_no" />
@@ -49,11 +50,11 @@
         <result property="updateBy" column="update_by" />
         <result property="updateTime" column="update_time" />
         <result property="remark" column="remark" />
-        <result property="isdeleted" column="isdeleted" />
+        <result property="isdeleted" column="is_delete" />
     </resultMap>
 
     <sql id="selectRentalMemberVo">
-        select m.member_id, m.tenant_id, m.member_code, m.member_type, m.auth_status,
+        select m.member_id, m.tenant_id, m.member_code, m.member_type, m.membership_type, m.auth_status,
                m.legal_subject_name, m.license_no, m.nickname, m.contact_name, m.contact_phone,
                m.service_phone, m.contact_email, m.alipay_real_name, m.alipay_account,
                m.store_logo_url, m.store_description, m.registered_capital, m.business_scope,
@@ -63,7 +64,7 @@
                m.contract_valid_to, m.contract_file_url, m.audit_time, m.audit_remark,
                m.freeze_time, m.freeze_reason, m.wechat_qr_file_id, m.vip_level,
                m.storage_quota_mb, m.external_accept_enabled, m.status, m.create_by,
-               m.create_time, m.update_by, m.update_time, m.remark, m.isdeleted,
+               m.create_time, m.update_by, m.update_time, m.remark, m.is_delete,
                (
                    select u.user_name
                    from `ry_rental`.`ry_rental_user_member` um
@@ -74,8 +75,8 @@
                    where um.tenant_id = m.tenant_id
                      and um.member_id = m.member_id
                      and um.member_role = 'owner'
-                     and um.status = '0' and um.isdeleted = '0'
-                     and u.status = '0' and u.isdeleted = '0'
+                     and um.status = '0' and um.is_delete = '0'
+                     and u.status = '0' and u.is_delete = '0'
                    order by um.id
                    limit 1
                ) as main_account
@@ -85,7 +86,7 @@
     <select id="selectRentalMemberList" parameterType="com.ruoyi.system.domain.rental.RentalMember" resultMap="RentalMemberResult">
         <include refid="selectRentalMemberVo" />
         <where>
-            m.isdeleted = '0'
+            m.is_delete = '0'
             <if test="tenantId != null">AND m.tenant_id = #{tenantId}</if>
             <if test="memberCode != null and memberCode != ''">
                 AND m.member_code like concat('%', #{memberCode}, '%')
@@ -115,24 +116,19 @@
 
     <select id="selectRentalMemberById" parameterType="Long" resultMap="RentalMemberResult">
         <include refid="selectRentalMemberVo" />
-        where m.member_id = #{memberId} and m.isdeleted = '0'
+        where m.member_id = #{memberId} and m.is_delete = '0'
     </select>
 
     <select id="selectRentalMemberByContactPhone" parameterType="String" resultMap="RentalMemberResult">
         <include refid="selectRentalMemberVo" />
-        where m.contact_phone = #{contactPhone} and m.isdeleted = '0'
+        where m.contact_phone = #{contactPhone} and m.is_delete = '0'
         order by m.member_id desc limit 1
-    </select>
-
-    <select id="checkMemberCodeUnique" parameterType="String" resultMap="RentalMemberResult">
-        <include refid="selectRentalMemberVo" />
-        where m.member_code = #{memberCode} and m.isdeleted = '0' limit 1
     </select>
 
     <insert id="insertRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember"
             useGeneratedKeys="true" keyProperty="memberId">
         insert into `ry_rental`.`ry_rental_member` (
-            tenant_id, member_code, member_type, auth_status, legal_subject_name, license_no,
+            tenant_id, member_code, member_type, membership_type, auth_status, legal_subject_name, license_no,
             nickname, contact_name, contact_phone, service_phone, contact_email,
             alipay_real_name, alipay_account, store_logo_url, store_description,
             registered_capital, business_scope, license_address, license_valid_from,
@@ -142,7 +138,7 @@
             freeze_time, freeze_reason, wechat_qr_file_id, vip_level, storage_quota_mb,
             external_accept_enabled, status, remark, create_by, create_time
         ) values (
-            #{tenantId}, #{memberCode}, #{memberType}, #{authStatus}, #{legalSubjectName}, #{licenseNo},
+            #{tenantId}, #{memberCode}, #{memberType}, #{membershipType}, #{authStatus}, #{legalSubjectName}, #{licenseNo},
             #{nickname}, #{contactName}, #{contactPhone}, #{servicePhone}, #{contactEmail},
             #{alipayRealName}, #{alipayAccount}, #{storeLogoUrl}, #{storeDescription},
             #{registeredCapital}, #{businessScope}, #{licenseAddress}, #{licenseValidFrom},
@@ -159,6 +155,7 @@
         set tenant_id = #{tenantId},
             member_code = #{memberCode},
             member_type = #{memberType},
+            membership_type = #{membershipType},
             auth_status = #{authStatus},
             legal_subject_name = #{legalSubjectName},
             license_no = #{licenseNo},
@@ -198,26 +195,27 @@
             remark = #{remark},
             update_by = #{updateBy},
             update_time = sysdate()
-        where member_id = #{memberId} and isdeleted = '0'
+        where member_id = #{memberId} and is_delete = '0'
     </update>
 
     <update id="auditRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember">
         update `ry_rental`.`ry_rental_member`
-        set auth_status = #{authStatus}, audit_time = #{auditTime}, audit_remark = #{auditRemark},
+        set auth_status = #{authStatus}, membership_type = #{membershipType},
+            external_accept_enabled = #{externalAcceptEnabled}, audit_time = #{auditTime}, audit_remark = #{auditRemark},
             update_by = #{updateBy}, update_time = sysdate()
-        where member_id = #{memberId} and auth_status = 'pending' and isdeleted = '0'
+        where member_id = #{memberId} and auth_status = 'pending' and is_delete = '0'
     </update>
 
     <update id="markRegistrationPending" parameterType="com.ruoyi.system.domain.rental.RentalMember">
         update `ry_rental`.`ry_rental_member`
         set auth_status = 'pending', audit_time = null, audit_remark = null,
             update_by = #{updateBy}, update_time = sysdate()
-        where member_id = #{memberId} and auth_status = 'rejected' and isdeleted = '0'
+        where member_id = #{memberId} and auth_status = 'rejected' and is_delete = '0'
     </update>
 
     <update id="deleteRentalMemberByIds" parameterType="Long">
         update `ry_rental`.`ry_rental_member`
-        set isdeleted = 1, update_time = sysdate()
+        set is_delete = 1, update_time = sysdate()
         where member_id in
         <foreach collection="array" item="memberId" open="(" separator="," close=")">
             #{memberId}

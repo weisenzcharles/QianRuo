@@ -13,7 +13,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="menuCheckStrictly"  column="menu_check_strictly"   />
 		<result property="deptCheckStrictly"  column="dept_check_strictly"   />
 		<result property="status"             column="status"                />
-		<result property="isdeleted"            column="isdeleted"              />
+		<result property="isdeleted"            column="is_delete"              />
 		<result property="createBy"           column="create_by"             />
 		<result property="createTime"         column="create_time"           />
 		<result property="updateBy"           column="update_by"             />
@@ -23,16 +23,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 	<sql id="selectRoleVo">
 	    select distinct r.role_id, r.role_name, r.role_key, r.role_sort, r.data_scope, r.menu_check_strictly, r.dept_check_strictly,
-            r.status, r.isdeleted, r.create_time, r.remark
+            r.status, r.is_delete, r.create_time, r.remark
         from sys_role r
-		        left join sys_user_role ur on ur.role_id = r.role_id and ur.isdeleted = 0
-		        left join sys_user u on u.user_id = ur.user_id and u.isdeleted = 0
-		        left join sys_dept d on u.dept_id = d.dept_id and d.isdeleted = 0
+		        left join sys_user_role ur on ur.role_id = r.role_id and ur.is_delete = 0
+		        left join sys_user u on u.user_id = ur.user_id and u.is_delete = 0
+		        left join sys_dept d on u.dept_id = d.dept_id and d.is_delete = 0
     </sql>
 
     <select id="selectRoleList" parameterType="SysRole" resultMap="SysRoleResult">
 		<include refid="selectRoleVo"/>
-		where r.isdeleted = '0'
+		where r.is_delete = '0'
 		<if test="roleId != null and roleId != 0">
 			AND r.role_id = #{roleId}
 		</if>
@@ -58,40 +58,40 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 	<select id="selectRolePermissionByUserId" parameterType="Long" resultMap="SysRoleResult">
 		<include refid="selectRoleVo"/>
-		WHERE r.isdeleted = '0' and ur.user_id = #{userId}
+		WHERE r.is_delete = '0' and ur.user_id = #{userId}
 	</select>
 
 		<select id="selectRoleAll" resultMap="SysRoleResult">
 			<include refid="selectRoleVo"/>
-			where r.isdeleted = 0
+			where r.is_delete = 0
 	</select>
 
 	<select id="selectRoleListByUserId" parameterType="Long" resultType="Long">
 		select r.role_id
         from sys_role r
-		        left join sys_user_role ur on ur.role_id = r.role_id and ur.isdeleted = 0
-		        left join sys_user u on u.user_id = ur.user_id and u.isdeleted = 0
-		    where u.user_id = #{userId} and r.isdeleted = 0
+		        left join sys_user_role ur on ur.role_id = r.role_id and ur.is_delete = 0
+		        left join sys_user u on u.user_id = ur.user_id and u.is_delete = 0
+		    where u.user_id = #{userId} and r.is_delete = 0
 	</select>
 
 	<select id="selectRoleById" parameterType="Long" resultMap="SysRoleResult">
 		<include refid="selectRoleVo"/>
-			where r.role_id = #{roleId} and r.isdeleted = 0
+			where r.role_id = #{roleId} and r.is_delete = 0
 	</select>
 
 	<select id="selectRolesByUserName" parameterType="String" resultMap="SysRoleResult">
 		<include refid="selectRoleVo"/>
-		WHERE r.isdeleted = '0' and u.user_name = #{userName}
+		WHERE r.is_delete = '0' and u.user_name = #{userName}
 	</select>
 
 	<select id="checkRoleNameUnique" parameterType="String" resultMap="SysRoleResult">
 		<include refid="selectRoleVo"/>
-		 where r.role_name=#{roleName} and r.isdeleted = '0' limit 1
+		 where r.role_name=#{roleName} and r.is_delete = '0' limit 1
 	</select>
 
 	<select id="checkRoleKeyUnique" parameterType="String" resultMap="SysRoleResult">
 		<include refid="selectRoleVo"/>
-		 where r.role_key=#{roleKey} and r.isdeleted = '0' limit 1
+		 where r.role_key=#{roleKey} and r.is_delete = '0' limit 1
 	</select>
 
         <insert id="insertRole" parameterType="SysRole" useGeneratedKeys="true" keyProperty="roleId">
@@ -140,11 +140,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</update>
 
 	<update id="deleteRoleById" parameterType="Long">
-        update sys_role set isdeleted = 1 where role_id = #{roleId}
+        update sys_role set is_delete = 1 where role_id = #{roleId}
         </update>
 
         <update id="deleteRoleByIds" parameterType="Long">
-            update sys_role set isdeleted = 1 where role_id in
+            update sys_role set is_delete = 1 where role_id in
         <foreach collection="array" item="roleId" open="(" separator="," close=")">
         #{roleId}
         </foreach>

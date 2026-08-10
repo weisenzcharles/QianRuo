@@ -80,6 +80,7 @@
 import Fuse from 'fuse.js'
 import { getNormalPath } from '@/utils/ruoyi'
 import { isHttp } from '@/utils/validate'
+import { resolveMerchantMenuTarget } from '@/utils/merchantMenu'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'
 
@@ -119,9 +120,8 @@ function change(val) {
   const p = val.path
   const query = val.query
   if (isHttp(p)) {
-    // http(s):// 路径新窗口打开
-    const pindex = p.indexOf("http")
-    window.open(p.substr(pindex, p.length), "_blank")
+    // 菜单搜索与其他菜单使用同一套内容区内嵌导航规则。
+    router.push(resolveMerchantMenuTarget(p))
   } else {
     if (query) {
       router.push({ path: p, query: JSON.parse(query) })

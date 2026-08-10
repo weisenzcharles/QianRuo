@@ -19,6 +19,20 @@ public class MerchantRouteConfiguration
     public RouteLocator merchantSystemRouteLocator(RouteLocatorBuilder builder)
     {
         return builder.routes()
+                .route("merchant-order-business", route -> route
+                        .order(-100)
+                        .path("/merchant/orders", "/merchant/orders/**")
+                        .uri("lb://rental-business"))
+                .route("merchant-master-data-business", route -> route
+                        .order(-90)
+                        .path("/merchant/warehouse", "/merchant/warehouse/**",
+                                "/merchant/pool", "/merchant/pool/**",
+                                "/merchant/product", "/merchant/product/**",
+                                "/merchant/sn", "/merchant/sn/**",
+                                "/merchant/accessory", "/merchant/accessory/**",
+                                "/merchant/package", "/merchant/package/**",
+                                "/merchant/inventory", "/merchant/inventory/**")
+                        .uri("lb://rental-business"))
                 .route("merchant-domain-static", route -> route
                         .path("/merchant/**")
                         .uri("lb://merchant-service"))

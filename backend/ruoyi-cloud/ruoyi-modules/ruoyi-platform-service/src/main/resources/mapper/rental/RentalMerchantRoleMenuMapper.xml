@@ -10,17 +10,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and menu_id = #{menuId}
-          and isdeleted = 0
+          and is_delete = 0
     </select>
 
     <update id="deleteRoleMenuByRoleId">
-        update `ry_rental`.`ry_rental_merchant_role_menu` set isdeleted = 1 where tenant_id = #{tenantId}
+        update `ry_rental`.`ry_rental_merchant_role_menu` set is_delete = 1 where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and role_id = #{roleId}
     </update>
 
     <update id="deleteRoleMenu">
-        update `ry_rental`.`ry_rental_merchant_role_menu` set isdeleted = 1 where tenant_id = #{tenantId}
+        update `ry_rental`.`ry_rental_merchant_role_menu` set is_delete = 1 where tenant_id = #{tenantId}
           and member_id = #{memberId}
           and role_id in
         <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
@@ -29,11 +29,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <insert id="batchRoleMenu">
-        insert into `ry_rental`.`ry_rental_merchant_role_menu`(tenant_id, member_id, role_id, menu_id, isdeleted) values
+        insert into `ry_rental`.`ry_rental_merchant_role_menu`(tenant_id, member_id, role_id, menu_id, is_delete) values
         <foreach item="item" collection="list" separator=",">
             (#{tenantId}, #{memberId}, #{item.roleId}, #{item.menuId}, 0)
         </foreach>
-        on duplicate key update isdeleted = 0
+        on duplicate key update is_delete = 0
     </insert>
 
 </mapper>

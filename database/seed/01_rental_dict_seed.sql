@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_user` (
   `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像',
   `password` VARCHAR(100) DEFAULT NULL COMMENT '登录密码',
   `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '账号状态：0正常 1停用',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   `login_ip` VARCHAR(128) DEFAULT NULL COMMENT '最后登录IP',
   `login_date` DATETIME DEFAULT NULL COMMENT '最后登录时间',
   `pwd_update_date` DATETIME DEFAULT NULL COMMENT '密码最后更新时间',
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_user` (
   UNIQUE KEY `uk_rental_merchant_user_name` (`user_name`),
   UNIQUE KEY `uk_rental_merchant_user_phone` (`phone`),
   KEY `idx_rental_merchant_user_member` (`tenant_id`, `member_id`),
-  KEY `idx_rental_merchant_user_status` (`status`, `isdeleted`)
+  KEY `idx_rental_merchant_user_status` (`status`, `is_delete`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端用户';
 
 CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_menu` (
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_menu` (
   `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT '' COMMENT '备注',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   PRIMARY KEY (`menu_id`),
   UNIQUE KEY `uk_rental_merchant_menu_path` (`member_id`, `parent_id`, `path`),
   KEY `idx_rental_merchant_menu_member` (`tenant_id`, `member_id`),
@@ -86,15 +86,15 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_role` (
   `role_sort` INT NOT NULL COMMENT '显示顺序',
   `menu_check_strictly` TINYINT NOT NULL DEFAULT 1 COMMENT '菜单树选择项是否父子联动',
   `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '角色状态：0正常 1停用',
-  `isdeleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '删除标志：0正常 1删除',
   `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建者',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_by` VARCHAR(64) DEFAULT '' COMMENT '更新者',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
   PRIMARY KEY (`role_id`),
-  UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `isdeleted`),
-  UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `isdeleted`),
+  UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `is_delete`),
+  UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `is_delete`),
   KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端角色';
 
@@ -416,95 +416,92 @@ INSERT INTO `ry_rental`.`ry_rental_member` (member_id, tenant_id, member_code, m
 SELECT 1, 10001, 'MERCHANT_DEMO', 'enterprise', 'verified', '迁渃演示商户', '演示商户', '商家管理员', '15500000000', 'standard', 10240, 1, '0', 'system', NOW(), '本地开发商家端演示商户'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_member` WHERE member_id = 1);
 
-INSERT INTO `ry_rental`.`ry_rental_merchant_user` (tenant_id, member_id, user_name, nick_name, phone, email, password, status, isdeleted, login_ip, login_date, pwd_update_date, must_change_password, create_by, create_time, remark)
+INSERT INTO `ry_rental`.`ry_rental_merchant_user` (tenant_id, member_id, user_name, nick_name, phone, email, password, status, is_delete, login_ip, login_date, pwd_update_date, must_change_password, create_by, create_time, remark)
 SELECT 10001, 1, '15500000000', '商家管理员', '15500000000', 'merchant@example.com', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', NOW(), NOW(), 0, 'system', NOW(), '本地开发商家端账号'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_user` WHERE phone = '15500000000');
 
 INSERT INTO `ry_rental`.`ry_rental_user_member` (tenant_id, member_id, merchant_user_id, member_role, warehouse_scope_type, sensitive_scope, status, create_by, create_time, remark)
 SELECT u.tenant_id, u.member_id, u.merchant_user_id, 'owner', 'all', 'detail', '0', 'system', NOW(), '本地开发商家端账号绑定'
 FROM `ry_rental`.`ry_rental_merchant_user` u
-WHERE u.phone = '15500000000' AND u.isdeleted = '0'
+WHERE u.phone = '15500000000' AND u.is_delete = '0'
   AND NOT EXISTS (
     SELECT 1 FROM `ry_rental`.`ry_rental_user_member` um
     WHERE um.member_id = u.member_id AND um.merchant_user_id = u.merchant_user_id
   );
 
 INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2100, 0, 0, '商家工作台', 0, 1, 'merchant-dashboard', 'merchant/dashboard/index', '', '', 1, 0, 'C', '0', '0', 'merchant:dashboard:view', 'dashboard', 'system', NOW(), '商家端首页'
+SELECT 2100, 0, 0, '首页', 0, 1, 'merchant/home', 'merchant/home/index', '', '', 1, 0, 'C', '0', '0', 'merchant:home:view', 'dashboard', 'system', NOW(), '商家端首页'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2100);
 INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2110, 0, 0, '订单中心', 0, 2, 'merchant-order', 'merchant/order/index', '', '', 1, 0, 'C', '0', '0', 'merchant:order:list', 'list', 'system', NOW(), '商家订单中心'
+SELECT 2110, 0, 0, '店铺', 0, 2, 'merchant/store', 'merchant/store/index', '', '', 1, 0, 'M', '0', '0', 'merchant:store:view', 'shop', 'system', NOW(), '店铺管理总入口'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2110);
 INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2120, 0, 0, '仓库库存', 0, 3, 'merchant-inventory', 'merchant/inventory/index', '', '', 1, 0, 'C', '0', '0', 'merchant:inventory:list', 'tree', 'system', NOW(), '商家仓库与库存'
+SELECT 2111, 0, 0, '商品管理', 2110, 1, 'merchant/product', 'merchant/product/index', '', '', 1, 0, 'M', '0', '0', 'merchant:product:view', 'goods', 'system', NOW(), '商品管理'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2111);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2112, 0, 0, '我的商品', 2111, 1, 'merchant/product/my', 'merchant/product/my/index', '', '', 1, 0, 'C', '0', '0', 'merchant:product:my:list', 'list', 'system', NOW(), '我的商品'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2112);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2113, 0, 0, '发布商品', 2111, 2, 'merchant/product/publish', 'merchant/product/publish/index', '', '', 1, 0, 'C', '0', '0', 'merchant:product:publish:add', 'upload', 'system', NOW(), '发布商品'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2113);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2114, 0, 0, '仓库管理', 2110, 2, 'merchant/warehouse', 'merchant/warehouse/index', '', '', 1, 0, 'C', '0', '0', 'merchant:warehouse:list', 'house', 'system', NOW(), '仓库管理'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2114);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2115, 0, 0, '店铺管理', 2110, 3, 'merchant/store/profile', 'merchant/profile/index', '', '', 1, 0, 'C', '0', '0', 'merchant:store:profile:view', 'shop', 'system', NOW(), '店铺资料与设置'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2115);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2116, 0, 0, '用户管理', 2110, 4, 'merchant/user', 'merchant/user/index', '', '', 1, 0, 'M', '0', '0', 'merchant:user:view', 'user', 'system', NOW(), '用户管理'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2116);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2117, 0, 0, '账号管理', 2116, 1, 'merchant/user/account', 'merchant/user/account/index', '', '', 1, 0, 'C', '0', '0', 'merchant:user:account:list', 'user', 'system', NOW(), '账号管理'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2117);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2118, 0, 0, '操作日志', 2116, 2, 'merchant/user/operlog', 'merchant/user/operlog/index', '', '', 1, 0, 'C', '0', '0', 'merchant:operlog:list', 'log', 'system', NOW(), '操作日志'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2118);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2120, 0, 0, '交易', 0, 3, 'merchant/trade', 'merchant/trade/index', '', '', 1, 0, 'M', '0', '0', 'merchant:trade:view', 'money', 'system', NOW(), '交易管理总入口'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2120);
 INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2130, 0, 0, '商品资料', 0, 4, 'merchant-product', 'merchant/product/index', '', '', 1, 0, 'C', '0', '0', 'merchant:product:list', 'shopping', 'system', NOW(), '商家商品、SN、配件与套餐'
+SELECT 2121, 0, 0, '订单管理', 2120, 1, 'merchant/order', 'merchant/order/index', '', '', 1, 0, 'C', '0', '0', 'merchant:order:list', 'document', 'system', NOW(), '订单管理'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2121);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2122, 0, 0, '库存管理', 2120, 2, 'merchant/inventory', 'merchant/inventory/index', '', '', 1, 0, 'C', '0', '0', 'merchant:inventory:list', 'box', 'system', NOW(), '库存管理'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2122);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2123, 0, 0, '物流管理', 2120, 3, 'merchant/logistics', 'merchant/logistics/index', '', '', 1, 0, 'C', '0', '0', 'merchant:logistics:list', 'van', 'system', NOW(), '物流管理'
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2123);
+INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 2130, 0, 0, '数据', 0, 4, 'merchant/data', 'merchant/data/index', '', '', 1, 0, 'C', '0', '0', 'merchant:data:view', 'chart', 'system', NOW(), '经营数据'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2130);
 INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2140, 0, 0, '物流归还', 0, 5, 'merchant-logistics', 'merchant/logistics/index', '', '', 1, 0, 'C', '0', '0', 'merchant:logistics:list', 'international', 'system', NOW(), '商家物流与客户归还'
+SELECT 2140, 0, 0, '帮助', 0, 5, 'merchant/help', 'merchant/help/index', '', '', 1, 0, 'C', '0', '0', 'merchant:help:view', 'question', 'system', NOW(), '帮助中心'
 WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2140);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2150, 0, 0, '联盟协作', 0, 6, 'merchant-alliance', 'merchant/alliance/index', '', '', 1, 0, 'C', '0', '0', 'merchant:alliance:list', 'peoples', 'system', NOW(), '商家多仓联盟协作'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2150);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2160, 0, 0, '周转市场', 0, 7, 'merchant-market', 'merchant/market/index', '', '', 1, 0, 'C', '0', '0', 'merchant:market:list', 'table', 'system', NOW(), '商家库存周转市场'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2160);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2170, 0, 0, '商家设置', 0, 8, 'merchant-profile', 'merchant/profile/index', '', '', 1, 0, 'C', '0', '0', 'merchant:profile:view', 'user', 'system', NOW(), '商家资料与员工设置'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2170);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2180, 0, 0, '角色权限', 0, 9, 'merchant-role', 'merchant/access/role/index', '', '', 1, 0, 'C', '0', '0', 'merchant:role:list', 'peoples', 'system', NOW(), '商户角色与菜单权限'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2180);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2181, 0, 0, '角色查询', 2180, 1, 'role-query', '', '', '', 1, 0, 'F', '0', '0', 'merchant:role:query', '#', 'system', NOW(), ''
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2181);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2182, 0, 0, '角色新增', 2180, 2, 'role-add', '', '', '', 1, 0, 'F', '0', '0', 'merchant:role:add', '#', 'system', NOW(), ''
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2182);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2183, 0, 0, '角色修改', 2180, 3, 'role-edit', '', '', '', 1, 0, 'F', '0', '0', 'merchant:role:edit', '#', 'system', NOW(), ''
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2183);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2184, 0, 0, '角色删除', 2180, 4, 'role-remove', '', '', '', 1, 0, 'F', '0', '0', 'merchant:role:remove', '#', 'system', NOW(), ''
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2184);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2190, 0, 0, '操作日志', 0, 10, 'merchant-operlog', 'merchant/monitor/operlog/index', '', '', 1, 0, 'C', '0', '0', 'merchant:operlog:list', 'log', 'system', NOW(), '当前商户操作日志'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2190);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2191, 0, 0, '日志导出', 2190, 1, 'operlog-export', '', '', '', 1, 0, 'F', '0', '0', 'merchant:operlog:export', '#', 'system', NOW(), '导出当前商户操作日志'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2191);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2192, 0, 0, '经营类目', 0, 11, 'merchant-product-class', 'merchant/productClass/index', '', '', 1, 0, 'C', '0', '0', 'merchant:class:list', 'tree-table', 'system', NOW(), '选择平台允许经营的产品类目'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2192);
-INSERT INTO `ry_rental`.`ry_rental_merchant_menu` (menu_id, tenant_id, member_id, menu_name, parent_id, order_num, path, component, `query`, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT 2193, 0, 0, '经营类目保存', 2192, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'merchant:class:edit', '#', 'system', NOW(), ''
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_menu` WHERE menu_id = 2193);
 
-INSERT INTO `ry_rental`.`ry_rental_merchant_role` (tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly, status, isdeleted, create_by, create_time, remark)
+INSERT INTO `ry_rental`.`ry_rental_merchant_role` (tenant_id, member_id, role_name, role_key, role_sort, menu_check_strictly, status, is_delete, create_by, create_time, remark)
 SELECT 10001, 1, '商户管理员', 'merchant_admin', 1, 1, '0', '0', 'system', NOW(), '商户默认管理员角色'
-WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_role` WHERE tenant_id = 10001 AND member_id = 1 AND role_key = 'merchant_admin' AND isdeleted = '0');
+WHERE NOT EXISTS (SELECT 1 FROM `ry_rental`.`ry_rental_merchant_role` WHERE tenant_id = 10001 AND member_id = 1 AND role_key = 'merchant_admin' AND is_delete = '0');
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_role_menu` (tenant_id, member_id, role_id, menu_id)
 SELECT r.tenant_id, r.member_id, r.role_id, m.menu_id
 FROM `ry_rental`.`ry_rental_merchant_role` r
 INNER JOIN `ry_rental`.`ry_rental_merchant_menu` m ON m.tenant_id = 0 AND m.member_id = 0
 WHERE r.tenant_id = 10001 AND r.member_id = 1 AND r.role_key = 'merchant_admin'
-  AND r.isdeleted = '0' AND m.isdeleted = '0';
+  AND r.is_delete = '0' AND m.is_delete = '0';
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_user_role` (tenant_id, member_id, merchant_user_id, role_id)
 SELECT u.tenant_id, u.member_id, u.merchant_user_id, r.role_id
 FROM `ry_rental`.`ry_rental_merchant_user` u
 INNER JOIN `ry_rental`.`ry_rental_merchant_role` r
   ON r.tenant_id = u.tenant_id AND r.member_id = u.member_id
-WHERE u.phone = '15500000000' AND u.isdeleted = '0'
-  AND r.role_key = 'merchant_admin' AND r.isdeleted = '0';
+WHERE u.phone = '15500000000' AND u.is_delete = '0'
+  AND r.role_key = 'merchant_admin' AND r.is_delete = '0';
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_user_menu` (tenant_id, member_id, merchant_user_id, menu_id)
 SELECT u.tenant_id, u.member_id, u.merchant_user_id, m.menu_id
 FROM `ry_rental`.`ry_rental_merchant_user` u
 INNER JOIN `ry_rental`.`ry_rental_merchant_menu` m ON m.tenant_id = 0 AND m.member_id = 0
-WHERE u.phone = '15500000000' AND u.isdeleted = '0' AND m.isdeleted = '0';
+WHERE u.phone = '15500000000' AND u.is_delete = '0' AND m.is_delete = '0';
 
 INSERT IGNORE INTO `ry_rental`.`ry_rental_merchant_user_menu` (tenant_id, member_id, merchant_user_id, menu_id)
 SELECT ur.tenant_id, ur.member_id, ur.merchant_user_id, rm.menu_id
@@ -521,5 +518,5 @@ INNER JOIN `ry_rental`.`ry_rental_merchant_menu` m
   ON m.menu_id = um.menu_id
 WHERE m.tenant_id = 0
   AND m.member_id = 0
-  AND m.isdeleted = '0'
+  AND m.is_delete = '0'
   AND m.parent_id <> 0;

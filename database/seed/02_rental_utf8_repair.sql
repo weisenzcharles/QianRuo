@@ -1,6 +1,8 @@
 -- 租赁系统 UTF-8 数据修复脚本
 -- 说明：用于修复早期初始化时未显式指定 MySQL 客户端字符集导致的菜单、字典中文乱码。
 
+SET NAMES utf8mb4;
+
 SET @add_client_type_sql = (
   SELECT IF(
     COUNT(*) = 0,

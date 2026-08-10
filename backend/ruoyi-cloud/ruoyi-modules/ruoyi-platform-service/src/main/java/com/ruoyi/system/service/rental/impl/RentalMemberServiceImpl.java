@@ -4,7 +4,6 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.ruoyi.common.core.constant.UserConstants;
 import com.ruoyi.common.core.constant.Constants;
 import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.domain.R;
@@ -17,7 +16,9 @@ import com.ruoyi.system.domain.rental.RentalMember;
 import com.ruoyi.system.mapper.rental.RentalMemberMapper;
 import com.ruoyi.system.model.rental.RentalMemberAuditCommand;
 import com.ruoyi.system.service.rental.IRentalMemberService;
+import com.ruoyi.system.service.rental.RentalMemberCertificationService;
 import com.ruoyi.system.service.rental.RentalMemberLifecyclePolicy;
+import com.ruoyi.system.service.SysCodeRuleService;
 
 /**
  * 租赁商户 服务层处理
@@ -34,7 +35,13 @@ public class RentalMemberServiceImpl implements IRentalMemberService
     private RentalMemberLifecyclePolicy lifecyclePolicy;
 
     @Autowired
+    private RentalMemberCertificationService certificationService;
+
+    @Autowired
     private RemoteMerchantUserService remoteMerchantUserService;
+
+    @Autowired
+    private SysCodeRuleService codeRuleService;
 
     /**
      * 查询租赁商户列表
@@ -78,10 +85,20 @@ public class RentalMemberServiceImpl implements IRentalMemberService
         {
             throw new ServiceException("联系电话已提交过商户申请");
         }
+        if (StringUtils.isBlank(member.getMembershipType()))
+        {
+            member.setMembershipType(defaultMembershipType(member.getMemberType()));
+        }
+        member.setMemberCode(codeRuleService.nextCode("merchant"));
         member.setAuthStatus("pending");
         member.setAuditRemark(null);
         lifecyclePolicy.prepareForCreate(member, DateUtils.getNowDate());
-        return memberMapper.insertRentalMember(member);
+        int rows = memberMapper.insertRentalMember(member);
+        if (rows > 0 && certificationService != null)
+        {
+            certificationService.createPendingCertification(member, member.getCreateBy());
+        }
+        return rows;
     }
 
     /**
@@ -118,6 +135,12 @@ public class RentalMemberServiceImpl implements IRentalMemberService
         member.setAuthStatus(previous.getAuthStatus());
         member.setAuditTime(previous.getAuditTime());
         member.setAuditRemark(previous.getAuditRemark());
+        if (StringUtils.isBlank(member.getMembershipType()))
+        {
+            member.setMembershipType(previous.getMembershipType());
+        }
+        // 修改资料时始终沿用数据库中的系统编码，避免客户端通过空值或自定义值覆盖唯一标识。
+        member.setMemberCode(previous.getMemberCode());
         lifecyclePolicy.prepareForUpdate(previous, member, DateUtils.getNowDate());
         return memberMapper.updateRentalMember(member);
     }
@@ -158,6 +181,10 @@ public class RentalMemberServiceImpl implements IRentalMemberService
         member.setAuditRemark(StringUtils.isBlank(command.getAuditRemark()) ? null : command.getAuditRemark().trim());
         member.setUpdateBy(operator);
         lifecyclePolicy.prepareForUpdate(previous, member, DateUtils.getNowDate());
+        if (certificationService != null)
+        {
+            certificationService.applyReview(member, command, operator);
+        }
         int rows = memberMapper.auditRentalMember(member);
         if (rows == 0)
         {
@@ -183,24 +210,6 @@ public class RentalMemberServiceImpl implements IRentalMemberService
     }
 
     /**
-     * 校验商户编码是否唯一
-     *
-     * @param member 租赁商户
-     * @return 结果
-     */
-    @Override
-    public boolean checkMemberCodeUnique(RentalMember member)
-    {
-        Long memberId = StringUtils.isNull(member.getMemberId()) ? -1L : member.getMemberId();
-        RentalMember info = memberMapper.checkMemberCodeUnique(member.getMemberCode());
-        if (StringUtils.isNotNull(info) && info.getMemberId().longValue() != memberId.longValue())
-        {
-            return UserConstants.NOT_UNIQUE;
-        }
-        return UserConstants.UNIQUE;
-    }
-
-    /**
      * 调用商户身份服务幂等开通商户所有者账号、管理员角色及对应菜单权限。
      * 远程调用失败时抛出业务异常，使当前审核事务回滚，避免出现已审核但未开户的中间状态。
      *
@@ -222,5 +231,16 @@ public class RentalMemberServiceImpl implements IRentalMemberService
         {
             throw new ServiceException(result == null ? "商户管理员开通服务无响应" : result.getMsg());
         }
+    }
+
+    /**
+     * 根据商户主体类型生成平台默认会员类型，避免历史表单未提交新字段时写入空值。
+     *
+     * @param memberType 商户主体类型
+     * @return 平台会员类型编码
+     */
+    private String defaultMembershipType(String memberType)
+    {
+        return "enterprise".equals(memberType) ? "ordinary_enterprise_member" : "personal_member";
     }
 }
