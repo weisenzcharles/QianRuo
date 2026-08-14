@@ -1,15 +1,13 @@
 <template>
-  <div class="app-container business-crud-page">
+  <div class="app-container merchant-list-page business-crud-page">
     <div class="page-heading">
       <div>
         <h2>{{ config.title }}</h2>
         <p>{{ config.description }}</p>
       </div>
-      <el-button v-if="config.editable" type="primary" icon="Plus" @click="openCreate">新增</el-button>
-      <el-button v-if="props.resource === 'inventory'" type="primary" icon="Edit" @click="openInventoryAdjust">调整库存</el-button>
     </div>
 
-    <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
+    <el-form v-show="showSearch" :inline="true" :model="query" @submit.prevent>
       <el-form-item label="关键词">
         <el-input v-model="query.keyword" clearable placeholder="编码、名称或型号" @keyup.enter="load" />
       </el-form-item>
@@ -30,6 +28,12 @@
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
+
+    <el-row :gutter="10" class="mb8">
+      <el-col v-if="config.editable" :span="1.5"><el-button type="primary" icon="Plus" @click="openCreate">新增</el-button></el-col>
+      <el-col v-if="props.resource === 'inventory'" :span="1.5"><el-button type="primary" icon="Edit" @click="openInventoryAdjust">调整库存</el-button></el-col>
+      <right-toolbar v-model:showSearch="showSearch" @queryTable="load" />
+    </el-row>
 
     <el-table v-loading="loading" :data="rows" row-key="id" border>
       <el-table-column v-for="column in config.columns" :key="column.key" :label="column.label" :prop="column.key" :min-width="column.width || 120">
@@ -53,7 +57,16 @@
         <el-row :gutter="16">
           <el-col v-for="field in config.fields" :key="field.key" :span="field.span || 12">
             <el-form-item :label="field.label" :required="field.required">
-              <el-select v-if="field.type === 'select'" v-model="form[field.key]" clearable :placeholder="field.placeholder || `请选择${field.label}`" class="field-control">
+              <el-select v-if="field.key === 'province'" v-model="form.province" clearable placeholder="请选择省" class="field-control" @change="changeProvince">
+                <el-option v-for="item in provinceOptions" :key="item.code" :label="item.name" :value="item.name" />
+              </el-select>
+              <el-select v-else-if="field.key === 'city'" v-model="form.city" clearable placeholder="请选择市" class="field-control" @change="changeCity">
+                <el-option v-for="item in cityOptions" :key="item.code" :label="item.name" :value="item.name" />
+              </el-select>
+              <el-select v-else-if="field.key === 'district'" v-model="form.district" clearable placeholder="请选择区/县" class="field-control">
+                <el-option v-for="item in districtOptions" :key="item.code" :label="item.name" :value="item.name" />
+              </el-select>
+              <el-select v-else-if="field.type === 'select'" v-model="form[field.key]" clearable :placeholder="field.placeholder || `请选择${field.label}`" class="field-control">
                 <el-option v-for="option in field.options" :key="String(option.value)" :label="option.label" :value="option.value" />
               </el-select>
               <el-input-number v-else-if="field.type === 'number'" v-model="form[field.key]" :min="field.min" :max="field.max" controls-position="right" class="field-control" />
@@ -103,6 +116,7 @@ import {
   deleteMerchantProduct,
   deleteMerchantSn,
   deleteMerchantWarehouse,
+  getMerchantWarehouse,
   listMerchantAccessories,
   listMerchantInventory,
   listMerchantPackages,
@@ -110,6 +124,7 @@ import {
   listMerchantProducts,
   listMerchantSns,
   listMerchantWarehouses,
+  listMerchantRegionChildren,
   updateMerchantAccessory,
   updateMerchantPackage,
   updateMerchantPool,
@@ -133,8 +148,8 @@ const assetStatusOptions = ['available', 'reserved', 'rented', 'repairing', 'los
 const configs = {
   warehouse: {
     title: '仓库管理', description: '维护商户仓库，所有操作受当前用户仓库权限约束。', editable: true, queryStatus: true,
-    columns: [{ key: 'code', label: '仓库编码' }, { key: 'name', label: '仓库名称' }, { key: 'city', label: '城市' }, { key: 'contactName', label: '负责人' }, { key: 'status', label: '状态', tag: true }],
-    fields: [{ key: 'code', label: '仓库编码', systemGenerated: true, placeholder: '保存后由系统自动生成' }, { key: 'name', label: '仓库名称', required: true }, { key: 'contactName', label: '负责人' }, { key: 'contactPhone', label: '联系电话' }, { key: 'city', label: '城市' }, { key: 'address', label: '详细地址', span: 24 }, { key: 'status', label: '状态', type: 'select', options: statusOptions }, { key: 'remark', label: '备注', type: 'textarea', span: 24 }]
+    columns: [{ key: 'code', label: '仓库编码' }, { key: 'name', label: '仓库名称' }, { key: 'province', label: '省份' }, { key: 'city', label: '城市' }, { key: 'contactName', label: '负责人' }, { key: 'contactPhone', label: '联系电话' }, { key: 'address', label: '详细地址', width: 220 }, { key: 'status', label: '状态', tag: true }],
+    fields: [{ key: 'code', label: '仓库编码', systemGenerated: true, placeholder: '保存后由系统自动生成' }, { key: 'name', label: '仓库名称', required: true }, { key: 'contactName', label: '负责人' }, { key: 'contactPhone', label: '联系电话' }, { key: 'province', label: '省' }, { key: 'city', label: '城市' }, { key: 'district', label: '区/县' }, { key: 'address', label: '详细地址', span: 24 }, { key: 'longitude', label: '经度', type: 'number', min: -180, max: 180 }, { key: 'latitude', label: '纬度', type: 'number', min: -90, max: 90 }, { key: 'pickupRuleJson', label: '取件规则 JSON', type: 'textarea', span: 24, rows: 3, placeholder: '例如：{"start":"09:00","end":"18:00"}' }, { key: 'returnEnabled', label: '允许归还', type: 'select', options: booleanOptions }, { key: 'allianceShareEnabled', label: '允许联盟共享', type: 'select', options: booleanOptions }, { key: 'status', label: '状态', type: 'select', options: statusOptions }, { key: 'remark', label: '备注', type: 'textarea', span: 24 }]
   },
   pool: {
     title: '库存资源池', description: '用资源池统一约束可替代库存，避免套餐切换时重复统计。', editable: true, queryStatus: true,
@@ -182,12 +197,16 @@ const api = computed(() => apiMap[props.resource])
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
+const showSearch = ref(true)
 const saving = ref(false)
 const dialogVisible = ref(false)
 const inventoryDialogVisible = ref(false)
 const editing = ref(false)
 const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: undefined, productType: undefined })
 const form = reactive({})
+const provinceOptions = ref([])
+const cityOptions = ref([])
+const districtOptions = ref([])
 const inventoryForm = reactive({ productId: undefined, warehouseId: undefined, changeQty: undefined, reason: '' })
 const formTitle = computed(() => `${editing.value ? '修改' : '新增'}${config.value.title}`)
 
@@ -216,17 +235,59 @@ function openCreate() {
   config.value.fields.forEach(field => { form[field.key] = field.key === 'components' ? '[]' : undefined })
   if (props.resource === 'pool') form.substitutableFlag = 1
   if (props.resource === 'sn' || props.resource === 'accessory') form.assetStatus = 'available'
+  if (props.resource === 'warehouse') { provinceOptions.value = []; cityOptions.value = []; districtOptions.value = []; loadRegions('0', provinceOptions) }
   dialogVisible.value = true
 }
 
 /** 打开编辑表单并复制当前行，防止表格数据被表单双向修改。 */
-function openEdit(row) {
+async function openEdit(row) {
   editing.value = true
   Object.keys(form).forEach(key => delete form[key])
-  form.id = row.id
-  config.value.fields.forEach(field => { form[field.key] = row[field.key] })
-  if (props.resource === 'package') form.components = JSON.stringify(row.components || [], null, 2)
+  // 编辑仓库必须重新读取详情，避免列表字段裁剪或旧接口缓存导致负责人等字段为空。
+  const detail = props.resource === 'warehouse'
+    ? await getMerchantWarehouse(row.id).then(response => response.data || response)
+    : row
+  form.id = detail.id
+  config.value.fields.forEach(field => { form[field.key] = detail[field.key] })
+  if (props.resource === 'package') form.components = JSON.stringify(detail.components || [], null, 2)
+  if (props.resource === 'warehouse') { cityOptions.value = []; districtOptions.value = []; loadWarehouseRegions(detail.province, detail.city) }
   dialogVisible.value = true
+}
+
+/** 从本地数据库加载行政区划选项，避免表单依赖外部网络。 */
+function loadRegions(parentCode, target) {
+  listMerchantRegionChildren(parentCode).then(response => { target.value = response.data || response.rows || [] })
+}
+
+/** 编辑仓库时按已保存的省市名称恢复两级下拉选项，确保原值正常回显。 */
+function loadWarehouseRegions(province, city) {
+  listMerchantRegionChildren('0').then(response => {
+    provinceOptions.value = response.data || response.rows || []
+    const provinceItem = provinceOptions.value.find(item => item.name === province)
+    if (!provinceItem) return
+    return listMerchantRegionChildren(provinceItem.code)
+  }).then(response => {
+    if (!response) return
+    cityOptions.value = response.data || response.rows || []
+    const cityItem = cityOptions.value.find(item => item.name === city)
+    if (cityItem) return listMerchantRegionChildren(cityItem.code)
+  }).then(response => {
+    if (response) districtOptions.value = response.data || response.rows || []
+  })
+}
+
+/** 省份变更后加载城市，并清空下级选择。 */
+function changeProvince(name) {
+  const item = provinceOptions.value.find(option => option.name === name)
+  form.city = undefined; form.district = undefined; cityOptions.value = []; districtOptions.value = []
+  if (item) loadRegions(item.code, cityOptions)
+}
+
+/** 城市变更后加载区县，并清空旧区县。 */
+function changeCity(name) {
+  const item = cityOptions.value.find(option => option.name === name)
+  form.district = undefined; districtOptions.value = []
+  if (item) loadRegions(item.code, districtOptions)
 }
 
 /** 提交新增或修改命令，并转换兼容型号和套餐 BOM 的输入格式。 */
@@ -285,9 +346,5 @@ load()
 
 <style scoped>
 .business-crud-page { min-height: calc(100vh - 84px); }
-.page-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
-.page-heading h2 { margin: 0; font-size: 20px; font-weight: 600; }
-.page-heading p { margin: 8px 0 0; color: var(--el-text-color-secondary); }
-.search-form { padding: 16px; margin-bottom: 16px; background: var(--el-fill-color-light); }
 .field-control { width: 100%; }
 </style>

@@ -55,9 +55,19 @@ public class RentalBusinessCommand
     public String city;
     public String district;
     public String address;
+    /** 仓库经度。 */
+    public BigDecimal longitude;
+    /** 仓库纬度。 */
+    public BigDecimal latitude;
+    /** 上门取件规则 JSON。 */
+    public String pickupRuleJson;
     public String remark;
 
     public Integer status;
+    /** 是否允许作为归还仓：1 是，0 否。 */
+    public Integer returnEnabled;
+    /** 是否允许参与租商联盟共享：1 是，0 否。 */
+    public Integer allianceShareEnabled;
     public Integer enabled;
     public Integer sortNo;
     public Integer requiredQty;

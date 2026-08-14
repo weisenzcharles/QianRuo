@@ -22,6 +22,10 @@ public class PlatformRouteConfiguration
                         .path("/admin/**")
                         .filters(filter -> filter.stripPrefix(1))
                         .uri("lb://platform-service"))
+                .route("platform-rental-business-fixed", route -> route
+                        .order(-100)
+                        .path("/platform", "/platform/**")
+                        .uri("lb://rental-business"))
                 .build();
     }
 }

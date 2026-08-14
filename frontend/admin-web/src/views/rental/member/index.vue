@@ -80,9 +80,7 @@
       <el-table-column label="联系电话" align="center" prop="contactPhone" width="140" />
       <el-table-column label="会员等级" align="center" prop="vipLevel" width="100">
         <template #default="scope">
-          <el-tag :type="findRentalOption(rentalVipLevelOptions, scope.row.vipLevel).tagType">
-            {{ findRentalOption(rentalVipLevelOptions, scope.row.vipLevel).label }}
-          </el-tag>
+          <el-tag>{{ levelName(scope.row.levelId) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="冻结状态" align="center" prop="status" width="100">
@@ -106,7 +104,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <el-dialog :title="title" v-model="open" width="min(1040px, 96vw)" top="4vh" append-to-body destroy-on-close>
-      <member-editor ref="memberEditorRef" v-model="form" />
+      <member-editor ref="memberEditorRef" v-model="form" :level-options="levelOptions" />
       <template #footer>
         <div class="dialog-footer">
           <el-button type="primary" :loading="submitting" @click="submitForm">确定</el-button>
@@ -157,11 +155,13 @@
 import { addMember, auditMember, delMember, getCertificationHistory, getMember, getMemberQualifications, getMembershipHistory, getQualificationHistory, listMember, updateMember } from '@/api/rental/member'
 import MemberDetailDrawer from './components/MemberDetailDrawer.vue'
 import MemberEditor from './components/MemberEditor.vue'
-import { findRentalOption, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalMembershipTypeOptions, rentalQualificationOptions, rentalVipLevelOptions } from '@/utils/rental/options'
+import { findRentalOption, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalMembershipTypeOptions, rentalQualificationOptions } from '@/utils/rental/options'
+import { listMerchantLevel } from '@/api/rental/merchantLevel'
 
 const { proxy } = getCurrentInstance()
 const memberEditorRef = ref()
 const memberList = ref([])
+const levelOptions = ref([])
 const open = ref(false)
 const detailOpen = ref(false)
 const detail = ref(null)
@@ -204,6 +204,21 @@ async function getList() {
   } finally {
     loading.value = false
   }
+}
+
+/** 加载平台商户等级选项，供列表显示以及商户新增和修改时选择。 */
+async function loadLevelOptions() {
+  levelOptions.value = (await listMerchantLevel()).data || []
+}
+
+/**
+ * 根据等级ID返回平台配置的等级名称。
+ *
+ * @param {number|string} levelId 商户等级ID
+ * @returns {string} 等级名称
+ */
+function levelName(levelId) {
+  return levelOptions.value.find(item => String(item.levelId) === String(levelId))?.levelName || '-'
 }
 
 /**
@@ -250,6 +265,7 @@ function defaultForm() {
     freezeTime: undefined,
     freezeReason: undefined,
     vipLevel: 'free',
+    levelId: undefined,
     storageQuotaMb: 1024,
     externalAcceptEnabled: 0,
     status: '0',
@@ -425,6 +441,7 @@ function validateAuditRemark(rule, value, callback) {
 }
 
 getList()
+loadLevelOptions()
 </script>
 
 <style scoped>

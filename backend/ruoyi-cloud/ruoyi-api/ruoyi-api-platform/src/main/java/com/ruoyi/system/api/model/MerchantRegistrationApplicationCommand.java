@@ -31,6 +31,8 @@ public class MerchantRegistrationApplicationCommand implements Serializable
     private String legalRepresentativeIdNo;
     private String legalIdFrontUrl;
     private String legalIdBackUrl;
+    private String registrationMode;
+    private String inviteCode;
 
     /** @return 商户主体类型，个人或企业 */
     public String getMemberType() { return memberType; }
@@ -169,4 +171,16 @@ public class MerchantRegistrationApplicationCommand implements Serializable
 
     /** @param legalIdBackUrl 法定代表人身份证国徽面文件地址 */
     public void setLegalIdBackUrl(String legalIdBackUrl) { this.legalIdBackUrl = legalIdBackUrl; }
+
+    /** @return 注册方式，paid 表示付费注册，invite 表示邀请码注册 */
+    public String getRegistrationMode() { return registrationMode; }
+
+    /** @param registrationMode 注册方式 */
+    public void setRegistrationMode(String registrationMode) { this.registrationMode = registrationMode; }
+
+    /** @return 邀请码注册时提交的邀请码 */
+    public String getInviteCode() { return inviteCode; }
+
+    /** @param inviteCode 邀请码 */
+    public void setInviteCode(String inviteCode) { this.inviteCode = inviteCode; }
 }

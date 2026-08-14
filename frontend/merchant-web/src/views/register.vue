@@ -12,10 +12,43 @@
       </div>
 
       <template v-if="mode === 'submit'">
-        <registration-form ref="submitFormRef" v-model="submitForm" />
-        <div class="page-actions">
-          <el-button type="primary" size="large" icon="Check" :loading="submitting" @click="submitApplication">提交审核</el-button>
-        </div>
+        <el-steps :active="submitStep" finish-status="success" simple class="registration-steps">
+          <el-step title="填写资料" />
+          <el-step title="完成支付" />
+          <el-step title="注册完成" />
+        </el-steps>
+        <template v-if="submitStep === 0">
+          <el-form label-width="110px" class="registration-mode-form">
+            <el-form-item label="注册方式" required>
+              <el-radio-group v-model="submitForm.registrationMode">
+                <el-radio-button value="paid">付费注册</el-radio-button>
+                <el-radio-button value="invite">邀请码注册</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item v-if="submitForm.registrationMode === 'invite'" label="邀请码" required>
+              <el-input v-model.trim="submitForm.inviteCode" maxlength="32" placeholder="请输入邀请商户提供的邀请码" style="width: 320px" />
+            </el-form-item>
+          </el-form>
+          <registration-form ref="submitFormRef" v-model="submitForm" />
+          <div class="page-actions">
+            <el-button type="primary" size="large" icon="Right" :loading="submitting" @click="submitApplication">下一步</el-button>
+          </div>
+        </template>
+        <template v-else-if="submitStep === 1">
+          <div class="payment-panel">
+            <el-icon size="42"><CreditCard /></el-icon>
+            <h2>支付注册费用</h2>
+            <div class="payment-amount">¥ {{ Number(application?.paymentAmount || 0).toFixed(2) }}</div>
+            <p>支付单号：{{ application?.paymentNo }}</p>
+            <el-alert title="当前尚未接入第三方支付渠道，点击确认支付将模拟支付成功。" type="warning" :closable="false" show-icon />
+            <el-button type="primary" size="large" :loading="paying" @click="confirmPayment">确认支付</el-button>
+          </div>
+        </template>
+        <template v-else>
+          <el-result icon="success" title="注册完成" sub-title="商户账号已创建，可使用注册手机号登录。">
+            <template #extra><el-button type="primary" size="large" @click="router.replace('/login')">前往登录</el-button></template>
+          </el-result>
+        </template>
       </template>
 
       <template v-else>
@@ -46,7 +79,7 @@
 </template>
 
 <script setup>
-import { lookupRegistration, requestRegistrationCode, resubmitRegistration, submitRegistration } from '@/api/merchant/registration'
+import { confirmRegistrationPayment, lookupRegistration, requestRegistrationCode, resubmitRegistration, submitRegistration } from '@/api/merchant/registration'
 import RegistrationForm from '@/views/merchant/registration/RegistrationForm.vue'
 
 const router = useRouter()
@@ -60,6 +93,8 @@ const submitFormRef = ref()
 const resubmitFormRef = ref()
 const lookupFormRef = ref()
 const submitting = ref(false)
+const paying = ref(false)
+const submitStep = ref(0)
 const lookingUp = ref(false)
 const resubmitting = ref(false)
 const countdown = ref(0)
@@ -96,6 +131,8 @@ const statusType = computed(() => ({ pending: 'warning', rejected: 'error', veri
  */
 function defaultForm() {
   return {
+    registrationMode: 'paid',
+    inviteCode: '',
     code: '',
     memberType: 'personal',
     nickname: '',
@@ -129,17 +166,32 @@ function defaultForm() {
 async function submitApplication() {
   const valid = await submitFormRef.value.validate().catch(() => false)
   if (!valid) return
+  if (submitForm.value.registrationMode === 'invite' && !submitForm.value.inviteCode) {
+    ElMessage.warning('请输入邀请码')
+    return
+  }
   submitting.value = true
   try {
     const response = await submitRegistration(submitForm.value)
-    ElMessage.success('入驻申请已提交')
+    ElMessage.success('注册资料已提交')
     lookupForm.phone = submitForm.value.contactPhone
     lookupForm.code = submitForm.value.code
     application.value = { ...defaultForm(), ...response.data, code: submitForm.value.code }
-    mode.value = 'lookup'
+    submitStep.value = response.data.registrationStatus === 'awaiting_payment' ? 1 : 2
   } finally {
     submitting.value = false
   }
+}
+
+/** 确认注册支付单并进入注册完成页面。 */
+async function confirmPayment() {
+  paying.value = true
+  try {
+    const response = await confirmRegistrationPayment(application.value.paymentNo)
+    application.value = { ...application.value, ...response.data }
+    submitStep.value = 2
+    ElMessage.success('支付成功，注册已完成')
+  } finally { paying.value = false }
 }
 
 /**
@@ -269,6 +321,12 @@ onBeforeUnmount(clearCountdown)
 .status-alert {
   margin: 24px 0;
 }
+
+.registration-steps { margin-bottom: 24px; }
+.registration-mode-form { padding: 16px 0 4px; border-bottom: 1px solid #e5e7eb; }
+.payment-panel { max-width: 560px; margin: 52px auto; text-align: center; }
+.payment-panel .payment-amount { margin: 16px 0; font-size: 36px; font-weight: 700; color: #409eff; }
+.payment-panel .el-alert { margin: 24px 0; text-align: left; }
 
 .page-actions {
   display: flex;

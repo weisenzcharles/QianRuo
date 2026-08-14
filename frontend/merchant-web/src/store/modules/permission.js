@@ -111,12 +111,26 @@ function filterChildren(childrenMap, lastRouter = false) {
  * @returns {Array} 规范化后的商户路由树
  */
 function normalizeMerchantRoutes(routes) {
+  const iconAliases = {
+    shop: 'shopping',
+    goods: 'component',
+    house: 'server',
+    van: 'upload',
+    coin: 'money',
+    connection: 'link',
+    operation: 'tool',
+    box: 'component',
+    folder: 'zip'
+  }
   return routes.map(route => {
     if (route.path && !route.path.startsWith('/') && !/^https?:\/\//.test(route.path)) {
       route.path = '/' + route.path
     }
     if (Array.isArray(route.children)) {
       route.children = normalizeMerchantRoutes(route.children)
+    }
+    if (route.meta) {
+      route.meta.icon = iconAliases[route.meta.icon] || route.meta.icon || 'component'
     }
     return route
   })

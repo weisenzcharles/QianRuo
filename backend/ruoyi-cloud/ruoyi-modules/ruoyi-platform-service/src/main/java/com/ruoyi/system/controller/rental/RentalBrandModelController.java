@@ -18,7 +18,8 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.ruoyi.common.security.utils.SecurityUtils;
-import com.ruoyi.system.domain.rental.RentalBrandModel;
+import com.ruoyi.system.model.rental.PlatformBrandModelCommand;
+import com.ruoyi.system.model.rental.PlatformBrandModelQuery;
 import com.ruoyi.system.service.rental.RentalBrandModelService;
 
 /** 平台标准品牌型号管理入口。 */
@@ -46,7 +47,7 @@ public class RentalBrandModelController extends BaseController
      */
     @RequiresPermissions("platform:brandModel:list")
     @GetMapping("/list")
-    public TableDataInfo list(RentalBrandModel query)
+    public TableDataInfo list(@Validated PlatformBrandModelQuery query)
     {
         assertPlatformClient();
         startPage();
@@ -70,31 +71,31 @@ public class RentalBrandModelController extends BaseController
     /**
      * 新增平台标准品牌型号。
      *
-     * @param model 待新增标准型号
+     * @param command 待新增标准型号命令
      * @return 操作结果
      */
     @RequiresPermissions("platform:brandModel:add")
-    @Log(title = "标准品牌型号", businessType = BusinessType.INSERT)
+    @Log(title = "标准型号", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody RentalBrandModel model)
+    public AjaxResult add(@Validated @RequestBody PlatformBrandModelCommand command)
     {
         assertPlatformClient();
-        return toAjax(brandModelService.add(model, SecurityUtils.getUsername()));
+        return toAjax(brandModelService.add(command, SecurityUtils.getUsername()));
     }
 
     /**
      * 修改平台标准品牌型号。
      *
-     * @param model 待修改标准型号
+     * @param command 待修改标准型号命令
      * @return 操作结果
      */
     @RequiresPermissions("platform:brandModel:edit")
-    @Log(title = "标准品牌型号", businessType = BusinessType.UPDATE)
+    @Log(title = "标准型号", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult update(@Validated @RequestBody RentalBrandModel model)
+    public AjaxResult update(@Validated @RequestBody PlatformBrandModelCommand command)
     {
         assertPlatformClient();
-        return toAjax(brandModelService.update(model, SecurityUtils.getUsername()));
+        return toAjax(brandModelService.update(command, SecurityUtils.getUsername()));
     }
 
     /**
@@ -104,7 +105,7 @@ public class RentalBrandModelController extends BaseController
      * @return 操作结果
      */
     @RequiresPermissions("platform:brandModel:remove")
-    @Log(title = "标准品牌型号", businessType = BusinessType.DELETE)
+    @Log(title = "标准型号", businessType = BusinessType.DELETE)
     @DeleteMapping("/{modelId}")
     public AjaxResult delete(@PathVariable Long modelId)
     {

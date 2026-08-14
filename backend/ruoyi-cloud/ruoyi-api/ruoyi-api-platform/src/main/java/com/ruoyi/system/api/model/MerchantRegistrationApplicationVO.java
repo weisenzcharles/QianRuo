@@ -10,6 +10,9 @@ public class MerchantRegistrationApplicationVO extends MerchantRegistrationAppli
     private String auditRemark;
     private Long submittedAt;
     private Long updatedAt;
+    private String registrationStatus;
+    private String paymentNo;
+    private java.math.BigDecimal paymentAmount;
 
     /** @return 平台生成的商户申请编码 */
     public String getMemberCode() { return memberCode; }
@@ -40,4 +43,22 @@ public class MerchantRegistrationApplicationVO extends MerchantRegistrationAppli
 
     /** @param updatedAt 最近修改时间的毫秒值 */
     public void setUpdatedAt(Long updatedAt) { this.updatedAt = updatedAt; }
+
+    /** @return 注册状态 */
+    public String getRegistrationStatus() { return registrationStatus; }
+
+    /** @param registrationStatus 注册状态 */
+    public void setRegistrationStatus(String registrationStatus) { this.registrationStatus = registrationStatus; }
+
+    /** @return 待支付注册单号 */
+    public String getPaymentNo() { return paymentNo; }
+
+    /** @param paymentNo 待支付注册单号 */
+    public void setPaymentNo(String paymentNo) { this.paymentNo = paymentNo; }
+
+    /** @return 注册支付金额 */
+    public java.math.BigDecimal getPaymentAmount() { return paymentAmount; }
+
+    /** @param paymentAmount 注册支付金额 */
+    public void setPaymentAmount(java.math.BigDecimal paymentAmount) { this.paymentAmount = paymentAmount; }
 }

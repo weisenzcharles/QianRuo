@@ -61,3 +61,17 @@ export function resubmitRegistration(data) {
     data
   })
 }
+
+/**
+ * 确认注册支付完成。正式支付渠道接入后由支付回调触发同一后端状态机。
+ *
+ * @param {string} paymentNo 注册支付单号
+ * @returns {Promise} 注册完成结果
+ */
+export function confirmRegistrationPayment(paymentNo) {
+  return request({
+    url: `/merchant/public/registration/payment/${paymentNo}/confirm`,
+    method: 'post',
+    headers: publicHeaders
+  })
+}

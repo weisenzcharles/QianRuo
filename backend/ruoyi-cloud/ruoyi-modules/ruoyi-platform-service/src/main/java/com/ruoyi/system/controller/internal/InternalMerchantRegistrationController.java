@@ -61,4 +61,17 @@ public class InternalMerchantRegistrationController
     {
         return R.ok(registrationService.resubmit(command));
     }
+
+    /**
+     * 完成付费注册支付确认。
+     *
+     * @param paymentNo 注册支付单号
+     * @return 注册完成后的申请资料
+     */
+    @InnerAuth
+    @PostMapping("/payment/{paymentNo}/confirm")
+    public R<MerchantRegistrationApplicationVO> confirmPayment(@PathVariable String paymentNo)
+    {
+        return R.ok(registrationService.confirmPayment(paymentNo));
+    }
 }

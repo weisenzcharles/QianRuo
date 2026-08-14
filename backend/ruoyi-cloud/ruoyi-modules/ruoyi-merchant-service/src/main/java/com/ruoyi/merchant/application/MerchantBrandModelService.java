@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.core.exception.ServiceException;
+import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.common.security.utils.SecurityUtils;
 import com.ruoyi.merchant.mapper.MerchantBrandModelMapper;
@@ -29,6 +30,8 @@ public class MerchantBrandModelService
 
     private final RemoteBrandModelService remoteBrandModelService;
 
+    private final MerchantBusinessAuditRecorder auditRecorder;
+
     /**
      * 注入商户常用型号关系、经营类目关系和平台标准型号内部服务。
      *
@@ -37,11 +40,13 @@ public class MerchantBrandModelService
      * @param remoteBrandModelService 平台标准型号内部服务
      */
     public MerchantBrandModelService(MerchantBrandModelMapper brandModelMapper,
-            MerchantProductClassMapper productClassMapper, RemoteBrandModelService remoteBrandModelService)
+            MerchantProductClassMapper productClassMapper, RemoteBrandModelService remoteBrandModelService,
+            MerchantBusinessAuditRecorder auditRecorder)
     {
         this.brandModelMapper = brandModelMapper;
         this.productClassMapper = productClassMapper;
         this.remoteBrandModelService = remoteBrandModelService;
+        this.auditRecorder = auditRecorder;
     }
 
     /**
@@ -113,11 +118,14 @@ public class MerchantBrandModelService
         Long tenantId = tenantId();
         Long merchantId = merchantId();
         String operator = SecurityUtils.getUsername();
+        List<Long> before = brandModelMapper.selectSelectedModelIds(tenantId, merchantId);
         brandModelMapper.softDeleteAll(tenantId, merchantId, operator);
         if (!modelIds.isEmpty())
         {
             brandModelMapper.upsertSelections(tenantId, merchantId, modelIds, operator);
         }
+        auditRecorder.record("品牌型号", "UPDATE", "MERCHANT_BRAND_MODEL", String.valueOf(merchantId),
+                "当前商户", "修改商户常用型号", before, brandModelMapper.selectSelectedModelIds(tenantId, merchantId));
     }
 
     /**

@@ -6,11 +6,31 @@ import org.apache.ibatis.annotations.Param;
 import com.ruoyi.merchant.domain.MerchantAccount;
 import com.ruoyi.merchant.domain.MerchantAdminRole;
 import com.ruoyi.merchant.domain.MerchantBinding;
-import com.ruoyi.merchant.domain.MerchantWarehouse;
+import com.ruoyi.merchant.model.MerchantUserQuery;
+import com.ruoyi.merchant.model.MerchantUserVO;
 
 /** 商户身份数据访问。所有归属查询均包含可信商户条件。 */
 public interface MerchantIdentityMapper
 {
+    /** 在当前商户下创建用户并回填数据库生成的主键。 */
+    int insertMerchantUser(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("user") MerchantUserVO user, @Param("password") String password, @Param("operator") String operator);
+    /** 查询当前商户的用户列表。 */
+    List<MerchantUserVO> selectMerchantUsers(@Param("tenantId") Long tenantId,
+            @Param("merchantId") Long merchantId, @Param("query") MerchantUserQuery query);
+
+    /** 查询当前商户用户详情。 */
+    MerchantUserVO selectMerchantUser(@Param("tenantId") Long tenantId,
+            @Param("merchantId") Long merchantId, @Param("userId") Long userId);
+
+    /** 修改当前商户用户基础资料和状态。 */
+    int updateMerchantUser(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("userId") Long userId, @Param("nickname") String nickname, @Param("phone") String phone,
+            @Param("email") String email, @Param("status") String status, @Param("operator") String operator);
+
+    /** 将当前商户用户密码重置为初始密码状态。 */
+    int resetMerchantUserPassword(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("userId") Long userId, @Param("password") String password, @Param("operator") String operator);
     /**
      * 按商户用户名查询未删除账号。
      *
@@ -90,7 +110,8 @@ public interface MerchantIdentityMapper
             @Param("userId") Long userId);
 
     /**
-     * 查询当前商户用户通过角色和直接授权获得的权限标识。
+     * 查询当前商户用户的权限标识。普通用户通过角色和直接授权获得权限；
+     * 商户管理员角色始终获得平台当前有效的全部商户权限，确保平台新增可显示菜单后无需依赖历史角色菜单快照。
      *
      * @param tenantId 可信租户主键
      * @param merchantId 可信商户主键
@@ -106,16 +127,6 @@ public interface MerchantIdentityMapper
      * @return 全局商户页面默认只读权限集合
      */
     List<String> selectDefaultReadPermissions();
-
-    /**
-     * 查询当前商户下可供登录用户使用的仓库资料。
-     *
-     * @param tenantId 可信租户主键
-     * @param merchantId 可信商户主键
-     * @return 商户仓库集合
-     */
-    List<MerchantWarehouse> selectWarehouses(@Param("tenantId") Long tenantId,
-            @Param("merchantId") Long merchantId);
 
     /**
      * 更新商户用户最近一次登录地址和时间。

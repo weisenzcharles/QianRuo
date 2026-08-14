@@ -92,6 +92,39 @@ DATABASE_MIGRATIONS=(
   "database/migrations/V20260804_002__rental_business_master_data_menu.sql"
   "database/migrations/V20260803_002__repair_merchant_menu_encoding_and_internal_routes.sql"
   "database/migrations/V20260805_001__unified_code_rule.sql"
+  "database/migrations/V20260810_001__order_channel_and_package_transfer.sql"
+  "database/migrations/V20260810_002__inventory_state_reservation_idempotency.sql"
+  "database/migrations/V20260810_003__file_quota_audit.sql"
+  "database/migrations/V20260810_004__protocol_version_acceptance.sql"
+  "database/migrations/V20260810_005__merchant_product_crud_permissions.sql"
+  "database/migrations/V20260810_006__merchant_product_my_menu.sql"
+  "database/migrations/V20260810_007__merchant_operating_class_menu.sql"
+  "database/migrations/V20260811_001__platform_standard_model_entry.sql"
+  "database/migrations/V20260811_002__retire_ry_rental_business_duplicates.sql"
+  "database/migrations/V20260811_003__merchant_level_registration_invitation.sql"
+  "database/migrations/V20260811_004__remove_merchant_product_publish_menu.sql"
+  "database/migrations/V20260812_001__region_dictionary.sql"
+  "database/migrations/V20260812_002__merchant_business_test_data.sql"
+  "database/migrations/V20260812_003__merchant_user_management_permissions.sql"
+  "database/migrations/V20260812_004__repair_merchant_owner_role_binding.sql"
+  # 先把历史订单关系迁移为最终 BIGINT 结构，后续测试数据与菜单脚本只面向最终结构。
+  "database/migrations/V20260813_001__order_channel_id_and_audit_user.sql"
+  "database/migrations/V20260813_002__merchant_business_audit_log.sql"
+  "database/migrations/V20260812_005__merchant_order_test_data.sql"
+  "database/migrations/V20260812_006__merchant_order_create_permission.sql"
+  "database/migrations/V20260812_007__merchant_order_create_permission_binding.sql"
+  "database/migrations/V20260812_008__merchant_menu_order_and_product_children.sql"
+  "database/migrations/V20260812_009__merchant_order_channel_menu_and_order_selects.sql"
+  "database/migrations/V20260812_010__platform_merchant_menu_management.sql"
+  "database/migrations/V20260813_003__merchant_operlog_menu_sync.sql"
+  "database/migrations/V20260813_004__unify_merchant_business_audit_source.sql"
+  "database/migrations/V20260814_001__restore_merchant_business_audit_source.sql"
+  "database/migrations/V20260814_002__remove_legacy_merchant_audit_copy.sql"
+  "database/migrations/V20260814_003__retire_legacy_merchant_request_log.sql"
+  "database/migrations/V20260814_004__sync_merchant_admin_menu_permissions.sql"
+  "database/migrations/V20260814_005__restore_merchant_master_data_menus.sql"
+  "database/migrations/V20260814_006__unify_merchant_business_audit_source.sql"
+  "database/migrations/V20260814_007__import_amap_region_dictionary.sql"
 )
 
 usage() {
@@ -400,12 +433,13 @@ run_sql_file() {
   fi
 
   log "Running SQL: $sql_file"
+  # 通过 Pod 内环境变量向 MySQL 客户端传递密码，避免密码出现在进程参数中并消除安全警告。
   if [[ -n "$database" ]]; then
     kubectl -n "$K8S_NAMESPACE" exec -i deployment/ruoyi-mysql -- \
-      sh -c "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 --database='$database'" < "$ROOT_DIR/$sql_file"
+      sh -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql -uroot --default-character-set=utf8mb4 --database='$database' >/dev/null" < "$ROOT_DIR/$sql_file"
   else
     kubectl -n "$K8S_NAMESPACE" exec -i deployment/ruoyi-mysql -- \
-      sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4' < "$ROOT_DIR/$sql_file"
+      sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --default-character-set=utf8mb4 >/dev/null' < "$ROOT_DIR/$sql_file"
   fi
 }
 
@@ -565,12 +599,13 @@ local_run_sql_file() {
   fi
 
   log "Running local SQL: $sql_file"
+  # 通过容器内环境变量向 MySQL 客户端传递密码，避免密码出现在进程参数中并消除安全警告。
   if [[ -n "$database" ]]; then
     compose exec -T ruoyi-mysql \
-      sh -c "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 --database='$database'" < "$ROOT_DIR/$sql_file"
+      sh -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql -uroot --default-character-set=utf8mb4 --database='$database' >/dev/null" < "$ROOT_DIR/$sql_file"
   else
     compose exec -T ruoyi-mysql \
-      sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4' < "$ROOT_DIR/$sql_file"
+      sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --default-character-set=utf8mb4 >/dev/null' < "$ROOT_DIR/$sql_file"
   fi
 }
 
@@ -582,12 +617,12 @@ local_init_db() {
   fi
   log "Waiting for local MySQL"
   for _ in {1..60}; do
-    if compose exec -T ruoyi-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1" >/dev/null' >/dev/null 2>&1; then
+    if compose exec -T ruoyi-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "SELECT 1" >/dev/null' >/dev/null 2>&1; then
       break
     fi
     sleep 2
   done
-  if ! compose exec -T ruoyi-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1" >/dev/null' >/dev/null 2>&1; then
+  if ! compose exec -T ruoyi-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "SELECT 1" >/dev/null' >/dev/null 2>&1; then
     echo "Timed out waiting for local MySQL to accept root password." >&2
     docker logs qianruo-mysql --tail 80 >&2 || true
     exit 1
@@ -604,17 +639,42 @@ local_migrate_db() {
   prepare_local_env
   log "Waiting for local MySQL before migrations"
   for _ in {1..60}; do
-    if compose exec -T ruoyi-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1" >/dev/null' >/dev/null 2>&1; then
+    if compose exec -T ruoyi-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "SELECT 1" >/dev/null' >/dev/null 2>&1; then
       local migration
       for migration in "${DATABASE_MIGRATIONS[@]}"; do
         local_run_sql_file "$migration"
       done
+      local_prepare_local_nacos_config
       return 0
     fi
     sleep 2
   done
   echo "Timed out waiting for local MySQL before migrations." >&2
   exit 1
+}
+
+local_prepare_local_nacos_config() {
+  # 本地 Docker 网络中的服务必须通过 Compose 服务名互相访问，不能继续使用宿主机开发环境遗留的 localhost 地址。
+  # 这里在 Nacos 启动前统一修正配置中心中的 Redis 和 MySQL 地址，并重新计算 Nacos 配置摘要，
+  # 确保 Nacos 能够识别配置发生变化，避免应用容器把 localhost 解析为自身而导致启动或缓存初始化阻塞。
+  log "Normalizing local Nacos service endpoints"
+  compose exec -T ruoyi-mysql \
+    sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --default-character-set=utf8mb4 --database=ry-config >/dev/null' <<'SQL'
+UPDATE config_info
+SET content = REPLACE(
+        REPLACE(content, 'host: localhost', 'host: ruoyi-redis'),
+        'jdbc:mysql://localhost:3306/',
+        'jdbc:mysql://ruoyi-mysql:3306/'
+    )
+WHERE content LIKE '%host: localhost%'
+   OR content LIKE '%jdbc:mysql://localhost:3306/%';
+
+UPDATE config_info
+SET md5 = MD5(content),
+    gmt_modified = NOW()
+WHERE content LIKE '%ruoyi-redis%'
+   OR content LIKE '%jdbc:mysql://ruoyi-mysql:3306/%';
+SQL
 }
 
 local_reload_gateway_config() {

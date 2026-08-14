@@ -26,7 +26,7 @@ services:
       - qianruo-mysql-data:/var/lib/mysql
       - ./scripts/provision-service-db-users.sh:/usr/local/bin/provision-service-db-users.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -uroot --silent"]
       interval: 5s
       timeout: 5s
       retries: 30

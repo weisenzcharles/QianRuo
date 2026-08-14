@@ -122,6 +122,10 @@ public class RentalMember extends BaseEntity
 
     @Excel(name = "会员等级")
     private String vipLevel;
+    private Long levelId;
+    private String registrationMode;
+    private String registrationStatus;
+    private Long inviterMemberId;
 
     @Excel(name = "存储额度MB", cellType = ColumnType.NUMERIC)
     private Long storageQuotaMb;
@@ -288,6 +292,22 @@ public class RentalMember extends BaseEntity
     @NotBlank(message = "会员等级不能为空")
     public String getVipLevel() { return vipLevel; }
     public void setVipLevel(String vipLevel) { this.vipLevel = vipLevel; }
+    /** @return 商户等级ID */
+    public Long getLevelId() { return levelId; }
+    /** @param levelId 商户等级ID */
+    public void setLevelId(Long levelId) { this.levelId = levelId; }
+    /** @return 注册方式 */
+    public String getRegistrationMode() { return registrationMode; }
+    /** @param registrationMode 注册方式 */
+    public void setRegistrationMode(String registrationMode) { this.registrationMode = registrationMode; }
+    /** @return 注册完成状态 */
+    public String getRegistrationStatus() { return registrationStatus; }
+    /** @param registrationStatus 注册完成状态 */
+    public void setRegistrationStatus(String registrationStatus) { this.registrationStatus = registrationStatus; }
+    /** @return 邀请商户ID */
+    public Long getInviterMemberId() { return inviterMemberId; }
+    /** @param inviterMemberId 邀请商户ID */
+    public void setInviterMemberId(Long inviterMemberId) { this.inviterMemberId = inviterMemberId; }
 
     @NotNull(message = "存储额度不能为空")
     @Min(value = 0, message = "存储额度不能小于0")

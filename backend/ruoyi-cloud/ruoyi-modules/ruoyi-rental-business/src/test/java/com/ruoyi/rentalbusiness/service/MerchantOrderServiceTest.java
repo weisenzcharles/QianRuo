@@ -10,6 +10,7 @@ import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.context.SecurityContextHolder;
 import com.ruoyi.rentalbusiness.domain.MerchantOrderRow;
 import com.ruoyi.rentalbusiness.mapper.MerchantOrderMapper;
+import com.ruoyi.rentalbusiness.model.MerchantOrderCreateCommand;
 import com.ruoyi.rentalbusiness.model.MerchantOrderQuery;
 import com.ruoyi.system.api.model.LoginUser;
 
@@ -71,6 +72,44 @@ public class MerchantOrderServiceTest
         private Long tenantId;
         private Long merchantId;
         private MerchantOrderQuery query;
+
+        /** 捕获订单详情查询参数，测试替身不访问真实数据库。 */
+        @Override
+        public MerchantOrderRow selectMerchantOrderById(Long tenantId, Long merchantId, Long orderId)
+        {
+            return null;
+        }
+
+        /** 模拟当前商户可以使用指定订单渠道。 */
+        @Override
+        public int countUsableOrderChannel(Long tenantId, Long merchantId, Long channelId)
+        {
+            return 1;
+        }
+
+        /** 模拟订单主表新增，测试查询范围时不执行写入。 */
+        @Override
+        public int insertMerchantOrder(Long tenantId, Long merchantId, MerchantOrderCreateCommand command,
+                Long operatorId)
+        {
+            return 1;
+        }
+
+        /** 模拟订单主表更新，测试查询范围时不执行写入。 */
+        @Override
+        public int updateMerchantOrder(Long tenantId, Long merchantId, MerchantOrderCreateCommand command,
+                Long operatorId)
+        {
+            return 1;
+        }
+
+        /** 模拟订单明细新增，测试查询范围时不执行写入。 */
+        @Override
+        public int insertMerchantOrderItem(Long tenantId, Long merchantId, MerchantOrderCreateCommand command,
+                Long operatorId)
+        {
+            return 1;
+        }
 
         /** 捕获应用服务传递给数据库层的可信范围和筛选条件。 */
         @Override

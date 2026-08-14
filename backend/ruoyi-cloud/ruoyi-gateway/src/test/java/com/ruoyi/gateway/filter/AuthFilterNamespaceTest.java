@@ -23,6 +23,16 @@ public class AuthFilterNamespaceTest
                 "platform token must not access merchant namespace");
     }
 
+    /** 验证商户终端不能访问平台租赁业务命名空间。 */
+    @Test
+    public void onlyPlatformTokenCanAccessPlatformBusinessNamespace()
+    {
+        require(AuthFilter.matchesNamespace("/platform/order-channel/list", Constants.CLIENT_TYPE_PLATFORM),
+                "platform token should access platform business namespace");
+        require(!AuthFilter.matchesNamespace("/platform/order-channel/list", Constants.CLIENT_TYPE_MERCHANT),
+                "merchant token must not access platform business namespace");
+    }
+
     @Test
     public void rejectsUnknownClientType()
     {

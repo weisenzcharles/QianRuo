@@ -15,9 +15,8 @@ public class RentalMemberLifecyclePolicy
     private static final String AUTH_VERIFIED = "verified";
     private static final String AUTH_REJECTED = "rejected";
     private static final Set<String> MEMBER_TYPES = Set.of("personal", "enterprise");
-    private static final Set<String> AUTH_STATUSES = Set.of("unverified", "pending", AUTH_VERIFIED, AUTH_REJECTED);
+    private static final Set<String> AUTH_STATUSES = Set.of("unverified", "payment_pending", "pending", AUTH_VERIFIED, AUTH_REJECTED);
     private static final Set<String> MEMBER_STATUSES = Set.of("0", STATUS_FROZEN);
-    private static final Set<String> VIP_LEVELS = Set.of("free", "standard", "pro", "enterprise");
 
     public void prepareForCreate(RentalMember member, Date now)
     {
@@ -74,9 +73,9 @@ public class RentalMemberLifecyclePolicy
         {
             throw new ServiceException("冻结状态不正确");
         }
-        if (!VIP_LEVELS.contains(member.getVipLevel()))
+        if (StringUtils.isBlank(member.getVipLevel()))
         {
-            throw new ServiceException("会员等级不正确");
+            throw new ServiceException("会员等级不能为空");
         }
         if (!Integer.valueOf(0).equals(member.getExternalAcceptEnabled())
                 && !Integer.valueOf(1).equals(member.getExternalAcceptEnabled()))

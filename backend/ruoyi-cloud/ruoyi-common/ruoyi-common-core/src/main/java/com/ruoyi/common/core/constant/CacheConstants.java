@@ -8,9 +8,9 @@ package com.ruoyi.common.core.constant;
 public class CacheConstants
 {
     /**
-     * 缓存有效期，默认720（分钟）
+     * 登录会话缓存有效期，默认10080分钟（7天）。平台端和商户端共用该会话周期。
      */
-    public final static long EXPIRATION = 720;
+    public final static long EXPIRATION = 10080;
 
     /**
      * 缓存刷新时间，默认120（分钟）

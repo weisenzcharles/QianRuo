@@ -139,6 +139,7 @@ SET menu_name = CASE menu_id
   WHEN 2182 THEN '角色新增'
   WHEN 2183 THEN '角色修改'
   WHEN 2184 THEN '角色删除'
+  WHEN 2118 THEN '操作日志'
   WHEN 2190 THEN '操作日志'
   WHEN 2191 THEN '日志导出'
   ELSE menu_name
@@ -157,8 +158,9 @@ remark = CASE menu_id
   WHEN 2182 THEN '商户角色新增'
   WHEN 2183 THEN '商户角色修改'
   WHEN 2184 THEN '商户角色删除'
-  WHEN 2190 THEN '当前商户操作日志'
-  WHEN 2191 THEN '导出当前商户操作日志'
+  WHEN 2118 THEN '当前商户业务审计日志'
+  WHEN 2190 THEN '历史顶级日志菜单，已迁移到用户管理'
+  WHEN 2191 THEN '导出当前商户业务审计日志'
   ELSE remark
 END
 WHERE menu_id BETWEEN 2100 AND 2191;

@@ -20,7 +20,7 @@ public class MerchantMapperXmlParsingTest
                 "mapper/merchant/MerchantIdentityMapper.xml",
                 "mapper/merchant/MerchantMenuMapper.xml",
                 "mapper/merchant/MerchantRoleMapper.xml",
-                "mapper/merchant/MerchantOperLogMapper.xml"))
+                "mapper/merchant/MerchantBusinessAuditMapper.xml"))
         {
             try (InputStream input = Resources.getResourceAsStream(resource))
             {

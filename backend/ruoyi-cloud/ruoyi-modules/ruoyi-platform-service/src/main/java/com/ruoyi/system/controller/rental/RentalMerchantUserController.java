@@ -43,9 +43,9 @@ import com.ruoyi.system.mapper.rental.RentalMerchantUserMenuMapper;
 import com.ruoyi.system.mapper.rental.RentalMerchantUserRoleMapper;
 import com.ruoyi.system.mapper.rental.RentalUserMemberMapper;
 import com.ruoyi.system.mapper.rental.RentalUserWarehouseScopeMapper;
-import com.ruoyi.system.mapper.rental.RentalWarehouseMapper;
 import com.ruoyi.system.service.ISysMenuService;
 import com.ruoyi.system.service.rental.IRentalMemberService;
+import com.ruoyi.system.service.rental.RentalBusinessGateway;
 
 /**
  * 平台商户用户管理
@@ -78,7 +78,7 @@ public class RentalMerchantUserController extends BaseController
     private RentalUserWarehouseScopeMapper userWarehouseScopeMapper;
 
     @Autowired
-    private RentalWarehouseMapper warehouseMapper;
+    private RentalBusinessGateway rentalBusinessGateway;
 
     @Autowired
     private IRentalMemberService memberService;
@@ -121,7 +121,7 @@ public class RentalMerchantUserController extends BaseController
         List<Long> warehouseIds = userWarehouseScopeMapper.selectWarehouseIds(user.getTenantId(), user.getMemberId(),
                 user.getMerchantUserId());
         user.setWarehouseIds(warehouseIds.toArray(new Long[warehouseIds.size()]));
-        ajax.put("warehouses", warehouseMapper.selectEnabledByMember(user.getTenantId(), user.getMemberId()));
+        ajax.put("warehouses", rentalBusinessGateway.listEnabledWarehouses(user.getTenantId(), user.getMemberId()));
         return ajax;
     }
 
@@ -131,7 +131,7 @@ public class RentalMerchantUserController extends BaseController
     {
         assertAdminClient();
         RentalMember member = requireMember(memberId);
-        return success(warehouseMapper.selectEnabledByMember(member.getTenantId(), member.getMemberId()));
+        return success(rentalBusinessGateway.listEnabledWarehouses(member.getTenantId(), member.getMemberId()));
     }
 
     @RequiresPermissions("admin:merchantUser:add")
@@ -362,7 +362,7 @@ public class RentalMerchantUserController extends BaseController
             throw new ServiceException("指定仓库权限时至少选择一个仓库");
         }
         List<Long> warehouseIds = new ArrayList<Long>(warehouseIdSet);
-        if (warehouseMapper.countEnabledByIds(member.getTenantId(), member.getMemberId(), warehouseIds)
+        if (rentalBusinessGateway.countEnabledWarehouses(member.getTenantId(), member.getMemberId(), warehouseIds)
                 != warehouseIds.size())
         {
             throw new ServiceException("仓库不存在、已停用或不属于当前商户");

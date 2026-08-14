@@ -1,14 +1,17 @@
 <template>
-  <div class="app-container merchant-brand-model-page">
+  <div class="app-container merchant-list-page merchant-brand-model-page">
     <div class="page-toolbar">
       <div>
         <h2>常用品牌型号</h2>
         <span class="selection-count">已选择 {{ selectedIds.length }} 项，仅展示当前商户经营类目内的标准型号</span>
       </div>
-      <el-button type="primary" icon="Check" :loading="saving" @click="saveSelections" v-hasPermi="['merchant:brandModel:edit']">保存</el-button>
     </div>
 
     <el-alert v-if="options.length === 0 && !loading" title="暂无可选型号，请先在经营类目中选择业务范围，或等待平台维护标准型号。" type="info" :closable="false" show-icon />
+    <el-row :gutter="10" class="mb8">
+      <el-col :span="1.5"><el-button type="primary" icon="Check" :loading="saving" @click="saveSelections" v-hasPermi="['merchant:brandModel:edit']">保存</el-button></el-col>
+      <right-toolbar :search="false" @queryTable="loadOptions" />
+    </el-row>
     <el-table ref="modelTableRef" v-loading="loading" :data="options" row-key="modelId" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" reserve-selection />
       <el-table-column label="产品类目" prop="className" min-width="160" show-overflow-tooltip />

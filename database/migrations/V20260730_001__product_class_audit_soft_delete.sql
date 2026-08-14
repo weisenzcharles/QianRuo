@@ -160,7 +160,7 @@ CALL `qianruo_add_column_if_missing`(
     'BIGINT DEFAULT NULL COMMENT ''平台产品类目ID'' AFTER `model_id`'
 )$$
 CALL `qianruo_add_column_if_missing`(
-    'ry_rental', 'ry_rental_product', 'class_id',
+    'ry_business', 'ry_rental_product', 'class_id',
     'BIGINT DEFAULT NULL COMMENT ''平台产品类目ID'' AFTER `member_id`'
 )$$
 
@@ -203,7 +203,7 @@ CALL `qianruo_add_index_if_missing`(
     'INDEX `idx_rental_brand_model_class` (`class_id`, `status`, `is_delete`)'
 )$$
 CALL `qianruo_add_index_if_missing`(
-    'ry_rental', 'ry_rental_product', 'idx_rental_product_member_class',
+    'ry_business', 'ry_rental_product', 'idx_rental_product_member_class',
     'INDEX `idx_rental_product_member_class` (`member_id`, `class_id`, `status`, `is_delete`)'
 )$$
 CALL `qianruo_add_index_if_missing`(

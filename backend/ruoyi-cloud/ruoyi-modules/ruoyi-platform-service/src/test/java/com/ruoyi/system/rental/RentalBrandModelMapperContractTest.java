@@ -7,7 +7,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
-/** 验证平台标准品牌型号 MyBatis 映射始终过滤软删除并保留型号引用保护。 */
+/** 验证平台标准品牌型号 MyBatis 映射始终过滤软删除并保留平台侧引用保护。 */
 public class RentalBrandModelMapperContractTest
 {
     /** 验证标准型号列表、内部发布和删除语句的软删除边界。 */
@@ -19,10 +19,13 @@ public class RentalBrandModelMapperContractTest
                 "platform brand model list must exclude deleted rows");
         require(sql(mapper, "selectActiveList").contains("m.status = '0'"),
                 "internal brand model list must publish only active rows");
-        require(sql(mapper, "countReferences").contains("ry_rental_product"),
-                "delete protection must check product references");
-        require(sql(mapper, "countReferences").contains("ry_rental_member_common_model"),
+        String localReferenceSql = sql(mapper, "countMerchantCommonModelReferences");
+        require(localReferenceSql.contains("ry_rental_member_common_model"),
                 "delete protection must check merchant common model references");
+        require(!localReferenceSql.contains("ry_rental_product"),
+                "platform mapper must not read rental business product tables");
+        require(!sql(mapper, "insert").contains("category_level1"),
+                "standard model writes must use class_id instead of legacy category text");
         require(sql(mapper, "softDelete").contains("is_delete = 1"),
                 "brand model delete must be a soft delete");
     }

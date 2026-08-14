@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.constant.SecurityConstants;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.core.exception.ServiceException;
+import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.common.security.utils.SecurityUtils;
 import com.ruoyi.merchant.mapper.MerchantProductClassMapper;
@@ -27,6 +28,8 @@ public class MerchantProductClassService
 
     private final RemoteProductClassService remoteProductClassService;
 
+    private final MerchantBusinessAuditRecorder auditRecorder;
+
     /**
      * 注入商户经营类目数据访问和平台类目内部服务。
      *
@@ -34,10 +37,11 @@ public class MerchantProductClassService
      * @param remoteProductClassService 平台产品类目内部服务
      */
     public MerchantProductClassService(MerchantProductClassMapper productClassMapper,
-            RemoteProductClassService remoteProductClassService)
+            RemoteProductClassService remoteProductClassService, MerchantBusinessAuditRecorder auditRecorder)
     {
         this.productClassMapper = productClassMapper;
         this.remoteProductClassService = remoteProductClassService;
+        this.auditRecorder = auditRecorder;
     }
 
     /**
@@ -98,11 +102,14 @@ public class MerchantProductClassService
         Long tenantId = tenantId();
         Long merchantId = merchantId();
         String operator = SecurityUtils.getUsername();
+        List<Long> before = productClassMapper.selectClassIds(tenantId, merchantId);
         productClassMapper.softDeleteAll(tenantId, merchantId, operator);
         if (!classIds.isEmpty())
         {
             productClassMapper.upsertSelections(tenantId, merchantId, classIds, operator);
         }
+        auditRecorder.record("经营类目", "UPDATE", "MERCHANT_CLASS_SCOPE", String.valueOf(merchantId),
+                "当前商户", "修改商户经营类目", before, productClassMapper.selectClassIds(tenantId, merchantId));
     }
 
     /**

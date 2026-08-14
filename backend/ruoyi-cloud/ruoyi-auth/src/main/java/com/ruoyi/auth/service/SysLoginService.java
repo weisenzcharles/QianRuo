@@ -17,6 +17,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.StringUtils;
 import com.ruoyi.common.core.utils.ip.IpUtils;
 import com.ruoyi.common.redis.service.RedisService;
+import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.utils.SecurityUtils;
 import com.ruoyi.merchant.api.RemoteMerchantUserService;
 import com.ruoyi.merchant.api.model.MerchantLoginIdentity;
@@ -47,6 +48,9 @@ public class SysLoginService
 
     @Autowired
     private RedisService redisService;
+
+    @Autowired
+    private MerchantBusinessAuditRecorder auditRecorder;
 
     /**
      * 登录
@@ -111,6 +115,7 @@ public class SysLoginService
         userInfo.setClientType(clientType);
         recordLogService.recordLogininfor(username, Constants.LOGIN_SUCCESS, "登录成功");
         recordLoginInfo(user.getUserId());
+        auditMerchantLogin(userInfo, username, "账号密码登录");
         return userInfo;
     }
 
@@ -164,7 +169,40 @@ public class SysLoginService
         userInfo.setClientType(Constants.CLIENT_TYPE_MERCHANT);
         recordLogService.recordLogininfor(phone, Constants.LOGIN_SUCCESS, "手机号验证码登录成功");
         recordLoginInfo(user.getUserId());
+        auditMerchantLogin(userInfo, phone, "手机号验证码登录");
         return userInfo;
+    }
+
+    /**
+     * 为商户登录写入业务审计；平台用户登录只保留平台登录日志，不进入商户审计表。
+     *
+     * @param loginUser 成功登录的商户用户
+     * @param loginName 登录名或手机号
+     * @param description 登录方式描述
+     */
+    private void auditMerchantLogin(LoginUser loginUser, String loginName, String description)
+    {
+        if (loginUser == null || !Constants.CLIENT_TYPE_MERCHANT.equals(loginUser.getClientType())
+                || loginUser.getSysUser() == null)
+        {
+            return;
+        }
+        com.ruoyi.merchant.api.model.MerchantBusinessAuditCommand command =
+                new com.ruoyi.merchant.api.model.MerchantBusinessAuditCommand();
+        command.setTenantId(loginUser.getTenantId());
+        command.setMemberId(loginUser.getMemberId());
+        command.setOperatorUserId(loginUser.getSysUser().getUserId());
+        command.setOperatorName(loginName);
+        command.setBusinessModule("用户认证");
+        command.setOperationType("LOGIN");
+        command.setTargetType("MERCHANT_USER");
+        command.setTargetId(String.valueOf(loginUser.getSysUser().getUserId()));
+        command.setTargetName(loginName);
+        command.setDescription(description);
+        command.setIpAddress(IpUtils.getIpAddr());
+        command.setStatus(0);
+        // 登录成功后会话已经建立，审计服务短暂不可用不能阻断登录；业务变更仍使用严格审计入口。
+        auditRecorder.recordBestEffort(command);
     }
 
     /**

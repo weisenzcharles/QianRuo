@@ -1,5 +1,5 @@
-<template><business-crud-page resource="product" /></template>
+<template><product-crud-page /></template>
 
 <script setup>
-import BusinessCrudPage from '../components/BusinessCrudPage.vue'
+import ProductCrudPage from './ProductCrudPage.vue'
 </script>

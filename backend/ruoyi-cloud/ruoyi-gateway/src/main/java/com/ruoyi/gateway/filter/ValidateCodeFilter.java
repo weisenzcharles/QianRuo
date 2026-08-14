@@ -36,6 +36,8 @@ public class ValidateCodeFilter extends AbstractGatewayFilterFactory<Object>
 
     private static final String CODE = "code";
 
+    private static final String CAPTCHA_CODE = "captchaCode";
+
     private static final String UUID = "uuid";
 
     @Override
@@ -54,7 +56,9 @@ public class ValidateCodeFilter extends AbstractGatewayFilterFactory<Object>
             {
                 String rspStr = resolveBodyFromRequest(request);
                 JSONObject obj = JSON.parseObject(rspStr);
-                validateCodeService.checkCaptcha(obj.getString(CODE), obj.getString(UUID));
+                String captchaCode = obj.containsKey(CAPTCHA_CODE)
+                        ? obj.getString(CAPTCHA_CODE) : obj.getString(CODE);
+                validateCodeService.checkCaptcha(captchaCode, obj.getString(UUID));
             }
             catch (Exception e)
             {

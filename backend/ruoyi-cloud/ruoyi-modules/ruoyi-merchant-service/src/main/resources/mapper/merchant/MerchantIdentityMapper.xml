@@ -26,16 +26,73 @@
         <result property="memberRole" column="member_role" />
         <result property="warehouseScopeType" column="warehouse_scope_type" />
     </resultMap>
-    <resultMap id="warehouse" type="MerchantWarehouse">
-        <id property="warehouseId" column="warehouse_id" />
-        <result property="warehouseCode" column="warehouse_code" />
-        <result property="warehouseName" column="warehouse_name" />
-    </resultMap>
-
     <sql id="accountColumns">
         merchant_user_id, tenant_id, member_id, user_name, nick_name, phone, email, avatar, password,
         status, is_delete, login_ip, login_date, pwd_update_date, must_change_password, create_time
     </sql>
+    <resultMap id="merchantUser" type="com.ruoyi.merchant.model.MerchantUserVO">
+        <id property="userId" column="merchant_user_id" />
+        <result property="userName" column="user_name" />
+        <result property="nickName" column="nick_name" />
+        <result property="phone" column="phone" />
+        <result property="email" column="email" />
+        <result property="status" column="status" />
+        <result property="mustChangePassword" column="must_change_password" />
+        <result property="loginDate" column="login_date" />
+        <result property="createTime" column="create_time" />
+        <result property="roleNames" column="role_names" />
+    </resultMap>
+    <insert id="insertMerchantUser" useGeneratedKeys="true" keyProperty="user.userId" keyColumn="merchant_user_id">
+        insert into `ry_rental`.`ry_rental_merchant_user`
+            (tenant_id, member_id, user_name, nick_name, phone, email, password, status,
+             must_change_password, create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{merchantId}, #{user.userName}, #{user.nickName}, #{user.phone}, #{user.email},
+                #{password}, '0', 1, #{operator}, sysdate(), #{operator}, sysdate(), '商户端新增用户', 0)
+    </insert>
+    <select id="selectMerchantUsers" resultMap="merchantUser">
+        select u.merchant_user_id, u.user_name, u.nick_name, u.phone, u.email, u.status,
+               u.must_change_password, u.login_date, u.create_time,
+               group_concat(distinct r.role_name order by r.role_id separator ',') role_names
+        from `ry_rental`.`ry_rental_merchant_user` u
+        inner join `ry_rental`.`ry_rental_user_member` um
+          on um.tenant_id = u.tenant_id and um.member_id = u.member_id
+         and um.merchant_user_id = u.merchant_user_id and um.is_delete = 0 and um.status = '0'
+        left join `ry_rental`.`ry_rental_merchant_user_role` ur
+          on ur.tenant_id = u.tenant_id and ur.member_id = u.member_id
+         and ur.merchant_user_id = u.merchant_user_id and ur.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_role` r
+          on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id
+         and r.role_id = ur.role_id and r.is_delete = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{merchantId} and u.is_delete = 0
+        <if test="query.userName != null and query.userName != ''">and u.user_name like concat('%', #{query.userName}, '%')</if>
+        <if test="query.phone != null and query.phone != ''">and u.phone like concat('%', #{query.phone}, '%')</if>
+        <if test="query.status != null and query.status != ''">and u.status = #{query.status}</if>
+        group by u.merchant_user_id order by u.create_time desc, u.merchant_user_id desc
+    </select>
+    <select id="selectMerchantUser" resultMap="merchantUser">
+        select u.merchant_user_id, u.user_name, u.nick_name, u.phone, u.email, u.status,
+               u.must_change_password, u.login_date, u.create_time,
+               group_concat(distinct r.role_name order by r.role_id separator ',') role_names
+        from `ry_rental`.`ry_rental_merchant_user` u
+        inner join `ry_rental`.`ry_rental_user_member` um on um.tenant_id=u.tenant_id and um.member_id=u.member_id
+          and um.merchant_user_id=u.merchant_user_id and um.is_delete=0
+        left join `ry_rental`.`ry_rental_merchant_user_role` ur on ur.tenant_id=u.tenant_id and ur.member_id=u.member_id
+          and ur.merchant_user_id=u.merchant_user_id and ur.is_delete=0
+        left join `ry_rental`.`ry_rental_merchant_role` r on r.tenant_id=ur.tenant_id and r.member_id=ur.member_id
+          and r.role_id=ur.role_id and r.is_delete=0
+        where u.tenant_id=#{tenantId} and u.member_id=#{merchantId} and u.merchant_user_id=#{userId} and u.is_delete=0
+        group by u.merchant_user_id
+    </select>
+    <update id="updateMerchantUser">
+        update `ry_rental`.`ry_rental_merchant_user`
+        set nick_name=#{nickname}, phone=#{phone}, email=#{email}, status=#{status}, update_by=#{operator}, update_time=sysdate()
+        where tenant_id=#{tenantId} and member_id=#{merchantId} and merchant_user_id=#{userId} and is_delete=0
+    </update>
+    <update id="resetMerchantUserPassword">
+        update `ry_rental`.`ry_rental_merchant_user`
+        set password=#{password}, pwd_update_date=null, must_change_password=1, update_by=#{operator}, update_time=sysdate()
+        where tenant_id=#{tenantId} and member_id=#{merchantId} and merchant_user_id=#{userId} and is_delete=0
+    </update>
     <select id="selectByUsername" resultMap="account">
         select <include refid="accountColumns" /> from `ry_rental`.`ry_rental_merchant_user`
         where user_name = #{username} and is_delete = '0'
@@ -104,6 +161,12 @@
                   and ur.merchant_user_id = #{userId} and rm.menu_id = m.menu_id
                   and ur.is_delete = 0 and rm.is_delete = 0
                   and r.status = '0' and r.is_delete = '0')
+            or exists (select 1 from `ry_rental`.`ry_rental_merchant_user_role` ur
+                inner join `ry_rental`.`ry_rental_merchant_role` r
+                    on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id and r.role_id = ur.role_id
+                where ur.tenant_id = #{tenantId} and ur.member_id = #{merchantId}
+                  and ur.merchant_user_id = #{userId} and ur.is_delete = 0
+                  and r.role_key = 'merchant_admin' and r.status = '0' and r.is_delete = '0')
           )
     </select>
     <select id="selectDefaultReadPermissions" resultType="String">
@@ -112,11 +175,6 @@
           and perms is not null and perms != ''
           and (perms like 'merchant:%:list' or perms like 'merchant:%:query')
         order by perms
-    </select>
-    <select id="selectWarehouses" resultMap="warehouse">
-        select warehouse_id, warehouse_code, warehouse_name from `ry_rental`.`ry_rental_warehouse`
-        where tenant_id = #{tenantId} and member_id = #{merchantId} and status = '0' and is_delete = '0'
-        order by warehouse_name, warehouse_id
     </select>
     <update id="updateLogin">
         update `ry_rental`.`ry_rental_merchant_user` set login_ip = #{loginIp}, login_date = #{loginDate}

@@ -1,7 +1,7 @@
 <template>
    <!-- 授权用户 -->
    <el-dialog title="选择用户" v-model="visible" width="800px" top="5vh" append-to-body>
-      <el-form :model="queryParams" ref="queryRef" :inline="true">
+      <el-form v-show="showSearch" :model="queryParams" ref="queryRef" :inline="true">
          <el-form-item label="用户名称" prop="userName">
             <el-input
                v-model="queryParams.userName"
@@ -25,6 +25,9 @@
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
          </el-form-item>
       </el-form>
+      <el-row :gutter="10" class="mb8">
+         <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
+      </el-row>
       <el-row>
          <el-table @row-click="clickRow" ref="refTable" :data="userList" @selection-change="handleSelectionChange" height="260px">
             <el-table-column type="selection" width="55"></el-table-column>
@@ -77,6 +80,7 @@ const userList = ref([])
 const visible = ref(false)
 const total = ref(0)
 const userIds = ref([])
+const showSearch = ref(true)
 
 const queryParams = reactive({
   pageNum: 1,

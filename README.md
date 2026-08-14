@@ -11,7 +11,7 @@
 - 后端服务：基于 RuoYi-Cloud 微服务体系，提供网关、认证、平台治理、商户身份、独立租赁业务、文件、任务调度和监控服务。
 - 数据库：平台和商户身份数据使用 `ry-cloud`/`ry_rental`，租赁核心业务服务独立使用 `ry_business`，不直接修改 RuoYi-Cloud 原生系统库表。
 
-当前历史租赁 DDL 仍会在 `ry_rental` 中初始化部分业务表；`rental-business` 已完成独立服务和数据库边界，后续按领域迁移商品、库存、订单等核心表到 `ry_business`。
+数据库边界已经固定：`ry_rental` 只承载商户主体、认证、商户 IAM、经营类目和治理配置，`ry_business` 是仓库、商品、套餐、库存、客户、订单、物流等租赁执行数据的唯一事实源。14 张同名核心业务遗留表已从 `ry_rental` 退役，禁止重新创建、双写、兼容读取或失败回退；尚未迁移的执行面附属表按领域逐批收口，详细规则见[`ry_rental` 与 `ry_business` 数据库边界设计](./docs/design/ry_rental与ry_business数据库边界设计.md)。
 
 ## 技术栈
 
@@ -105,13 +105,13 @@
 
 商家端只允许访问本商户主体下的数据。后端必须按商户、租户、仓库权限做服务端隔离，不能只依赖前端菜单隐藏。
 
-商户业务接口统一通过 `MerchantContextUtils` 读取服务端登录态中的租户、商户和仓库范围。查询必须追加 `tenantId + memberId` 条件，涉及具体仓库的操作必须调用 `checkWarehouseAccess(warehouseId)`；不得信任前端提交的租户或商户 ID。
+商户业务接口统一通过 `MerchantContextUtils` 读取服务端登录态中的租户、商户和仓库范围。查询必须追加 `tenantId + memberId` 条件，涉及具体仓库的操作必须调用 `checkWarehouseAccess(warehouseId)`；不得信任前端提交的租户或商户 ID。商户日志列表和详情通过 `ry_rental_audit_log.actor_id = ry_rental_merchant_user.merchant_user_id` 关联用户信息，其中“用户名”读取 `user_name`，“操作人”读取 `nick_name`，并同时校验租户和商户归属；用户软删除或昵称为空时使用日志快照中的操作人名称兜底。
 
-商家端操作日志由 `merchant-service` 独立写入 `ry_rental_merchant_oper_log`。商户管理员默认拥有查看与导出权限，其他商户用户需通过角色权限分配；日志查询始终限制在当前登录态的 `tenantId + memberId` 范围内。
+商户端请求级日志统一沿平台通用链路写入 `ry-cloud.sys_oper_log`；商户业务日志由 `MerchantBusinessAuditRecorder` 只记录新增、修改、删除、登录、密码和权限变更等业务动作，统一写入 `ry_rental.ry_rental_audit_log`。日志按业务模块展示，保存脱敏的变更前后快照，不记录请求方式列；查询始终限制在当前登录态的 `tenantId + memberId` 范围内。历史重复表 `ry_rental_merchant_business_audit_log` 已停用，不再作为运行时数据源。
 
 平台统一维护多级产品类目，商户只能在 `/merchant/class/**` 中选择经营范围。商户商品、型号和套餐业务只读取当前商户已选类目；平台有效类目通过内部 Feign 契约提供，商户服务不跨库调用平台 Mapper。
 
-所有 Controller 接口由通用切面记录入库审计，应用表统一使用 `isdeleted` 软删除。MyBatis 运行时拒绝物理 `DELETE` 和 `TRUNCATE`，代码生成模板也默认生成软删除 SQL。
+平台和商户的请求级 Controller 日志由通用切面统一写入平台 `ry-cloud.sys_oper_log`；商户业务服务在新增、修改、删除、登录、密码和权限等动作成功后显式调用 `MerchantBusinessAuditRecorder`，写入统一的 `ry_rental.ry_rental_audit_log`。两类日志不混用，商户日志页面只读取统一业务审计表。应用表统一使用 `is_delete` 软删除，MyBatis 运行时拒绝物理 `DELETE` 和 `TRUNCATE`，代码生成模板也默认生成软删除 SQL。
 
 平台商户资料统一维护店铺、企业资质、法人身份、签约合同、认证审核和冻结状态。店铺主账号从商户用户绑定关系实时读取，不在商户主体表重复保存；审核时间、冻结时间及解冻清理由后端状态规则统一处理。
 
@@ -228,6 +228,7 @@ cp deploy/.env.example deploy/.env
 
 - `docs/design/1.0需求基线与实施差异.md`：最新三个 1.0 Word 文档的统一术语、不可变规则、实现差异和新增表组。
 - `docs/design/项目架构图.md`：当前运行架构、Maven 模块依赖、认证隔离、服务调用和全量数据关系图。
+- `docs/design/ry_rental与ry_business数据库边界设计.md`：商户控制面与租赁执行面的物理数据库边界、完整表归类和遗留表收口方案。
 - `docs/design/商品与套餐库存数据结构设计.md`：共享资源池、版本化 BOM、套餐容量、订单预占和并发防超卖设计。
 - `docs/design/产品类目、接口审计与软删除设计.md`：平台多级类目、商户经营范围、全接口审计和统一软删除规范。
 - `docs/design/租赁项目设计文档.md`：项目总体定位与核心模块。

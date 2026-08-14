@@ -27,6 +27,12 @@ import Layout from '@/layout'
 // 公共路由
 export const constantRoutes = [
   {
+    path: '/merchant/order/form',
+    component: Layout,
+    hidden: true,
+    children: [{ path: '', component: () => import('@/views/merchant/order/form.vue'), name: 'MerchantOrderForm', meta: { title: '订单编辑', noCache: true } }]
+  },
+  {
     path: '/redirect',
     component: Layout,
     hidden: true,
@@ -60,15 +66,8 @@ export const constantRoutes = [
   {
     path: '',
     component: Layout,
-    redirect: '/index',
-    children: [
-      {
-        path: '/index',
-        component: () => import('@/views/index'),
-        name: 'Index',
-        meta: { title: '首页', icon: 'dashboard', affix: true }
-      }
-    ]
+    redirect: '/merchant/home',
+    hidden: true
   },
   {
     path: '/lock',

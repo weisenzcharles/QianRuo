@@ -4,11 +4,13 @@
 -- 1. 本脚本只创建 rental-business 使用的 ry_business 表，不再为新业务写入 ry_rental。
 -- 2. 套餐只保存版本化 BOM，库存只按资源池、逐件库存和数量库存计算。
 -- 3. 所有删除均为 is_delete 软删除；所有商户表必须同时带 tenant_id 和 member_id。
--- 4. 旧表作为兼容数据源保留，但新接口不读取旧套餐库存快照和旧兼容型号字符串。
+-- 4. 升级旧环境时只在旧源表存在的情况下复制数据；新环境不创建执行面旧表。
 
 CREATE DATABASE IF NOT EXISTS `ry_business`
   DEFAULT CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
+
+USE `ry_business`;
 
 CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_stock_pool` (
   `pool_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '库存资源池ID',
@@ -78,23 +80,135 @@ PREPARE rental_stock_pool_index_statement FROM @rental_stock_pool_index_sql;
 EXECUTE rental_stock_pool_index_statement;
 DEALLOCATE PREPARE rental_stock_pool_index_statement;
 
--- 主数据表与订单表分属同一业务服务，迁移时统一复制到 ry_business，避免新接口回读旧库。
-CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_asset_sn`
-  LIKE `ry_rental`.`ry_rental_asset_sn`;
-CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_accessory_item`
-  LIKE `ry_rental`.`ry_rental_accessory_item`;
-CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_package_item`
-  LIKE `ry_rental`.`ry_rental_package_item`;
-CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_inventory_ledger`
-  LIKE `ry_rental`.`ry_rental_inventory_ledger`;
-INSERT IGNORE INTO `ry_business`.`ry_rental_asset_sn`
-SELECT * FROM `ry_rental`.`ry_rental_asset_sn`;
-INSERT IGNORE INTO `ry_business`.`ry_rental_accessory_item`
-SELECT * FROM `ry_rental`.`ry_rental_accessory_item`;
-INSERT IGNORE INTO `ry_business`.`ry_rental_package_item`
-SELECT * FROM `ry_rental`.`ry_rental_package_item`;
-INSERT IGNORE INTO `ry_business`.`ry_rental_inventory_ledger`
-SELECT * FROM `ry_rental`.`ry_rental_inventory_ledger`;
+-- 主数据表与库存流水表直接创建在 ry_business，避免新环境先创建 ry_rental 执行面表。
+CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_asset_sn` (
+  `sn_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'SN设备ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `product_id` BIGINT NOT NULL COMMENT '商品ID',
+  `warehouse_id` BIGINT DEFAULT NULL COMMENT '当前仓库ID',
+  `sn_code` VARCHAR(128) NOT NULL COMMENT 'SN编码',
+  `barcode` VARCHAR(128) DEFAULT NULL COMMENT '条码',
+  `qr_code` VARCHAR(255) DEFAULT NULL COMMENT '二维码内容',
+  `asset_status` VARCHAR(32) NOT NULL DEFAULT 'available' COMMENT '设备状态',
+  `condition_level` VARCHAR(32) DEFAULT NULL COMMENT '新旧程度/成色',
+  `purchase_time` DATE DEFAULT NULL COMMENT '购买时间',
+  `purchase_cost` DECIMAL(18,2) DEFAULT NULL COMMENT '采购成本',
+  `activate_time` DATE DEFAULT NULL COMMENT '激活时间',
+  `warranty_until` DATE DEFAULT NULL COMMENT '保修到期',
+  `insurance_until` DATE DEFAULT NULL COMMENT '保险到期',
+  `latest_photo_file_id` BIGINT DEFAULT NULL COMMENT '最新照片文件ID',
+  `total_rent_count` INT NOT NULL DEFAULT 0 COMMENT '累计租赁次数',
+  `recent_3m_rent_count` INT NOT NULL DEFAULT 0 COMMENT '近3个月租赁次数',
+  `version` INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '状态',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `remark` VARCHAR(500) DEFAULT NULL,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`sn_id`),
+  UNIQUE KEY `uk_rental_asset_sn` (`member_id`, `sn_code`),
+  KEY `idx_rental_asset_tenant_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_asset_product` (`product_id`),
+  KEY `idx_rental_asset_warehouse_status` (`warehouse_id`, `asset_status`),
+  KEY `idx_rental_asset_insurance` (`insurance_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备SN';
+
+CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_accessory_item` (
+  `accessory_item_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '配件实例ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `product_id` BIGINT NOT NULL COMMENT '配件商品ID',
+  `warehouse_id` BIGINT DEFAULT NULL COMMENT '仓库ID',
+  `item_code` VARCHAR(128) NOT NULL COMMENT '配件编码/SN/虚拟ID',
+  `stock_mode` VARCHAR(20) NOT NULL DEFAULT 'qty' COMMENT '来源模式：sn qty',
+  `item_status` VARCHAR(32) NOT NULL DEFAULT 'available' COMMENT '配件状态',
+  `compatible_model_ids` VARCHAR(500) DEFAULT NULL COMMENT '兼容型号ID列表',
+  `version` INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+  `status` TINYINT(1) NOT NULL DEFAULT 0,
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `remark` VARCHAR(500) DEFAULT NULL,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`accessory_item_id`),
+  UNIQUE KEY `uk_rental_accessory_item` (`member_id`, `item_code`),
+  KEY `idx_rental_accessory_product` (`product_id`),
+  KEY `idx_rental_accessory_warehouse_status` (`warehouse_id`, `item_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='配件实例';
+
+CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_package_item` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `package_id` BIGINT NOT NULL COMMENT '套餐ID',
+  `product_id` BIGINT NOT NULL COMMENT '商品/配件ID',
+  `item_role` VARCHAR(32) NOT NULL DEFAULT 'accessory' COMMENT '角色：main主机 accessory配件',
+  `quantity` INT NOT NULL DEFAULT 1 COMMENT '数量',
+  `required_flag` TINYINT NOT NULL DEFAULT 1 COMMENT '是否必选',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_rental_package_item_package` (`package_id`),
+  KEY `idx_rental_package_item_product` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='套餐物料明细';
+
+CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_inventory_ledger` (
+  `ledger_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '库存流水ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `warehouse_id` BIGINT DEFAULT NULL COMMENT '当前仓库ID',
+  `product_id` BIGINT DEFAULT NULL COMMENT '商品ID',
+  `sn_id` BIGINT DEFAULT NULL COMMENT 'SN ID',
+  `accessory_item_id` BIGINT DEFAULT NULL COMMENT '配件实例ID',
+  `change_type` VARCHAR(64) NOT NULL COMMENT '变更类型',
+  `from_status` VARCHAR(32) DEFAULT NULL COMMENT '原状态',
+  `to_status` VARCHAR(32) DEFAULT NULL COMMENT '新状态',
+  `change_qty` INT NOT NULL DEFAULT 1 COMMENT '变更数量',
+  `ref_type` VARCHAR(64) DEFAULT NULL COMMENT '关联类型',
+  `ref_id` BIGINT DEFAULT NULL COMMENT '关联ID',
+  `reason` VARCHAR(500) DEFAULT NULL COMMENT '原因',
+  `operator_id` BIGINT DEFAULT NULL COMMENT '操作人ID',
+  `operator_name` VARCHAR(64) DEFAULT NULL COMMENT '操作人',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`ledger_id`),
+  KEY `idx_rental_inventory_ledger_tenant` (`tenant_id`, `member_id`),
+  KEY `idx_rental_inventory_ledger_sn` (`sn_id`, `create_time`),
+  KEY `idx_rental_inventory_ledger_ref` (`ref_type`, `ref_id`),
+  KEY `idx_rental_inventory_ledger_wh_product` (`warehouse_id`, `product_id`, `create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存状态流水';
+
+DELIMITER $$
+DROP PROCEDURE IF EXISTS `qianruo_copy_master_business_table`$$
+CREATE PROCEDURE `qianruo_copy_master_business_table`(IN table_name_value VARCHAR(128))
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'ry_rental'
+          AND table_name = table_name_value
+          AND table_type = 'BASE TABLE'
+    ) THEN
+        SET @qianruo_copy_master_sql = CONCAT(
+            'INSERT IGNORE INTO `ry_business`.`', table_name_value,
+            '` SELECT * FROM `ry_rental`.`', table_name_value, '`'
+        );
+        PREPARE qianruo_copy_master_statement FROM @qianruo_copy_master_sql;
+        EXECUTE qianruo_copy_master_statement;
+        DEALLOCATE PREPARE qianruo_copy_master_statement;
+    END IF;
+END$$
+CALL `qianruo_copy_master_business_table`('ry_rental_asset_sn')$$
+CALL `qianruo_copy_master_business_table`('ry_rental_accessory_item')$$
+CALL `qianruo_copy_master_business_table`('ry_rental_package_item')$$
+CALL `qianruo_copy_master_business_table`('ry_rental_inventory_ledger')$$
+DROP PROCEDURE IF EXISTS `qianruo_copy_master_business_table`$$
+DELIMITER ;
 
 -- 统一新服务使用的库存模式值；旧表中的 sn/qty 只作为历史数据输入。
 UPDATE `ry_business`.`ry_rental_product`
@@ -213,6 +327,25 @@ CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_inventory_reservation_item` 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存预占资源池明细';
 
 -- 兼容已有订单预占主表；新业务通过预占明细按资源池计算，不再按套餐数量重复统计。
-CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_inventory_reservation` LIKE `ry_rental`.`ry_rental_inventory_reservation`;
-INSERT IGNORE INTO `ry_business`.`ry_rental_inventory_reservation`
-SELECT * FROM `ry_rental`.`ry_rental_inventory_reservation`;
+CREATE TABLE IF NOT EXISTS `ry_business`.`ry_rental_inventory_reservation` (
+  `reservation_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '库存预占ID',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `order_id` BIGINT NOT NULL COMMENT '订单ID',
+  `product_id` BIGINT NOT NULL COMMENT '商品ID',
+  `package_id` BIGINT DEFAULT NULL COMMENT '套餐ID',
+  `warehouse_id` BIGINT DEFAULT NULL COMMENT '仓库ID',
+  `reserved_qty` INT NOT NULL DEFAULT 1 COMMENT '预占数量',
+  `reservation_status` VARCHAR(32) NOT NULL DEFAULT 'reserved' COMMENT '状态：reserved locked released consumed expired',
+  `expire_time` DATETIME DEFAULT NULL COMMENT '过期时间',
+  `version` INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+  `create_by` VARCHAR(64) DEFAULT '',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by` VARCHAR(64) DEFAULT '',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`reservation_id`),
+  KEY `idx_rental_reservation_order` (`order_id`),
+  KEY `idx_rental_reservation_stock` (`member_id`, `warehouse_id`, `product_id`, `reservation_status`),
+  KEY `idx_rental_reservation_expire` (`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存预占';

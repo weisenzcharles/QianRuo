@@ -26,12 +26,20 @@ public class MerchantRouteConfiguration
                 .route("merchant-master-data-business", route -> route
                         .order(-90)
                         .path("/merchant/warehouse", "/merchant/warehouse/**",
+                                "/merchant/region", "/merchant/region/**",
                                 "/merchant/pool", "/merchant/pool/**",
                                 "/merchant/product", "/merchant/product/**",
                                 "/merchant/sn", "/merchant/sn/**",
                                 "/merchant/accessory", "/merchant/accessory/**",
                                 "/merchant/package", "/merchant/package/**",
                                 "/merchant/inventory", "/merchant/inventory/**")
+                        .uri("lb://rental-business"))
+                .route("merchant-workflow-business", route -> route
+                        .order(-80)
+                        .path("/merchant/order-channel", "/merchant/order-channel/**",
+                                "/merchant/batch", "/merchant/batch/**",
+                                "/merchant/file-quota", "/merchant/file-quota/**",
+                                "/merchant/protocol", "/merchant/protocol/**")
                         .uri("lb://rental-business"))
                 .route("merchant-domain-static", route -> route
                         .path("/merchant/**")

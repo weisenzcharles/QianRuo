@@ -19,7 +19,7 @@ public class MerchantOrderQuery extends BaseEntity
 
     private String status;
 
-    private String channel;
+    private Long channelId;
 
     private String shipDate;
 
@@ -72,9 +72,9 @@ public class MerchantOrderQuery extends BaseEntity
      *
      * @return 订单渠道编码或名称
      */
-    public String getChannel()
+    public Long getChannelId()
     {
-        return channel;
+        return channelId;
     }
 
     /**
@@ -82,9 +82,9 @@ public class MerchantOrderQuery extends BaseEntity
      *
      * @param channel 订单渠道编码或名称
      */
-    public void setChannel(String channel)
+    public void setChannelId(Long channelId)
     {
-        this.channel = channel;
+        this.channelId = channelId;
     }
 
     /**

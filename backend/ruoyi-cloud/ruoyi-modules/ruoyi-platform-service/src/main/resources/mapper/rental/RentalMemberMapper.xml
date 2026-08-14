@@ -42,6 +42,10 @@
         <result property="freezeReason" column="freeze_reason" />
         <result property="wechatQrFileId" column="wechat_qr_file_id" />
         <result property="vipLevel" column="vip_level" />
+        <result property="levelId" column="level_id" />
+        <result property="registrationMode" column="registration_mode" />
+        <result property="registrationStatus" column="registration_status" />
+        <result property="inviterMemberId" column="inviter_member_id" />
         <result property="storageQuotaMb" column="storage_quota_mb" />
         <result property="externalAcceptEnabled" column="external_accept_enabled" />
         <result property="status" column="status" />
@@ -62,7 +66,8 @@
                m.license_image_url, m.legal_representative_name, m.legal_representative_id_no,
                m.legal_id_front_url, m.legal_id_back_url, m.signing_date, m.contract_valid_from,
                m.contract_valid_to, m.contract_file_url, m.audit_time, m.audit_remark,
-               m.freeze_time, m.freeze_reason, m.wechat_qr_file_id, m.vip_level,
+               m.freeze_time, m.freeze_reason, m.wechat_qr_file_id, m.vip_level, m.level_id,
+               m.registration_mode, m.registration_status, m.inviter_member_id,
                m.storage_quota_mb, m.external_accept_enabled, m.status, m.create_by,
                m.create_time, m.update_by, m.update_time, m.remark, m.is_delete,
                (
@@ -135,7 +140,8 @@
             license_valid_to, license_long_term, license_image_url, legal_representative_name,
             legal_representative_id_no, legal_id_front_url, legal_id_back_url, signing_date,
             contract_valid_from, contract_valid_to, contract_file_url, audit_time, audit_remark,
-            freeze_time, freeze_reason, wechat_qr_file_id, vip_level, storage_quota_mb,
+            freeze_time, freeze_reason, wechat_qr_file_id, vip_level, level_id, registration_mode,
+            registration_status, inviter_member_id, storage_quota_mb,
             external_accept_enabled, status, remark, create_by, create_time
         ) values (
             #{tenantId}, #{memberCode}, #{memberType}, #{membershipType}, #{authStatus}, #{legalSubjectName}, #{licenseNo},
@@ -145,7 +151,8 @@
             #{licenseValidTo}, #{licenseLongTerm}, #{licenseImageUrl}, #{legalRepresentativeName},
             #{legalRepresentativeIdNo}, #{legalIdFrontUrl}, #{legalIdBackUrl}, #{signingDate},
             #{contractValidFrom}, #{contractValidTo}, #{contractFileUrl}, #{auditTime}, #{auditRemark},
-            #{freezeTime}, #{freezeReason}, #{wechatQrFileId}, #{vipLevel}, #{storageQuotaMb},
+            #{freezeTime}, #{freezeReason}, #{wechatQrFileId}, #{vipLevel}, #{levelId}, #{registrationMode},
+            #{registrationStatus}, #{inviterMemberId}, #{storageQuotaMb},
             #{externalAcceptEnabled}, #{status}, #{remark}, #{createBy}, sysdate()
         )
     </insert>
@@ -189,6 +196,7 @@
             freeze_reason = #{freezeReason},
             wechat_qr_file_id = #{wechatQrFileId},
             vip_level = #{vipLevel},
+            level_id = #{levelId},
             storage_quota_mb = #{storageQuotaMb},
             external_accept_enabled = #{externalAcceptEnabled},
             status = #{status},

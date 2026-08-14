@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantBusinessAuditMapper">
+    <resultMap id="audit" type="com.ruoyi.merchant.model.MerchantBusinessAuditVO">
+        <id property="auditId" column="audit_id" />
+        <result property="operatorUserId" column="operator_user_id" />
+        <result property="operatorName" column="operator_name" />
+        <result property="username" column="username" />
+        <result property="businessModule" column="business_module" />
+        <result property="operationType" column="operation_type" />
+        <result property="targetType" column="target_type" />
+        <result property="targetId" column="target_id" />
+        <result property="targetName" column="target_name" />
+        <result property="description" column="description" />
+        <result property="ipAddress" column="ip_address" />
+        <result property="status" column="status" />
+        <result property="operationTime" column="operation_time" />
+        <result property="beforeContent" column="before_content" />
+        <result property="afterContent" column="after_content" />
+        <result property="errorMessage" column="error_message" />
+        <result property="traceId" column="trace_id" />
+    </resultMap>
+
+    <sql id="summaryColumns">
+        a.audit_id, a.actor_id AS operator_user_id,
+        coalesce(nullif(u.user_name, ''), a.actor_name) AS username,
+        coalesce(nullif(u.nick_name, ''), a.actor_name) AS operator_name,
+        a.business_module, a.operation_type, a.object_type AS target_type,
+        a.object_id AS target_id, a.target_name, a.description,
+        a.client_ip AS ip_address, a.status, a.create_time AS operation_time
+    </sql>
+
+    <sql id="detailColumns">
+        a.audit_id, a.actor_id AS operator_user_id,
+        coalesce(nullif(u.user_name, ''), a.actor_name) AS username,
+        coalesce(nullif(u.nick_name, ''), a.actor_name) AS operator_name,
+        a.business_module, a.operation_type, a.object_type AS target_type,
+        a.object_id AS target_id, a.target_name, a.description,
+        a.client_ip AS ip_address, a.status, a.create_time AS operation_time,
+        a.before_json AS before_content, a.after_json AS after_content,
+        a.error_message, a.trace_id
+    </sql>
+
+    <insert id="insert">
+        insert into `ry_rental`.`ry_rental_audit_log`(
+            tenant_id, member_id, actor_id, actor_name, actor_type, action_code,
+            business_module, operation_type, object_type, object_id, target_name, description,
+            before_json, after_json, sensitive_flag, client_ip, status, error_message,
+            trace_id, create_time, is_delete
+        ) values (
+            #{record.tenantId}, #{record.memberId}, #{record.operatorUserId},
+            coalesce(#{record.operatorName}, ''), 'merchant_user',
+            concat('merchant.', lower(coalesce(#{record.operationType}, 'business'))),
+            coalesce(#{record.businessModule}, ''), coalesce(#{record.operationType}, ''),
+            coalesce(#{record.targetType}, ''), substring(coalesce(#{record.targetId}, ''), 1, 64),
+            coalesce(#{record.targetName}, ''), coalesce(#{record.description}, ''),
+            nullif(#{record.beforeContent}, ''), nullif(#{record.afterContent}, ''), 0,
+            substring(coalesce(#{record.ipAddress}, ''), 1, 128), coalesce(#{record.status}, 0),
+            coalesce(#{record.errorMessage}, ''), coalesce(#{record.traceId}, ''), now(), 0
+        )
+    </insert>
+
+    <select id="selectList" resultMap="audit">
+        select <include refid="summaryColumns" />
+        from `ry_rental`.`ry_rental_audit_log` a
+        left join `ry_rental`.`ry_rental_merchant_user` u
+          on u.merchant_user_id = a.actor_id
+         and u.tenant_id = a.tenant_id
+         and u.member_id = a.member_id
+         and u.is_delete = 0
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+          and a.actor_type = 'merchant_user' and a.is_delete = 0
+        <if test="query.businessModule != null and query.businessModule != ''">
+            and a.business_module like concat('%', #{query.businessModule}, '%')
+        </if>
+        <if test="query.operationType != null and query.operationType != ''">
+            and a.operation_type = #{query.operationType}
+        </if>
+        <if test="query.username != null and query.username != ''">
+            and coalesce(nullif(u.user_name, ''), a.actor_name)
+                like concat('%', #{query.username}, '%')
+        </if>
+        <if test="query.operatorName != null and query.operatorName != ''">
+            and coalesce(nullif(u.nick_name, ''), a.actor_name)
+                like concat('%', #{query.operatorName}, '%')
+        </if>
+        <if test="query.description != null and query.description != ''">
+            and a.description like concat('%', #{query.description}, '%')
+        </if>
+        <if test="query.ipAddress != null and query.ipAddress != ''">
+            and a.client_ip like concat('%', #{query.ipAddress}, '%')
+        </if>
+        <if test="query.status != null">and a.status = #{query.status}</if>
+        <if test="query.params.beginTime != null and query.params.beginTime != ''">
+            and a.create_time &gt;= #{query.params.beginTime}
+        </if>
+        <if test="query.params.endTime != null and query.params.endTime != ''">
+            and a.create_time &lt;= #{query.params.endTime}
+        </if>
+        order by a.create_time desc, a.audit_id desc
+    </select>
+
+    <select id="selectById" resultMap="audit">
+        select <include refid="detailColumns" />
+        from `ry_rental`.`ry_rental_audit_log` a
+        left join `ry_rental`.`ry_rental_merchant_user` u
+          on u.merchant_user_id = a.actor_id
+         and u.tenant_id = a.tenant_id
+         and u.member_id = a.member_id
+         and u.is_delete = 0
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+          and a.actor_type = 'merchant_user'
+          and a.audit_id = #{auditId} and a.is_delete = 0
+    </select>
+
+    <select id="selectBusinessModules" resultType="java.lang.String">
+        select distinct a.business_module
+        from `ry_rental`.`ry_rental_audit_log` a
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+          and a.actor_type = 'merchant_user' and a.is_delete = 0
+          and a.business_module is not null and a.business_module != ''
+        order by a.business_module
+    </select>
+
+    <select id="selectOperatorNames" resultType="java.lang.String">
+        select distinct coalesce(nullif(u.nick_name, ''), a.actor_name)
+        from `ry_rental`.`ry_rental_audit_log` a
+        left join `ry_rental`.`ry_rental_merchant_user` u
+          on u.merchant_user_id = a.actor_id
+         and u.tenant_id = a.tenant_id
+         and u.member_id = a.member_id
+         and u.is_delete = 0
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+          and a.actor_type = 'merchant_user' and a.is_delete = 0
+          and coalesce(nullif(u.nick_name, ''), a.actor_name) != ''
+        order by coalesce(nullif(u.nick_name, ''), a.actor_name)
+    </select>
+</mapper>

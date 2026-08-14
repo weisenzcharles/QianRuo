@@ -31,6 +31,18 @@ public interface MerchantRoleMapper
             @Param("roleId") Long roleId);
     List<Long> selectUserIdsByRole(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
             @Param("roleId") Long roleId);
+    /** 查询当前商户用户已分配的角色。 */
+    List<Long> selectRoleIdsByUser(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("userId") Long userId);
+    /** 统计属于当前商户的角色数量。 */
+    int countRolesInMerchant(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("roleIds") Long[] roleIds);
+    /** 删除用户的指定角色关系。 */
+    int deleteUserRoleBatch(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("roleIds") Long[] roleIds, @Param("userIds") Long[] userIds);
+    /** 写入用户角色关系。 */
+    int insertUserRoles(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("userId") Long userId, @Param("roleIds") Long[] roleIds);
     int deleteRoleMenus(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
             @Param("roleId") Long roleId);
     int insertRoleMenus(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,

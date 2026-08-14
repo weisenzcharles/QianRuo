@@ -8,7 +8,7 @@
       </div>
       <div class="heading-actions">
         <el-tag type="info" effect="plain">今日更新 {{ lastUpdated }}</el-tag>
-        <el-button type="primary" :icon="Plus" @click="handleAction('新建订单')">新建订单</el-button>
+        <el-button type="primary" :icon="Plus" @click="openCreateOrder">新建订单</el-button>
       </div>
     </header>
 
@@ -26,8 +26,8 @@
       </button>
     </section>
 
-    <section class="filter-panel" aria-label="订单筛选">
-      <el-form :model="queryParams" :inline="true" @submit.prevent>
+    <section v-show="showSearch" class="filter-panel" aria-label="订单筛选">
+      <el-form v-show="showSearch" :model="queryParams" :inline="true" @submit.prevent>
         <el-form-item label="订单搜索">
           <el-input
             v-model="queryParams.keyword"
@@ -45,8 +45,8 @@
           </el-select>
         </el-form-item>
         <el-form-item label="订单渠道">
-          <el-select v-model="queryParams.channel" clearable placeholder="全部渠道" class="filter-select">
-            <el-option v-for="item in channelOptions" :key="item" :label="item" :value="item" />
+          <el-select v-model="queryParams.channelId" clearable placeholder="全部渠道" class="filter-select">
+            <el-option v-for="item in channelOptions" :key="item.channelId" :label="item.channelName" :value="item.channelId" />
           </el-select>
         </el-form-item>
         <el-form-item label="发货日期">
@@ -65,6 +65,10 @@
       </el-form>
     </section>
 
+    <el-row :gutter="10" class="mb8 order-query-toolbar">
+      <right-toolbar v-model:showSearch="showSearch" @queryTable="loadOrders" />
+    </el-row>
+
     <section class="order-list-shell" aria-label="订单列表">
       <div class="list-toolbar">
         <div>
@@ -73,7 +77,6 @@
         </div>
         <div class="list-toolbar-actions">
           <el-checkbox v-model="showOnlyAttention">仅看待处理</el-checkbox>
-          <el-button text :icon="Refresh" :loading="loading" @click="loadOrders">刷新</el-button>
         </div>
       </div>
 
@@ -198,21 +201,51 @@
         <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="createVisible" title="新增订单" width="720px" destroy-on-close>
+      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="100px">
+        <el-row :gutter="18">
+          <el-col :span="12"><el-form-item label="客户姓名" prop="customerName"><el-input v-model="createForm.customerName" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="联系电话" prop="customerPhone"><el-input v-model="createForm.customerPhone" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="订单渠道" prop="channelId"><el-select v-model="createForm.channelId" class="full-width" filterable placeholder="请选择订单渠道"><el-option v-for="item in channelOptions" :key="item.channelId" :label="item.channelName" :value="item.channelId" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="外部订单号"><el-input v-model="createForm.externalOrderNo" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="收货地址"><el-input v-model="createForm.customerAddress" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="租赁开始" prop="leaseStartDate"><el-date-picker v-model="createForm.leaseStartDate" type="date" value-format="YYYY-MM-DD" class="full-width" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="租赁结束" prop="leaseEndDate"><el-date-picker v-model="createForm.leaseEndDate" type="date" value-format="YYYY-MM-DD" class="full-width" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="租金"><el-input-number v-model="createForm.rentAmount" :min="0" :precision="2" class="full-width" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="押金"><el-input-number v-model="createForm.depositAmount" :min="0" :precision="2" class="full-width" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="备注"><el-input v-model="createForm.remark" type="textarea" :rows="3" /></el-form-item></el-col>
+        </el-row>
+      </el-form>
+      <template #footer><el-button @click="createVisible = false">取消</el-button><el-button type="primary" :loading="createLoading" @click="submitCreateOrder">保存订单</el-button></template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="MerchantOrder">
 import { Bell, Calendar, Camera, Check, CircleCheck, CopyDocument, Edit, Finished, InfoFilled, Location, Plus, Search, Refresh, ShoppingCart, Switch, User, VideoCamera, Van, Box } from '@element-plus/icons-vue'
-import { listMerchantOrders } from '@/api/merchant/order'
+import { addMerchantOrder, listMerchantOrders, updateMerchantOrder } from '@/api/merchant/order'
+import { listMerchantOrderChannels } from '@/api/merchant/orderChannel'
+import { listMerchantWarehouses } from '@/api/merchant/rentalBusiness'
 
 const { proxy } = getCurrentInstance()
+const router = useRouter()
 const loading = ref(false)
 const lastUpdated = ref('刚刚')
 const showOnlyAttention = ref(false)
+const showSearch = ref(true)
 const detailVisible = ref(false)
+const createVisible = ref(false)
+const createLoading = ref(false)
+const createFormRef = ref(null)
 const activeOrder = ref(null)
+const warehouseOptions = ref([])
 const orders = ref([])
-const useRemoteOrders = import.meta.env.VITE_USE_ORDER_API === 'true'
+// 订单列表默认读取业务服务数据库，只有明确配置为 false 时才使用演示数据。
+const useRemoteOrders = import.meta.env.VITE_USE_ORDER_API !== 'false'
+const createForm = reactive({ customerName: '', customerPhone: '', channelId: null, externalOrderNo: '', customerAddress: '', leaseStartDate: '', leaseEndDate: '', rentAmount: 0, depositAmount: 0, remark: '' })
+const editingOrderId = ref(null)
+const createRules = { customerName: [{ required: true, message: '请输入客户姓名', trigger: 'blur' }], customerPhone: [{ required: true, message: '请输入联系电话', trigger: 'blur' }], channelId: [{ required: true, message: '请选择订单渠道', trigger: 'change' }], leaseStartDate: [{ required: true, message: '请选择租赁开始日期', trigger: 'change' }], leaseEndDate: [{ required: true, message: '请选择租赁结束日期', trigger: 'change' }] }
 
 const statusOptions = [
   { label: '待发货', value: '待发货' },
@@ -226,12 +259,12 @@ const statusOptions = [
   { label: '已完成', value: '已完成' }
 ]
 
-const channelOptions = ['人人租', '租仓联盟', '商户自有渠道']
+const channelOptions = ref([])
 
 const queryParams = reactive({
   keyword: '',
   status: '',
-  channel: '',
+  channelId: null,
   shipDate: ''
 })
 
@@ -248,7 +281,7 @@ const filteredOrders = computed(() => {
     const searchable = [order.orderNo, order.model, order.packageName, order.channel, order.customer.nickname, order.customer.name, order.trackingNo].join(' ').toLowerCase()
     const matchesKeyword = !keyword || searchable.includes(keyword)
     const matchesStatus = !queryParams.status || order.status === queryParams.status
-    const matchesChannel = !queryParams.channel || order.channel === queryParams.channel
+    const matchesChannel = !queryParams.channelId || order.channelId === queryParams.channelId
     const matchesShipDate = !queryParams.shipDate || order.shipping.shipDate === queryParams.shipDate
     const matchesAttention = !showOnlyAttention.value || order.attention || order.status === '待发货' || order.weather.risk
     return matchesKeyword && matchesStatus && matchesChannel && matchesShipDate && matchesAttention
@@ -274,6 +307,17 @@ function loadOrders() {
   })
 }
 
+/** 加载订单筛选和录单使用的启用渠道、启用仓库。 */
+function loadOrderOptions() {
+  Promise.all([
+    listMerchantOrderChannels({ status: 0, pageNum: 1, pageSize: 1000 }),
+    listMerchantWarehouses({ status: 0, pageNum: 1, pageSize: 1000 })
+  ]).then(([channelResponse, warehouseResponse]) => {
+    channelOptions.value = channelResponse.rows || channelResponse.data?.rows || []
+    warehouseOptions.value = warehouseResponse.rows || warehouseResponse.data?.rows || []
+  })
+}
+
 /** 执行订单筛选，并将筛选结果保持在当前页面，不重新创建动态路由。 */
 function handleQuery() {
   lastUpdated.value = '已筛选'
@@ -283,7 +327,7 @@ function handleQuery() {
 function resetQuery() {
   queryParams.keyword = ''
   queryParams.status = ''
-  queryParams.channel = ''
+  queryParams.channelId = null
   queryParams.shipDate = ''
   showOnlyAttention.value = false
   handleQuery()
@@ -297,6 +341,10 @@ function selectStatus(status) {
 
 /** 统一处理订单操作，详情类操作打开摘要，其余操作预留给后续状态机接口。 */
 function handleAction(action, order) {
+  if (action === '编辑') {
+    router.push({ path: '/merchant/order/form', query: { orderId: order.orderId } })
+    return
+  }
   if (action === '查看套餐详情') {
     activeOrder.value = order
     detailVisible.value = true
@@ -304,6 +352,50 @@ function handleAction(action, order) {
   }
   const subject = order ? `订单 ${order.orderNo}` : '订单'
   proxy.$modal.msgSuccess(`${subject}：${action}操作入口已准备`)
+}
+
+/** 打开新增订单表单并清空上一次录单数据。 */
+function openCreateOrder() {
+  router.push('/merchant/order/form')
+  return
+  /* 兼容旧弹窗状态，待历史缓存页面自然销毁后移除。 */
+  editingOrderId.value = null
+  Object.assign(createForm, { customerName: '', customerPhone: '', channelId: null, externalOrderNo: '', customerAddress: '', leaseStartDate: '', leaseEndDate: '', rentAmount: 0, depositAmount: 0, remark: '' })
+  createVisible.value = true
+}
+
+/** 打开订单编辑表单并将列表中的可编辑字段映射到提交命令。 */
+function openEditOrder(order) {
+  editingOrderId.value = order.orderId || null
+  Object.assign(createForm, {
+    customerName: order.customer?.name || '',
+    customerPhone: order.customer?.phone || '',
+    channelId: order.channelId || null,
+    externalOrderNo: order.externalOrderNo || '',
+    customerAddress: order.customer?.address || '',
+    leaseStartDate: order.leaseStartDate || '',
+    leaseEndDate: order.leaseEndDate || '',
+    rentAmount: Number(order.rent || 0),
+    depositAmount: Number(order.depositAmount || 0),
+    remark: order.customer?.note || ''
+  })
+  createVisible.value = true
+}
+
+/** 校验并提交新增订单，成功后刷新当前商户订单列表。 */
+function submitCreateOrder() {
+  createFormRef.value.validate(valid => {
+    if (!valid) return
+    createLoading.value = true
+    const request = editingOrderId.value
+      ? updateMerchantOrder({ ...createForm, orderId: editingOrderId.value })
+      : addMerchantOrder(createForm)
+    request.then(() => {
+      proxy.$modal.msgSuccess('订单创建成功')
+      createVisible.value = false
+      loadOrders()
+    }).finally(() => { createLoading.value = false })
+  })
 }
 
 /** 构造页面联调阶段使用的订单数据，接口上线后由服务端数据替换。 */
@@ -378,6 +470,7 @@ function createDemoOrders() {
 function normalizeOrder(order) {
   return {
     ...order,
+    status: normalizeStatusLabel(order.status),
     customer: {
       nickname: '-',
       name: '-',
@@ -411,6 +504,12 @@ function normalizeOrder(order) {
     addOns: Array.isArray(order.addOns) ? order.addOns : [],
     actions: Array.isArray(order.actions) ? order.actions : createOrderActions()
   }
+}
+
+/** 将历史订单接口可能返回的英文状态编码统一转换为中文显示。 */
+function normalizeStatusLabel(status) {
+  const labels = { pending_ship: '待发货', prepared: '已备货', ship_in_transit: '已发货', shipped: '已发货', shipping: '运输中', renting: '租用中', returning: '归还中', overdue_return: '归还逾期', overdue: '已逾期', after_sales: '售后中', completed: '已完成', cancelled: '已取消' }
+  return labels[status] || status || '未知状态'
 }
 
 /** 将订单基础参数补齐为页面统一消费的数据结构。 */
@@ -486,6 +585,7 @@ function createOrderActions() {
 }
 
 loadOrders()
+loadOrderOptions()
 </script>
 
 <style scoped>
@@ -667,6 +767,7 @@ loadOrders()
 }
 
 .order-card {
+  min-width: 1650px;
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
@@ -722,7 +823,18 @@ loadOrders()
 .money { color: var(--el-color-danger); font-weight: 650; }
 
 .customer-name { gap: 5px; margin-bottom: 12px; font-size: 14px; font-weight: 650; }
-.customer-name :deep(.el-icon) { color: var(--el-color-primary); }
+.customer-name :deep(.el-icon) {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--el-color-primary);
+  font-size: 14px;
+}
+.customer-name > svg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+}
 
 .cell-note {
   display: flex;
@@ -733,12 +845,31 @@ loadOrders()
   line-height: 1.5;
 }
 
-.cell-note :deep(.el-icon) { flex: 0 0 auto; margin-top: 2px; color: var(--el-color-warning); }
+.cell-note :deep(.el-icon) {
+  flex: 0 0 13px;
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  color: var(--el-color-warning);
+  font-size: 13px;
+}
+.cell-note > svg {
+  flex: 0 0 13px;
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+}
 .route-line { gap: 5px; margin-bottom: 11px; color: var(--el-text-color-primary); font-size: 13px; font-weight: 650; }
 .route-line :deep(.el-icon) { color: var(--el-color-danger); }
+.route-line > svg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--el-color-danger);
+}
 .weather-line { gap: 6px; margin-bottom: 7px; color: var(--el-text-color-secondary); font-size: 12px; }
 .weather-line > span { width: 14px; color: var(--el-text-color-primary); }
-.weather-line i { width: 18px; font-size: 14px; font-style: normal; text-align: center; }
+.weather-line i { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; font-size: 13px; font-style: normal; line-height: 16px; text-align: center; }
 .weather-line i.sunny { color: #f59e0b; }
 .weather-line i.rain { color: #5b7cba; }
 .weather-cell :deep(.el-tag) { margin-top: 5px; }
@@ -755,11 +886,15 @@ loadOrders()
 .product-list-cell p { margin: 8px 0 0; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.5; }
 .product-list-cell strong :deep(.el-button) { padding: 0; font-size: 12px; }
 .addon-title { display: flex; align-items: center; gap: 4px; color: var(--el-text-color-primary) !important; font-weight: 650; }
+.addon-title > svg { flex: 0 0 14px; width: 14px; height: 14px; }
 .addon-item { padding-left: 18px; }
+.full-width { width: 100%; }
 
 .order-footer {
   justify-content: space-between;
   gap: 16px;
+  box-sizing: border-box;
+  min-width: 1650px;
   min-height: 48px;
   padding: 8px 16px;
   border-top: 1px solid var(--el-border-color-lighter);
@@ -793,6 +928,8 @@ loadOrders()
   .list-toolbar-actions { width: 100%; justify-content: space-between; }
   .order-scroll-area { overflow-x: visible; }
   .order-grid { display: block; min-width: 0; }
+  .order-card,
+  .order-footer { min-width: 0; }
   .order-grid-header { display: none; }
   .order-grid-content { padding: 0; }
   .order-cell { padding: 16px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); }

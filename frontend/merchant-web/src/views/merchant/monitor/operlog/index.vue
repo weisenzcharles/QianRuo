@@ -1,26 +1,31 @@
 <template>
-  <div class="app-container">
-    <el-form ref="queryRef" :model="queryParams" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="操作地址" prop="operIp">
-        <el-input v-model="queryParams.operIp" placeholder="请输入操作地址" clearable style="width: 220px" @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item label="系统模块" prop="title">
-        <el-input v-model="queryParams.title" placeholder="请输入系统模块" clearable style="width: 220px" @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item label="操作人员" prop="operName">
-        <el-input v-model="queryParams.operName" placeholder="请输入操作人员" clearable style="width: 220px" @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item label="类型" prop="businessType">
-        <el-select v-model="queryParams.businessType" placeholder="操作类型" clearable style="width: 220px">
-          <el-option v-for="option in OPER_TYPE_OPTIONS" :key="option.value" :label="option.label" :value="option.value" />
+  <div class="app-container merchant-list-page">
+    <el-form ref="queryRef" :model="queryParams" :inline="true" v-show="showSearch" label-width="76px">
+      <el-form-item label="模块" prop="businessModule">
+        <el-select v-model="queryParams.businessModule" placeholder="请选择模块" clearable style="width: 180px">
+          <el-option v-for="module in moduleOptions" :key="module" :label="module" :value="module" />
         </el-select>
       </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="操作状态" clearable style="width: 220px">
-          <el-option v-for="option in OPER_STATUS_OPTIONS" :key="option.value" :label="option.label" :value="option.value" />
+      <el-form-item label="操作类型" prop="operationType">
+        <el-select v-model="queryParams.operationType" placeholder="请选择操作类型" clearable style="width: 180px">
+          <el-option v-for="option in MERCHANT_AUDIT_TYPE_OPTIONS" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
       </el-form-item>
-      <el-form-item label="操作时间" style="width: 340px">
+      <el-form-item label="用户名" prop="username">
+        <el-input v-model="queryParams.username" placeholder="请输入用户名" clearable style="width: 180px" @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="操作人" prop="operatorName">
+        <el-select v-model="queryParams.operatorName" placeholder="请选择操作人" clearable style="width: 180px">
+          <el-option v-for="operator in operatorOptions" :key="operator" :label="operator" :value="operator" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="描述" prop="description">
+        <el-input v-model="queryParams.description" placeholder="请输入描述" clearable style="width: 220px" @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="IP地址" prop="ipAddress">
+        <el-input v-model="queryParams.ipAddress" placeholder="请输入IP地址" clearable style="width: 180px" @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="操作时间" style="width: 350px">
         <el-date-picker
           v-model="dateRange"
           value-format="YYYY-MM-DD HH:mm:ss"
@@ -37,37 +42,30 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['merchant:operlog:export']">导出</el-button>
-      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
 
-    <el-table v-loading="loading" :data="operlogList" :default-sort="defaultSort" @sort-change="handleSortChange">
-      <el-table-column label="日志编号" align="center" prop="operId" width="100" />
-      <el-table-column label="系统模块" align="center" prop="title" min-width="130" show-overflow-tooltip />
-      <el-table-column label="操作类型" align="center" prop="businessType" width="110">
+    <el-table v-loading="loading" :data="auditList" :default-sort="defaultSort" @sort-change="handleSortChange">
+      <el-table-column label="操作时间" align="center" prop="operationTime" width="180" sortable="custom">
+        <template #default="scope">{{ parseTime(scope.row.operationTime) }}</template>
+      </el-table-column>
+      <el-table-column label="用户名" align="center" prop="username" min-width="140" show-overflow-tooltip sortable="custom" />
+      <el-table-column label="操作人" align="center" prop="operatorName" min-width="120" show-overflow-tooltip sortable="custom" />
+      <el-table-column label="模块" align="center" prop="businessModule" min-width="130" show-overflow-tooltip>
         <template #default="scope">
-          <dict-tag :options="OPER_TYPE_OPTIONS" :value="scope.row.businessType" />
+          <el-tag type="primary" effect="light">{{ scope.row.businessModule || '-' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="请求方式" align="center" prop="requestMethod" width="100" />
-      <el-table-column label="操作人员" align="center" prop="operName" min-width="120" show-overflow-tooltip sortable="custom" />
-      <el-table-column label="操作地址" align="center" prop="operIp" width="140" show-overflow-tooltip />
-      <el-table-column label="操作状态" align="center" prop="status" width="100">
+      <el-table-column label="操作类型" align="center" prop="operationType" width="110">
         <template #default="scope">
-          <dict-tag :options="OPER_STATUS_OPTIONS" :value="scope.row.status" />
+          <dict-tag :options="MERCHANT_AUDIT_TYPE_OPTIONS" :value="scope.row.operationType" />
         </template>
       </el-table-column>
-      <el-table-column label="操作日期" align="center" prop="operTime" width="180" sortable="custom">
-        <template #default="scope">{{ parseTime(scope.row.operTime) }}</template>
-      </el-table-column>
-      <el-table-column label="消耗时间" align="center" prop="costTime" width="110" sortable="custom">
-        <template #default="scope">{{ scope.row.costTime }}毫秒</template>
-      </el-table-column>
+      <el-table-column label="描述" align="left" prop="description" min-width="280" show-overflow-tooltip />
+      <el-table-column label="IP地址" align="center" prop="ipAddress" width="150" show-overflow-tooltip />
       <el-table-column label="操作" align="center" width="90" fixed="right">
         <template #default="scope">
-          <el-button link type="primary" icon="View" @click="showDetail(scope.row)">详细</el-button>
+          <el-button link type="primary" icon="View" @click="showDetail(scope.row)">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -80,74 +78,89 @@
       @pagination="getList"
     />
 
-    <operlog-detail v-model:visible="detailVisible" :row="detailRow" />
+    <operlog-detail v-model:visible="detailVisible" :audit-id="detailId" />
   </div>
 </template>
 
 <script setup name="MerchantOperlog">
 import OperlogDetail from './detail.vue'
-import { listMerchantOperLog } from '@/api/merchant/operlog'
-import { OPER_STATUS_OPTIONS, OPER_TYPE_OPTIONS } from '@/constants/options'
+import { getMerchantOperLogOptions, listMerchantOperLog } from '@/api/merchant/operlog'
+import { MERCHANT_AUDIT_TYPE_OPTIONS } from '@/constants/options'
 
 const { proxy } = getCurrentInstance()
 const queryRef = ref()
 const loading = ref(false)
 const showSearch = ref(true)
-const operlogList = ref([])
+const auditList = ref([])
+const moduleOptions = ref([])
+const operatorOptions = ref([])
 const total = ref(0)
 const dateRange = ref([])
 const detailVisible = ref(false)
-const detailRow = ref({})
-const defaultSort = { prop: 'operTime', order: 'descending' }
+const detailId = ref(null)
+const defaultSort = { prop: 'operationTime', order: 'descending' }
 
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
-  operIp: undefined,
-  title: undefined,
-  operName: undefined,
-  businessType: undefined,
-  status: undefined
+  businessModule: undefined,
+  operationType: undefined,
+  username: undefined,
+  operatorName: undefined,
+  description: undefined,
+  ipAddress: undefined
 })
 
+/** 查询当前商户的业务审计摘要列表。 */
 async function getList() {
   loading.value = true
   try {
     const response = await listMerchantOperLog(proxy.addDateRange(queryParams, dateRange.value))
-    operlogList.value = response.rows
-    total.value = response.total
+    auditList.value = response.rows || []
+    total.value = response.total || 0
   } finally {
     loading.value = false
   }
 }
 
+/** 执行审计条件查询并回到第一页。 */
 function handleQuery() {
   queryParams.pageNum = 1
   getList()
 }
 
+/** 清空筛选条件并刷新审计列表。 */
 function resetQuery() {
   dateRange.value = []
   queryRef.value?.resetFields()
   handleQuery()
 }
 
+/** 按操作时间或操作人切换服务端排序。 */
 function handleSortChange(column) {
   queryParams.orderByColumn = column.prop
   queryParams.isAsc = column.order
   getList()
 }
 
+/** 打开审计详情并由详情组件加载前后快照。 */
 function showDetail(row) {
-  detailRow.value = row
+  detailId.value = row.auditId
   detailVisible.value = true
 }
 
-function handleExport() {
-  proxy.download('/merchant/operlog/export', {
-    ...proxy.addDateRange({ ...queryParams }, dateRange.value)
-  }, `merchant_operlog_${Date.now()}.xlsx`)
+/** 查询当前商户日志中可用的模块和操作人筛选项。 */
+async function loadOptions() {
+  try {
+    const response = await getMerchantOperLogOptions()
+    moduleOptions.value = response.data?.businessModules || []
+    operatorOptions.value = response.data?.operatorNames || []
+  } catch (error) {
+    moduleOptions.value = []
+    operatorOptions.value = []
+  }
 }
 
+loadOptions()
 getList()
 </script>

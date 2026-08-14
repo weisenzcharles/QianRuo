@@ -71,6 +71,23 @@
           <template #prefix><svg-icon icon-class="validCode" class="el-input__icon input-icon" /></template>
         </el-input>
       </el-form-item>
+      <el-form-item prop="captchaCode">
+        <el-input
+          v-model="loginForm.captchaCode"
+          size="large"
+          maxlength="8"
+          auto-complete="off"
+          placeholder="图形验证码"
+          style="width: 63%"
+          @keyup.enter="handleLogin"
+        >
+          <template #prefix><svg-icon icon-class="validCode" class="el-input__icon input-icon" /></template>
+        </el-input>
+        <div class="login-code">
+          <img :src="codeUrl" @click="getCode" class="login-code-img" />
+        </div>
+      </el-form-item>
+      <el-checkbox v-model="loginForm.rememberMe" style="margin:0px 0px 25px 0px;">记住密码</el-checkbox>
       <div class="sms-login-tip">当前未接入短信，输入任意四位数字验证码</div>
       </template>
       <el-form-item style="width:100%;">
@@ -123,6 +140,7 @@ const loginForm = ref({
   uuid: "",
   phone: "",
   smsCode: ""
+  ,captchaCode: ""
 })
 
 const passwordLoginRules = {
@@ -138,7 +156,8 @@ const smsLoginRules = {
   smsCode: [
     { required: true, trigger: "change", message: "请输入验证码" },
     { pattern: /^\d{4}$/, trigger: "change", message: "请输入四位数字验证码" }
-  ]
+  ],
+  captchaCode: [{ required: true, trigger: "change", message: "请输入图形验证码" }]
 }
 const loginRules = computed(() => loginForm.value.loginType === "sms" ? smsLoginRules : passwordLoginRules)
 
@@ -157,14 +176,18 @@ function handleLogin() {
     if (valid) {
       loading.value = true
       // 勾选了需要记住密码设置在 cookie 中设置记住用户名和密码
-      if (loginForm.value.loginType === "password" && loginForm.value.rememberMe) {
+      if (loginForm.value.rememberMe) {
         Cookies.set(usernameKey, loginForm.value.username, { expires: 30 })
-        Cookies.set(passwordKey, encrypt(loginForm.value.password), { expires: 30 })
+        if (loginForm.value.loginType === "password") {
+          Cookies.set(passwordKey, encrypt(loginForm.value.password), { expires: 30 })
+        }
+        Cookies.set('merchant-phone', loginForm.value.phone, { expires: 30 })
         Cookies.set(rememberMeKey, loginForm.value.rememberMe, { expires: 30 })
       } else {
         // 否则移除
         Cookies.remove(usernameKey)
         Cookies.remove(passwordKey)
+        Cookies.remove('merchant-phone')
         Cookies.remove(rememberMeKey)
       }
       // 调用action的登录方法
@@ -180,7 +203,7 @@ function handleLogin() {
       }).catch(() => {
         loading.value = false
         // 重新获取验证码
-        if (loginForm.value.loginType === "password" && captchaEnabled.value) {
+        if (captchaEnabled.value) {
           getCode()
         }
       })
@@ -202,6 +225,7 @@ function getCookie() {
   const username = Cookies.get(usernameKey)
   const password = Cookies.get(passwordKey)
   const rememberMe = Cookies.get(rememberMeKey)
+  const phone = Cookies.get('merchant-phone')
   loginForm.value = {
     username: username === undefined ? loginForm.value.username : username,
     password: password === undefined ? loginForm.value.password : decrypt(password),
@@ -209,8 +233,9 @@ function getCookie() {
     loginType: loginForm.value.loginType,
     code: loginForm.value.code,
     uuid: loginForm.value.uuid,
-    phone: loginForm.value.phone,
-    smsCode: loginForm.value.smsCode
+    phone: phone === undefined ? loginForm.value.phone : phone,
+    smsCode: loginForm.value.smsCode,
+    captchaCode: loginForm.value.captchaCode
   }
 }
 

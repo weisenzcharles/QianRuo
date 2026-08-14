@@ -3,6 +3,7 @@ package com.ruoyi.system.mapper.rental;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.rental.RentalBrandModel;
+import com.ruoyi.system.model.rental.PlatformBrandModelQuery;
 
 /** 平台标准品牌型号数据访问。 */
 public interface RentalBrandModelMapper
@@ -13,7 +14,7 @@ public interface RentalBrandModelMapper
      * @param query 品牌、型号、类目和状态查询条件
      * @return 标准品牌型号集合
      */
-    List<RentalBrandModel> selectList(RentalBrandModel query);
+    List<RentalBrandModel> selectList(PlatformBrandModelQuery query);
 
     /**
      * 查询全部正常标准品牌型号，供商户服务内部读取。
@@ -50,7 +51,7 @@ public interface RentalBrandModelMapper
      * @param modelId 标准型号主键
      * @return 引用记录数
      */
-    int countReferences(Long modelId);
+    int countMerchantCommonModelReferences(Long modelId);
 
     /**
      * 新增平台标准品牌型号。

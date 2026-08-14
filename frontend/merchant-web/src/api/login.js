@@ -14,7 +14,7 @@ export function login(username, password, code, uuid) {
 }
 
 // 手机号验证码登录
-export function smsLogin(phone, code) {
+export function smsLogin(phone, code, captchaCode, uuid) {
   return request({
     url: '/auth/smsLogin',
     headers: {
@@ -22,7 +22,7 @@ export function smsLogin(phone, code) {
       repeatSubmit: false
     },
     method: 'post',
-    data: { phone, code }
+    data: { phone, code, captchaCode, uuid }
   })
 }
 

@@ -5,9 +5,6 @@
         <id property="modelId" column="model_id" />
         <result property="classId" column="class_id" />
         <result property="className" column="class_name" />
-        <result property="categoryLevel1" column="category_level1" />
-        <result property="categoryLevel2" column="category_level2" />
-        <result property="categoryLevel3" column="category_level3" />
         <result property="brand" column="brand" />
         <result property="modelName" column="model_name" />
         <result property="memorySpec" column="memory_spec" />
@@ -22,8 +19,8 @@
     </resultMap>
 
     <sql id="columns">
-        m.model_id, m.class_id, c.class_name, m.category_level1, m.category_level2, m.category_level3,
-        m.brand, m.model_name, m.memory_spec, m.official_flag, m.status, m.is_delete,
+        m.model_id, m.class_id, c.class_name, m.brand, m.model_name, m.memory_spec,
+        m.official_flag, m.status, m.is_delete,
         m.create_by, m.create_time, m.update_by, m.update_time, m.remark
     </sql>
 
@@ -66,30 +63,25 @@
         <if test="excludeModelId != null">and model_id != #{excludeModelId}</if>
     </select>
 
-    <select id="countReferences" resultType="int">
-        select (
-            select count(1) from `ry_rental`.`ry_rental_product`
-            where model_id = #{modelId} and is_delete = 0
-        ) + (
-            select count(1) from `ry_rental`.`ry_rental_member_common_model`
-            where model_id = #{modelId} and is_delete = 0
-        )
+    <select id="countMerchantCommonModelReferences" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_member_common_model`
+        where model_id = #{modelId} and is_delete = 0
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="modelId">
         insert into `ry_rental`.`ry_rental_brand_model`(
-            class_id, category_level1, category_level2, category_level3, brand, model_name, memory_spec,
-            official_flag, status, is_delete, create_by, create_time, remark
+            class_id, brand, model_name, memory_spec, official_flag, status,
+            is_delete, create_by, create_time, remark
         ) values (
-            #{classId}, #{categoryLevel1}, #{categoryLevel2}, #{categoryLevel3}, #{brand}, #{modelName}, #{memorySpec},
-            #{officialFlag}, #{status}, 0, #{createBy}, sysdate(), #{remark}
+            #{classId}, #{brand}, #{modelName}, #{memorySpec}, #{officialFlag}, #{status},
+            0, #{createBy}, sysdate(), #{remark}
         )
     </insert>
 
     <update id="update">
         update `ry_rental`.`ry_rental_brand_model`
-        set class_id = #{classId}, category_level1 = #{categoryLevel1}, category_level2 = #{categoryLevel2},
-            category_level3 = #{categoryLevel3}, brand = #{brand}, model_name = #{modelName},
+        set class_id = #{classId}, brand = #{brand}, model_name = #{modelName},
             memory_spec = #{memorySpec}, official_flag = #{officialFlag}, status = #{status},
             update_by = #{updateBy}, update_time = sysdate(), remark = #{remark}
         where model_id = #{modelId} and is_delete = 0

@@ -4,7 +4,10 @@
     <resultMap id="merchantOrderRow" type="com.ruoyi.rentalbusiness.domain.MerchantOrderRow">
         <id property="orderId" column="order_id" />
         <result property="orderNo" column="order_no" />
+        <result property="externalOrderNo" column="external_order_no" />
+        <result property="channelId" column="channel_id" />
         <result property="channelCode" column="channel_code" />
+        <result property="channelName" column="channel_name" />
         <result property="shopName" column="shop_name" />
         <result property="customerName" column="customer_name" />
         <result property="customerNickname" column="customer_nickname" />
@@ -13,6 +16,13 @@
         <result property="customerNote" column="customer_note" />
         <result property="warehouseName" column="warehouse_name" />
         <result property="warehouseCity" column="warehouse_city" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="returnWarehouseId" column="return_warehouse_id" />
+        <result property="productId" column="product_id" />
+        <result property="packageId" column="package_id" />
+        <result property="snId" column="sn_id" />
+        <result property="accessoryItemIds" column="accessory_item_ids" />
+        <result property="quantity" column="quantity" />
         <result property="leaseStartDate" column="lease_start_date" />
         <result property="leaseEndDate" column="lease_end_date" />
         <result property="shipDueTime" column="ship_due_time" />
@@ -20,7 +30,14 @@
         <result property="expectedArriveTime" column="expected_arrive_time" />
         <result property="createTime" column="create_time" />
         <result property="rentAmount" column="rent_amount" />
+        <result property="depositAmount" column="deposit_amount" />
         <result property="orderStatus" column="order_status" />
+        <result property="payStatus" column="pay_status" />
+        <result property="timeEffectStatus" column="time_effect_status" />
+        <result property="priorityFlag" column="priority_flag" />
+        <result property="version" column="version" />
+        <result property="remark" column="remark" />
+        <result property="sourceTextSnapshot" column="source_text_snapshot" />
         <result property="weatherRiskFlag" column="weather_risk_flag" />
         <result property="modelName" column="model_name" />
         <result property="packageName" column="package_name" />
@@ -39,7 +56,10 @@
         select
             o.order_id,
             o.order_no,
-            o.channel_code,
+            o.external_order_no,
+            o.channel_id,
+            cch.channel_code,
+            cch.channel_name,
             o.shop_name,
             o.customer_name,
             coalesce(c.customer_nickname, '') as customer_nickname,
@@ -190,6 +210,7 @@
                   and oi.tenant_id = o.tenant_id
                   and oi.member_id = o.member_id
                   and oi.is_delete = 0
+                  and p.product_type = 'accessory'
             ) as addon_names,
             o.create_by
         from ry_business.ry_rental_order o
@@ -203,6 +224,9 @@
            and w.tenant_id = o.tenant_id
            and w.member_id = o.member_id
            and w.is_delete = 0
+        left join ry_business.ry_rental_order_channel cch
+            on cch.channel_id = o.channel_id
+           and cch.is_delete = 0
         where o.tenant_id = #{tenantId}
           and o.member_id = #{merchantId}
           and o.is_delete = 0
@@ -224,7 +248,8 @@
             and (
                 o.order_no like concat('%', #{query.keyword}, '%')
                 or o.external_order_no like concat('%', #{query.keyword}, '%')
-                or o.channel_code like concat('%', #{query.keyword}, '%')
+                or cch.channel_code like concat('%', #{query.keyword}, '%')
+                or cch.channel_name like concat('%', #{query.keyword}, '%')
                 or o.shop_name like concat('%', #{query.keyword}, '%')
                 or o.customer_name like concat('%', #{query.keyword}, '%')
                 or o.customer_phone like concat('%', #{query.keyword}, '%')
@@ -257,12 +282,83 @@
         <if test="query.status != null and query.status != ''">
             and o.order_status = #{query.status}
         </if>
-        <if test="query.channel != null and query.channel != ''">
-            and o.channel_code = #{query.channel}
+        <if test="query.channelId != null">
+            and o.channel_id = #{query.channelId}
         </if>
         <if test="query.shipDate != null and query.shipDate != ''">
             and date(coalesce(o.ship_due_time, o.create_time)) = #{query.shipDate}
         </if>
         order by o.priority_flag desc, o.create_time desc, o.order_id desc
     </select>
+
+    <select id="selectMerchantOrderById" resultMap="merchantOrderRow">
+        select o.order_id, o.order_no, o.external_order_no, o.channel_id,
+               cch.channel_code, cch.channel_name, o.shop_name,
+               o.customer_name, o.customer_phone, o.customer_address, o.lease_start_date, o.lease_end_date,
+               o.warehouse_id, o.return_warehouse_id, o.ship_due_time, o.return_due_time, o.create_time, o.rent_amount, o.deposit_amount,
+               o.order_status, o.pay_status, o.time_effect_status, o.weather_risk_flag, o.priority_flag,
+               o.source_text_snapshot, o.share_snapshot_json, o.source_order_id, o.version, o.remark,
+               oi.product_id, oi.package_id, oi.sn_id, oi.accessory_item_ids, oi.quantity,
+               c.customer_nickname, c.remark as customer_note, w.warehouse_name, w.city as warehouse_city
+        from ry_business.ry_rental_order o
+        left join ry_business.ry_rental_customer c on c.customer_id = o.customer_id
+            and c.tenant_id = o.tenant_id and c.member_id = o.member_id and c.is_delete = 0
+        left join ry_business.ry_rental_order_channel cch on cch.channel_id = o.channel_id
+            and cch.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = o.warehouse_id
+            and w.tenant_id = o.tenant_id and w.member_id = o.member_id and w.is_delete = 0
+        left join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+        where o.order_id = #{orderId} and o.tenant_id = #{tenantId} and o.member_id = #{merchantId} and o.is_delete = 0
+        order by oi.order_item_id
+        limit 1
+    </select>
+
+    <select id="countUsableOrderChannel" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_order_channel
+        where channel_id = #{channelId}
+          and status = 0
+          and is_delete = 0
+          and ((scope_type = 'platform' and channel_type = 'alliance')
+               or (scope_type = 'merchant' and tenant_id = #{tenantId} and member_id = #{merchantId}))
+    </select>
+
+    <insert id="insertMerchantOrder" useGeneratedKeys="true" keyProperty="command.orderId">
+        insert into ry_business.ry_rental_order
+        (tenant_id, member_id, order_no, external_order_no, channel_id, shop_name,
+         customer_name, customer_phone, customer_address, warehouse_id, return_warehouse_id,
+         lease_start_date, lease_end_date, ship_due_time, return_due_time, rent_amount, deposit_amount,
+         order_status, pay_status, time_effect_status, weather_risk_flag, priority_flag,
+         source_text_snapshot, share_snapshot_json, source_order_id, version, create_by, create_time, update_by, update_time, remark, is_delete)
+        values
+        (#{tenantId}, #{merchantId}, #{command.orderNo}, #{command.externalOrderNo}, #{command.channelId}, #{command.shopName},
+         #{command.customerName}, #{command.customerPhone}, #{command.customerAddress}, #{command.warehouseId}, #{command.returnWarehouseId},
+         #{command.leaseStartDate}, #{command.leaseEndDate}, nullif(#{command.shipDueTime}, ''), nullif(#{command.returnDueTime}, ''), #{command.rentAmount}, #{command.depositAmount},
+         coalesce(#{command.orderStatus}, 'pending_ship'), coalesce(#{command.payStatus}, 'unpaid'), #{command.timeEffectStatus},
+         coalesce(#{command.weatherRiskFlag}, 0), coalesce(#{command.priorityFlag}, 0), #{command.sourceTextSnapshot},
+         nullif(trim(#{command.shareSnapshotJson}), ''), #{command.sourceOrderId}, coalesce(#{command.version}, 0), #{operatorId}, now(), #{operatorId}, now(), #{command.remark}, 0)
+    </insert>
+
+    <update id="updateMerchantOrder">
+        update ry_business.ry_rental_order
+        set channel_id = #{command.channelId}, external_order_no = #{command.externalOrderNo},
+            customer_name = #{command.customerName}, customer_phone = #{command.customerPhone},
+            customer_address = #{command.customerAddress}, warehouse_id = #{command.warehouseId}, return_warehouse_id = #{command.returnWarehouseId},
+            lease_start_date = #{command.leaseStartDate}, lease_end_date = #{command.leaseEndDate}, ship_due_time = nullif(#{command.shipDueTime}, ''), return_due_time = nullif(#{command.returnDueTime}, ''),
+            rent_amount = #{command.rentAmount}, deposit_amount = #{command.depositAmount}, order_status = #{command.orderStatus}, pay_status = #{command.payStatus},
+            time_effect_status = #{command.timeEffectStatus}, weather_risk_flag = coalesce(#{command.weatherRiskFlag}, 0), priority_flag = coalesce(#{command.priorityFlag}, 0),
+            source_text_snapshot = #{command.sourceTextSnapshot}, share_snapshot_json = nullif(trim(#{command.shareSnapshotJson}), ''), source_order_id = #{command.sourceOrderId}, version = version + 1,
+            remark = #{command.remark}, update_by = #{operatorId}, update_time = now()
+        where order_id = #{command.orderId} and tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
+    </update>
+
+    <insert id="insertMerchantOrderItem">
+        insert into ry_business.ry_rental_order_item
+        (tenant_id, member_id, order_id, product_id, package_id, sn_id, accessory_item_ids, quantity,
+         item_status, create_by, create_time, update_by, update_time, remark, is_delete)
+        values
+        (#{tenantId}, #{merchantId}, #{command.orderId}, #{command.productId}, #{command.packageId}, #{command.snId},
+         #{command.accessoryItemIds}, coalesce(#{command.quantity}, 1), 'pending', #{operatorId}, now(), #{operatorId}, now(), #{command.remark}, 0)
+    </insert>
 </mapper>

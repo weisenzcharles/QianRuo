@@ -1,5 +1,5 @@
 <template>
-  <div class="merchant-certification-page">
+  <div class="app-container merchant-list-page merchant-certification-page">
     <el-card shadow="never">
       <template #header>
         <div class="section-title">商户认证状态</div>
@@ -20,6 +20,9 @@
       <template #header>
         <div class="section-title">当前接单资格</div>
       </template>
+      <el-row :gutter="10" class="mb8">
+        <right-toolbar :search="false" @queryTable="loadCertification" />
+      </el-row>
       <el-table :data="certification.qualifications || []" size="small">
         <el-table-column label="资格" prop="qualificationCode">
           <template #default="scope">{{ qualificationLabel(scope.row.qualificationCode) }}</template>

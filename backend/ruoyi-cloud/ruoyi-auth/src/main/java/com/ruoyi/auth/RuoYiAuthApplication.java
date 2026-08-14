@@ -8,6 +8,7 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.context.annotation.Import;
 
 import com.ruoyi.common.security.annotation.EnableRyFeignClients;
+import com.ruoyi.merchant.api.factory.RemoteMerchantBusinessAuditFallbackFactory;
 import com.ruoyi.merchant.api.factory.RemoteMerchantUserFallbackFactory;
 import com.ruoyi.system.api.factory.RemoteLogFallbackFactory;
 import com.ruoyi.system.api.factory.RemoteUserFallbackFactory;
@@ -19,7 +20,7 @@ import com.ruoyi.system.api.factory.RemoteUserFallbackFactory;
  */
 @EnableRyFeignClients
 @Import({ RemoteUserFallbackFactory.class, RemoteLogFallbackFactory.class,
-        RemoteMerchantUserFallbackFactory.class })
+        RemoteMerchantUserFallbackFactory.class, RemoteMerchantBusinessAuditFallbackFactory.class })
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class })
 public class RuoYiAuthApplication
 {

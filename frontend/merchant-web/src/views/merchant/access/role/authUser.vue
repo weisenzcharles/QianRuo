@@ -1,6 +1,6 @@
 
 <template>
-   <div class="app-container">
+  <div class="app-container merchant-list-page">
       <el-form :model="queryParams" ref="queryRef" v-show="showSearch" :inline="true">
          <el-form-item label="用户名称" prop="userName">
             <el-input

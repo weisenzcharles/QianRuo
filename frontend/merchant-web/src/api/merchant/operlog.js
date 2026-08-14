@@ -7,3 +7,28 @@ export function listMerchantOperLog(query) {
     params: query
   })
 }
+
+/**
+ * 查询当前商户日志列表使用的模块和操作人下拉选项。
+ *
+ * @returns {Promise} 当前商户范围内的审计筛选项
+ */
+export function getMerchantOperLogOptions() {
+  return request({
+    url: '/merchant/operlog/options',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询一条商户业务审计详情。
+ *
+ * @param {number|string} auditId 审计记录主键
+ * @returns {Promise} 审计详情请求
+ */
+export function getMerchantBusinessAudit(auditId) {
+  return request({
+    url: `/merchant/operlog/${auditId}`,
+    method: 'get'
+  })
+}

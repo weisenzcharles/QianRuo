@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
+import com.ruoyi.merchant.application.RentalBusinessWarehouseGateway;
 import com.ruoyi.merchant.domain.MerchantWarehouse;
-import com.ruoyi.merchant.mapper.MerchantIdentityMapper;
 
 /** 当前商户可信工作上下文。 */
 @RestController
@@ -18,7 +18,7 @@ import com.ruoyi.merchant.mapper.MerchantIdentityMapper;
 public class MerchantContextController
 {
     @Autowired
-    private MerchantIdentityMapper identityMapper;
+    private RentalBusinessWarehouseGateway rentalBusinessWarehouseGateway;
 
     @GetMapping
     public AjaxResult context()
@@ -41,8 +41,7 @@ public class MerchantContextController
     @GetMapping("/warehouses")
     public AjaxResult warehouses()
     {
-        List<MerchantWarehouse> warehouses = identityMapper.selectWarehouses(
-                MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId());
+        List<MerchantWarehouse> warehouses = rentalBusinessWarehouseGateway.listEnabledWarehouses();
         if (!MerchantContextUtils.hasAllWarehouseAccess())
         {
             Set<Long> allowed = MerchantContextUtils.getWarehouseIds();

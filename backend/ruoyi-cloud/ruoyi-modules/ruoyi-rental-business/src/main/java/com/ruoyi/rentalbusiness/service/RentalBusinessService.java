@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.exception.ServiceException;
 import com.ruoyi.common.core.utils.StringUtils;
+import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.common.security.utils.SecurityUtils;
 import com.ruoyi.common.core.constant.SecurityConstants;
@@ -55,15 +56,27 @@ public class RentalBusinessService
 
     private final CodeGeneratorClient codeGeneratorClient;
 
+    private final MerchantBusinessAuditRecorder auditRecorder;
+
     /** 注入租赁主数据 Mapper。 */
+    @org.springframework.beans.factory.annotation.Autowired
     public RentalBusinessService(RentalBusinessMapper mapper,
             RemoteMerchantProductClassService merchantProductClassService, RemoteBrandModelService brandModelService,
-            CodeGeneratorClient codeGeneratorClient)
+            CodeGeneratorClient codeGeneratorClient, MerchantBusinessAuditRecorder auditRecorder)
     {
         this.mapper = mapper;
         this.merchantProductClassService = merchantProductClassService;
         this.brandModelService = brandModelService;
         this.codeGeneratorClient = codeGeneratorClient;
+        this.auditRecorder = auditRecorder;
+    }
+
+    /** 保留旧构造方式，供现有单元测试使用；测试未提供审计记录器时不影响主业务校验。 */
+    public RentalBusinessService(RentalBusinessMapper mapper,
+            RemoteMerchantProductClassService merchantProductClassService, RemoteBrandModelService brandModelService,
+            CodeGeneratorClient codeGeneratorClient)
+    {
+        this(mapper, merchantProductClassService, brandModelService, codeGeneratorClient, null);
     }
 
     /** 查询当前商户可见仓库。 */
@@ -72,6 +85,53 @@ public class RentalBusinessService
         Scope scope = scope();
         return mapList(mapper.selectWarehouses(scope.tenantId, scope.memberId, trim(keyword), status,
                 scope.warehouseIds, scope.allWarehouseAccess), this::toView);
+    }
+
+    /**
+     * 查询指定商户的仓库内部视图，供平台服务和商户身份服务通过内部契约调用。
+     *
+     * @param tenantId 可信租户主键
+     * @param memberId 可信商户主键
+     * @param status 仓库状态，为空时不限制状态
+     * @return 仓库内部视图集合
+     */
+    public List<Map<String, Object>> listWarehousesForInternal(Long tenantId, Long memberId, Integer status)
+    {
+        requireInternalScope(tenantId, memberId);
+        return mapper.selectWarehousesForInternal(tenantId, memberId, status);
+    }
+
+    /**
+     * 统计指定商户启用仓库中命中主键集合的数量，供平台端保存仓库权限时做完整归属校验。
+     *
+     * @param tenantId 可信租户主键
+     * @param memberId 可信商户主键
+     * @param warehouseIds 待校验仓库主键集合
+     * @return 命中的启用仓库数量
+     */
+    public int countEnabledWarehousesForInternal(Long tenantId, Long memberId, List<Long> warehouseIds)
+    {
+        requireInternalScope(tenantId, memberId);
+        if (warehouseIds == null || warehouseIds.isEmpty())
+        {
+            return 0;
+        }
+        return mapper.countEnabledWarehouses(tenantId, memberId, warehouseIds);
+    }
+
+    /**
+     * 判断标准型号是否已经被租赁业务数据引用，供平台端删除标准型号前执行跨服务校验。
+     *
+     * @param modelId 平台标准型号主键
+     * @return 已被商品或资源池兼容关系引用返回 true
+     */
+    public boolean hasModelReferencesForInternal(Long modelId)
+    {
+        if (modelId == null || modelId <= 0)
+        {
+            throw new ServiceException("标准型号主键不能为空");
+        }
+        return mapper.countModelReferences(modelId) > 0;
     }
 
     /** 查询当前商户仓库详情并校验用户仓库范围。 */
@@ -92,8 +152,12 @@ public class RentalBusinessService
         String code = codeGeneratorClient.next("warehouse");
         mapper.insertWarehouse(scope.tenantId, scope.memberId, code, name, trim(command.contactName),
                 trim(command.contactPhone), trim(command.province), trim(command.city), trim(command.district),
-                trim(command.address), status(command.status), trim(command.remark), operator());
-        return getWarehouse(mapper.selectLastInsertId());
+                trim(command.address), command.longitude, command.latitude, trim(command.pickupRuleJson),
+                status(command.status), booleanValue(command.returnEnabled, 1), booleanValue(command.allianceShareEnabled, 0),
+                trim(command.remark), operator());
+        RentalBusinessVO created = getWarehouse(mapper.selectLastInsertId());
+        audit("仓库管理", "CREATE", "WAREHOUSE", created.id, created.name, "创建仓库", null, created);
+        return created;
     }
 
     /** 修改仓库资料；系统编码一经生成即保持不变。 */
@@ -108,8 +172,12 @@ public class RentalBusinessService
         String name = required(command.name, "仓库名称不能为空");
         mapper.updateWarehouse(scope.tenantId, scope.memberId, warehouseId, code, name, trim(command.contactName),
                 trim(command.contactPhone), trim(command.province), trim(command.city), trim(command.district),
-                trim(command.address), status(command.status), trim(command.remark), operator());
-        return getWarehouse(warehouseId);
+                trim(command.address), command.longitude, command.latitude, trim(command.pickupRuleJson),
+                status(command.status), booleanValue(command.returnEnabled, 1), booleanValue(command.allianceShareEnabled, 0),
+                trim(command.remark), operator());
+        RentalBusinessVO updated = getWarehouse(warehouseId);
+        audit("仓库管理", "UPDATE", "WAREHOUSE", warehouseId, updated.name, "编辑仓库", existing, updated);
+        return updated;
     }
 
     /** 软删除仓库，存在库存、SN、配件或订单引用时拒绝删除。 */
@@ -118,12 +186,14 @@ public class RentalBusinessService
     {
         writeGuard();
         Scope scope = scope();
-        requireWarehouse(scope, warehouseId, true);
+        RentalBusinessVO existing = requireWarehouse(scope, warehouseId, true);
         if (mapper.countWarehouseReferences(scope.tenantId, scope.memberId, warehouseId) > 0)
         {
             throw new ServiceException("仓库仍被库存、SN、配件或订单引用，不能删除");
         }
-        return mapper.softDeleteWarehouse(scope.tenantId, scope.memberId, warehouseId, operator());
+        int rows = mapper.softDeleteWarehouse(scope.tenantId, scope.memberId, warehouseId, operator());
+        audit("仓库管理", "DELETE", "WAREHOUSE", warehouseId, existing.name, "删除仓库", existing, null);
+        return rows;
     }
 
     /** 查询当前商户资源池列表。 */
@@ -159,7 +229,9 @@ public class RentalBusinessService
                 command.resourceType, flag(command.substitutableFlag), status(command.status), trim(command.remark), operator());
         Long poolId = mapper.selectLastInsertId();
         replacePoolModels(scope, poolId, command.compatibleModelIds);
-        return getPool(poolId);
+        RentalBusinessVO created = getPool(poolId);
+        audit("资源池管理", "CREATE", "RESOURCE_POOL", poolId, created.poolName, "创建资源池", null, created);
+        return created;
     }
 
     /** 修改资源池并保持兼容型号关系与资源池主记录在同一事务内。 */
@@ -180,7 +252,9 @@ public class RentalBusinessService
         mapper.updatePool(scope.tenantId, scope.memberId, poolId, code, required(command.poolName, "资源池名称不能为空"),
                 command.resourceType, flag(command.substitutableFlag), status(command.status), trim(command.remark), operator());
         replacePoolModels(scope, poolId, command.compatibleModelIds);
-        return getPool(poolId);
+        RentalBusinessVO updated = getPool(poolId);
+        audit("资源池管理", "UPDATE", "RESOURCE_POOL", poolId, updated.poolName, "编辑资源池", existing, updated);
+        return updated;
     }
 
     /** 软删除资源池，存在商品、套餐或预占引用时拒绝删除。 */
@@ -189,12 +263,14 @@ public class RentalBusinessService
     {
         writeGuard();
         Scope scope = scope();
-        requirePool(scope, poolId);
+        RentalBusinessVO existing = requirePool(scope, poolId);
         if (mapper.countPoolReferences(scope.tenantId, scope.memberId, poolId) > 0)
         {
             throw new ServiceException("资源池仍被商品、套餐或预占引用，不能删除");
         }
-        return mapper.softDeletePool(scope.tenantId, scope.memberId, poolId, operator());
+        int rows = mapper.softDeletePool(scope.tenantId, scope.memberId, poolId, operator());
+        audit("资源池管理", "DELETE", "RESOURCE_POOL", poolId, existing.poolName, "删除资源池", existing, null);
+        return rows;
     }
 
     /** 查询当前商户商品。 */
@@ -228,7 +304,9 @@ public class RentalBusinessService
                 required(command.productName, "商品名称不能为空"), command.productType, command.stockMode, trim(command.brand),
                 trim(command.modelName), trim(command.memorySpec), command.purchaseCost, command.salePrice,
                 status(command.status), trim(command.remark), operator());
-        return getProduct(mapper.selectLastInsertId());
+        RentalBusinessVO created = getProduct(mapper.selectLastInsertId());
+        audit("商品管理", "CREATE", "PRODUCT", created.id, created.productName, "创建商品", null, created);
+        return created;
     }
 
     /** 修改商品，已有库存事实后禁止切换库存模式、商品类型或资源池。 */
@@ -240,17 +318,21 @@ public class RentalBusinessService
         Long productId = requiredId(command == null ? null : command.id, "商品ID不能为空");
         RentalBusinessVO existing = getProduct(productId);
         validateProduct(command, existing);
-        if (mapper.countProductReferences(scope.tenantId, scope.memberId, productId) > 0
+        int referenceCount = mapper.countProductReferences(scope.tenantId, scope.memberId, productId);
+        if (referenceCount > 0
                 && (!same(existing.stockMode, command.stockMode) || !same(existing.productType, command.productType)
-                || !sameId(existing.poolId, command.poolId)))
+                || !sameId(existing.poolId, command.poolId) || !sameId(existing.classId, command.classId)
+                || !sameId(existing.modelId, command.modelId)))
         {
-            throw new ServiceException("商品已有库存或订单引用，不能修改商品类型、库存模式或资源池");
+            throw new ServiceException("商品已有库存、套餐或订单引用，不能修改类目、型号、商品类型、库存模式或资源池");
         }
         mapper.updateProduct(scope.tenantId, scope.memberId, productId, command.classId, command.modelId, command.poolId,
                 existing.productCode, required(command.productName, "商品名称不能为空"),
                 command.productType, command.stockMode, trim(command.brand), trim(command.modelName), trim(command.memorySpec),
                 command.purchaseCost, command.salePrice, status(command.status), trim(command.remark), operator());
-        return getProduct(productId);
+        RentalBusinessVO updated = getProduct(productId);
+        audit("商品管理", "UPDATE", "PRODUCT", productId, updated.productName, "编辑商品", existing, updated);
+        return updated;
     }
 
     /** 软删除商品，存在 SN、配件、库存余额、套餐或订单引用时拒绝删除。 */
@@ -259,12 +341,14 @@ public class RentalBusinessService
     {
         writeGuard();
         Scope scope = scope();
-        getProduct(productId);
+        RentalBusinessVO existing = getProduct(productId);
         if (mapper.countProductReferences(scope.tenantId, scope.memberId, productId) > 0)
         {
             throw new ServiceException("商品仍被库存、SN、配件、套餐或订单引用，不能删除");
         }
-        return mapper.softDeleteProduct(scope.tenantId, scope.memberId, productId, operator());
+        int rows = mapper.softDeleteProduct(scope.tenantId, scope.memberId, productId, operator());
+        audit("商品管理", "DELETE", "PRODUCT", productId, existing.productName, "删除商品", existing, null);
+        return rows;
     }
 
     /** 查询当前用户仓库范围内的 SN。 */
@@ -299,7 +383,9 @@ public class RentalBusinessService
         mapper.insertSn(scope.tenantId, scope.memberId, command.productId, command.warehouseId,
                 required(command.snCode, "SN编码不能为空"), trim(command.barcode), defaultValue(command.assetStatus, "available"),
                 trim(command.conditionLevel), operator(), trim(command.remark));
-        return getSn(mapper.selectLastInsertId());
+        RentalBusinessVO created = getSn(mapper.selectLastInsertId());
+        audit("SN管理", "CREATE", "SN", created.id, created.snCode, "创建SN", null, created);
+        return created;
     }
 
     /** 修改 SN，已租用或预占的 SN 不允许直接改变仓库和状态。 */
@@ -322,7 +408,9 @@ public class RentalBusinessService
         Scope scope = scope();
         mapper.updateSn(scope.tenantId, scope.memberId, snId, command.warehouseId, command.snCode, trim(command.barcode),
                 defaultValue(command.assetStatus, existing.assetStatus), trim(command.conditionLevel), operator(), trim(command.remark));
-        return getSn(snId);
+        RentalBusinessVO updated = getSn(snId);
+        audit("SN管理", "UPDATE", "SN", snId, updated.snCode, "编辑SN", existing, updated);
+        return updated;
     }
 
     /** 软删除 SN，已租用或预占状态必须先完成业务归还或释放。 */
@@ -336,7 +424,9 @@ public class RentalBusinessService
             throw new ServiceException("已租用或已预占的SN不能删除");
         }
         Scope scope = scope();
-        return mapper.softDeleteSn(scope.tenantId, scope.memberId, snId, operator());
+        int rows = mapper.softDeleteSn(scope.tenantId, scope.memberId, snId, operator());
+        audit("SN管理", "DELETE", "SN", snId, existing.snCode, "删除SN", existing, null);
+        return rows;
     }
 
     /** 查询当前用户仓库范围内的配件实例。 */
@@ -374,7 +464,9 @@ public class RentalBusinessService
         mapper.insertAccessory(scope.tenantId, scope.memberId, command.productId, command.warehouseId,
                 codeGeneratorClient.next("accessory_item"), "serial", defaultValue(command.itemStatus, "available"),
                 operator(), trim(command.remark));
-        return getAccessory(mapper.selectLastInsertId());
+        RentalBusinessVO created = getAccessory(mapper.selectLastInsertId());
+        audit("配件管理", "CREATE", "ACCESSORY", created.id, created.itemCode, "创建配件", null, created);
+        return created;
     }
 
     /** 修改配件实例。 */
@@ -393,7 +485,9 @@ public class RentalBusinessService
         }
         mapper.updateAccessory(scope.tenantId, scope.memberId, itemId, command.warehouseId, existing.itemCode,
                 defaultValue(command.itemStatus, existing.itemStatus), operator(), trim(command.remark));
-        return getAccessory(itemId);
+        RentalBusinessVO updated = getAccessory(itemId);
+        audit("配件管理", "UPDATE", "ACCESSORY", itemId, updated.itemCode, "编辑配件", existing, updated);
+        return updated;
     }
 
     /** 软删除配件实例。 */
@@ -407,7 +501,9 @@ public class RentalBusinessService
             throw new ServiceException("已租用或已预占的配件不能删除");
         }
         Scope scope = scope();
-        return mapper.softDeleteAccessory(scope.tenantId, scope.memberId, itemId, operator());
+        int rows = mapper.softDeleteAccessory(scope.tenantId, scope.memberId, itemId, operator());
+        audit("配件管理", "DELETE", "ACCESSORY", itemId, existing.itemCode, "删除配件", existing, null);
+        return rows;
     }
 
     /** 查询当前商户套餐，并附带当前生效版本的 BOM。 */
@@ -443,7 +539,9 @@ public class RentalBusinessService
                 trim(command.platformCode), enabled(command.enabled), number(command.sortNo), trim(command.remark), operator());
         Long packageId = mapper.selectLastInsertId();
         publishPackageVersion(scope, packageId, command.components);
-        return getPackage(packageId);
+        RentalBusinessVO created = getPackage(packageId);
+        audit("套餐管理", "CREATE", "PACKAGE", packageId, created.packageName, "创建套餐", null, created);
+        return created;
     }
 
     /** 修改套餐模板时只创建新版本，不原地覆盖历史 BOM。 */
@@ -459,7 +557,9 @@ public class RentalBusinessService
                 required(command.packageName, "套餐名称不能为空"), trim(command.platformCode), enabled(command.enabled),
                 number(command.sortNo), trim(command.remark), operator());
         publishPackageVersion(scope, packageId, command.components);
-        return getPackage(packageId);
+        RentalBusinessVO updated = getPackage(packageId);
+        audit("套餐管理", "UPDATE", "PACKAGE", packageId, updated.packageName, "编辑套餐", existing, updated);
+        return updated;
     }
 
     /** 软删除套餐；历史版本保留但不再生效，已有订单不受影响。 */
@@ -468,14 +568,16 @@ public class RentalBusinessService
     {
         writeGuard();
         Scope scope = scope();
-        getPackage(packageId);
+        RentalBusinessVO existing = getPackage(packageId);
         if (mapper.countPackageReferences(scope.tenantId, scope.memberId, packageId) > 0)
         {
             throw new ServiceException("套餐已有订单引用，不能删除");
         }
         mapper.softDeletePackageVersions(scope.tenantId, scope.memberId, packageId, operator());
         mapper.softDeletePackageComponentsByPackage(scope.tenantId, scope.memberId, packageId, operator());
-        return mapper.softDeletePackage(scope.tenantId, scope.memberId, packageId, operator());
+        int rows = mapper.softDeletePackage(scope.tenantId, scope.memberId, packageId, operator());
+        audit("套餐管理", "DELETE", "PACKAGE", packageId, existing.packageName, "删除套餐", existing, null);
+        return rows;
     }
 
     /** 查询当前商户仓库范围内的库存汇总。 */
@@ -528,7 +630,10 @@ public class RentalBusinessService
         {
             throw new ServiceException("资源池仍有预占库存，不能删除库存余额");
         }
-        return mapper.softDeleteInventoryBalance(scope.tenantId, scope.memberId, product.id, warehouseId, operator());
+        int rows = mapper.softDeleteInventoryBalance(scope.tenantId, scope.memberId, product.id, warehouseId, operator());
+        audit("库存管理", "DELETE", "INVENTORY", product.id + "@" + warehouseId,
+                product.productName, "删除库存余额", balance, null);
+        return rows;
     }
 
     /** 调整数量型商品库存，所有变更都追加库存流水并禁止库存变为负数。 */
@@ -573,8 +678,11 @@ public class RentalBusinessService
         }
         mapper.insertInventoryLedger(scope.tenantId, scope.memberId, warehouseId, productId,
                 defaultValue(command.changeType, "manual_adjust"), changeQty, trim(command.reason), operator());
-        return listInventory(product.productCode, warehouseId, product.productType).stream()
+        RentalBusinessVO updated = listInventory(product.productCode, warehouseId, product.productType).stream()
                 .filter(item -> sameId(item.productId, productId)).findFirst().orElse(product);
+        audit("库存管理", "UPDATE", "INVENTORY", productId + "@" + warehouseId, product.productName,
+                "调整库存数量", balance, updated);
+        return updated;
     }
 
     /** 校验某套餐在指定仓库可否按数量组装，所有组件按资源池独立校验。 */
@@ -648,11 +756,16 @@ public class RentalBusinessService
     /** 校验商品类型、库存模式、资源池归属和设备型号必填规则。 */
     private void validateProduct(RentalBusinessCommand command, RentalBusinessVO existing)
     {
-        if (command == null || !PRODUCT_TYPES.contains(trim(command.productType)))
+        if (command == null)
+        {
+            throw new ServiceException("商品数据不能为空");
+        }
+        command.productName = required(command.productName, "商品名称不能为空");
+        command.productType = trim(command.productType);
+        if (!PRODUCT_TYPES.contains(command.productType))
         {
             throw new ServiceException("商品类型必须是 device 或 accessory");
         }
-        command.productType = trim(command.productType);
         command.stockMode = trim(command.stockMode);
         if (!STOCK_MODES.contains(trim(command.stockMode)))
         {
@@ -675,7 +788,8 @@ public class RentalBusinessService
         {
             throw new ServiceException("销售价格不能小于零");
         }
-        validateModel(command.modelId, command.classId);
+        BrandModel standardModel = command.modelId == null ? null : findActiveModel(command.modelId, command.classId);
+        normalizeProductModel(command, standardModel);
         Scope scope = scope();
         RentalBusinessVO pool = getPool(command.poolId);
         if ("device".equals(command.productType) && !"device".equals(pool.resourceType))
@@ -694,6 +808,37 @@ public class RentalBusinessService
         if (scope.tenantId == null || scope.memberId == null)
         {
             throw new ServiceException("商户上下文不完整");
+        }
+    }
+
+    /**
+     * 使用平台标准型号补齐商品展示字段。
+     *
+     * <p>商品仍然保留自身的品牌、型号和规格快照，便于历史订单展示；当请求
+     * 绑定标准型号且对应字段为空时，使用平台当前有效型号补齐，避免前端必须
+     * 重复输入标准主数据。已经填写的商品规格允许保留，用于表达同型号的商品
+     * 变体，例如不同存储规格或销售包装。</p>
+     *
+     * @param command 待校验商品命令
+     * @param model 已经完成启用状态和类目归属校验的标准型号
+     */
+    private void normalizeProductModel(RentalBusinessCommand command, BrandModel model)
+    {
+        if (command.modelId == null || model == null)
+        {
+            return;
+        }
+        if (StringUtils.isEmpty(trim(command.brand)))
+        {
+            command.brand = model.getBrand();
+        }
+        if (StringUtils.isEmpty(trim(command.modelName)))
+        {
+            command.modelName = model.getModelName();
+        }
+        if (StringUtils.isEmpty(trim(command.memorySpec)))
+        {
+            command.memorySpec = model.getMemorySpec();
         }
     }
 
@@ -892,13 +1037,15 @@ public class RentalBusinessService
         }
     }
 
-    /** 校验标准型号存在、处于启用状态并且属于商品选择的产品类目。 */
-    private void validateModel(Long modelId, Long classId)
+    /**
+     * 从平台内部服务查找有效标准型号并校验其类目归属。
+     *
+     * @param modelId 标准型号主键
+     * @param classId 商品类目主键
+     * @return 匹配的有效标准型号
+     */
+    private BrandModel findActiveModel(Long modelId, Long classId)
     {
-        if (modelId == null)
-        {
-            return;
-        }
         R<List<BrandModel>> response = brandModelService.listActive(SecurityConstants.INNER);
         if (response == null || R.FAIL == response.getCode() || response.getData() == null)
         {
@@ -914,12 +1061,35 @@ public class RentalBusinessService
         {
             throw new ServiceException("商品类目与标准型号所属类目不一致");
         }
+        return model;
     }
 
     /** 返回当前操作用户名称。 */
     private String operator()
     {
         return SecurityUtils.getUsername();
+    }
+
+    /**
+     * 写入商户业务审计；审计服务未注入时仅用于兼容单元测试，不影响主业务处理。
+     *
+     * @param module 业务模块
+     * @param operationType 操作类型
+     * @param targetType 业务对象类型
+     * @param targetId 业务对象主键
+     * @param targetName 业务对象名称
+     * @param description 业务描述
+     * @param before 变更前对象
+     * @param after 变更后对象
+     */
+    private void audit(String module, String operationType, String targetType, Object targetId,
+            String targetName, String description, Object before, Object after)
+    {
+        if (auditRecorder != null)
+        {
+            auditRecorder.record(module, operationType, targetType, targetId == null ? null : String.valueOf(targetId),
+                    targetName, description, before, after);
+        }
     }
 
     /** 将 Map 集合转换为统一展示对象。 */
@@ -963,6 +1133,15 @@ public class RentalBusinessService
         view.conditionLevel = text(row, "conditionLevel");
         view.warehouseName = text(row, "warehouseName");
         view.warehouseCity = text(row, "warehouseCity");
+        view.province = text(row, "province");
+        view.city = text(row, "city");
+        view.district = text(row, "district");
+        view.address = text(row, "address");
+        view.contactName = text(row, "contactName");
+        view.contactPhone = text(row, "contactPhone");
+        view.longitude = decimal(row, "longitude");
+        view.latitude = decimal(row, "latitude");
+        view.pickupRuleJson = text(row, "pickupRuleJson");
         view.packageCode = text(row, "packageCode");
         view.packageName = text(row, "packageName");
         view.platformCode = text(row, "platformCode");
@@ -975,6 +1154,8 @@ public class RentalBusinessService
         view.reservedQty = valueNullable(row, "reservedQty");
         view.requiredQty = valueNullable(row, "requiredQty");
         view.substitutableFlag = valueNullable(row, "substitutableFlag");
+        view.returnEnabled = valueNullable(row, "returnEnabled");
+        view.allianceShareEnabled = valueNullable(row, "allianceShareEnabled");
         view.purchaseCost = decimal(row, "purchaseCost");
         view.salePrice = decimal(row, "salePrice");
         view.remark = text(row, "remark");
@@ -1036,6 +1217,20 @@ public class RentalBusinessService
         return value == null ? 1 : (value == 0 ? 0 : 1);
     }
 
+    /** 读取可选布尔字段并应用业务默认值。 */
+    private int booleanValue(Integer value, int defaultValue)
+    {
+        if (value == null)
+        {
+            return defaultValue;
+        }
+        if (value != 0 && value != 1)
+        {
+            throw new ServiceException("布尔字段只能是 0 或 1");
+        }
+        return value;
+    }
+
     /** 以固定默认值读取启用状态。 */
     private int enabled(Integer value)
     {
@@ -1089,6 +1284,20 @@ public class RentalBusinessService
         return StringUtils.isEmpty(trim(value)) ? fallback : trim(value);
     }
 
+    /**
+     * 校验内部接口收到的租户和商户范围，避免空主键导致跨商户查询或数据库全表条件退化。
+     *
+     * @param tenantId 可信租户主键
+     * @param memberId 可信商户主键
+     */
+    private void requireInternalScope(Long tenantId, Long memberId)
+    {
+        if (tenantId == null || tenantId <= 0 || memberId == null || memberId <= 0)
+        {
+            throw new ServiceException("租赁业务内部调用缺少有效商户范围");
+        }
+    }
+
     /** 比较字符串。 */
     private boolean same(String left, String right)
     {
@@ -1115,15 +1324,50 @@ public class RentalBusinessService
         return value == null ? fallback : value;
     }
 
-    /** 从 Map 读取可空整数。 */
-    private Integer valueNullable(Map<String, Object> row, String key)
+    /**
+     * 从 JDBC Map 中读取可空整数，统一兼容数值、字符串以及 MySQL
+     * 驱动对 {@code TINYINT(1)} 返回的布尔值。
+     *
+     * @param row JDBC 返回的字段 Map
+     * @param key 待读取的字段别名
+     * @return 字段对应的整数，字段不存在或值为空时返回 {@code null}
+     */
+    static Integer valueNullable(Map<String, Object> row, String key)
     {
         Object value = row == null ? null : row.get(key);
         if (value == null)
         {
             return null;
         }
-        return value instanceof Number ? ((Number) value).intValue() : Integer.valueOf(String.valueOf(value));
+        if (value instanceof Number)
+        {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof Boolean)
+        {
+            return ((Boolean) value) ? 1 : 0;
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty())
+        {
+            return null;
+        }
+        if ("true".equalsIgnoreCase(text))
+        {
+            return 1;
+        }
+        if ("false".equalsIgnoreCase(text))
+        {
+            return 0;
+        }
+        try
+        {
+            return Integer.valueOf(text);
+        }
+        catch (NumberFormatException exception)
+        {
+            throw new ServiceException("数据库字段 " + key + " 不是有效整数");
+        }
     }
 
     /** 从 Map 读取长整数。 */

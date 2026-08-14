@@ -22,6 +22,39 @@ public interface RentalBusinessMapper
             @Param("status") Integer status, @Param("warehouseIds") java.util.Set<Long> warehouseIds,
             @Param("allWarehouseAccess") boolean allWarehouseAccess);
 
+    /**
+     * 查询供平台服务和商户服务使用的仓库内部视图。
+     *
+     * <p>该方法只允许租赁业务服务访问自己的业务库，调用方必须传入已经由上游
+     * 身份服务确认的租户和商户主键。</p>
+     *
+     * @param tenantId 可信租户主键
+     * @param memberId 可信商户主键
+     * @param status 仓库状态，为空时不限制状态
+     * @return 仓库内部视图集合
+     */
+    List<Map<String, Object>> selectWarehousesForInternal(@Param("tenantId") Long tenantId,
+            @Param("memberId") Long memberId, @Param("status") Integer status);
+
+    /**
+     * 统计指定商户启用仓库中命中主键集合的数量，供平台端校验用户仓库范围。
+     *
+     * @param tenantId 可信租户主键
+     * @param memberId 可信商户主键
+     * @param warehouseIds 待校验仓库主键集合
+     * @return 命中的启用仓库数量
+     */
+    int countEnabledWarehouses(@Param("tenantId") Long tenantId, @Param("memberId") Long memberId,
+            @Param("warehouseIds") List<Long> warehouseIds);
+
+    /**
+     * 统计标准型号在租赁业务库中的有效引用数量。
+     *
+     * @param modelId 平台标准型号主键
+     * @return 商品和资源池兼容关系中的有效引用数量
+     */
+    int countModelReferences(@Param("modelId") Long modelId);
+
     /** 查询当前商户单个仓库。 */
     Map<String, Object> selectWarehouse(@Param("tenantId") Long tenantId,
             @Param("memberId") Long memberId, @Param("warehouseId") Long warehouseId);
@@ -31,14 +64,20 @@ public interface RentalBusinessMapper
             @Param("code") String code, @Param("name") String name, @Param("contactName") String contactName,
             @Param("contactPhone") String contactPhone, @Param("province") String province,
             @Param("city") String city, @Param("district") String district, @Param("address") String address,
-            @Param("status") Integer status, @Param("remark") String remark, @Param("operator") String operator);
+            @Param("longitude") java.math.BigDecimal longitude, @Param("latitude") java.math.BigDecimal latitude,
+            @Param("pickupRuleJson") String pickupRuleJson, @Param("status") Integer status,
+            @Param("returnEnabled") Integer returnEnabled, @Param("allianceShareEnabled") Integer allianceShareEnabled,
+            @Param("remark") String remark, @Param("operator") String operator);
 
     /** 修改仓库。 */
     int updateWarehouse(@Param("tenantId") Long tenantId, @Param("memberId") Long memberId,
             @Param("warehouseId") Long warehouseId, @Param("code") String code, @Param("name") String name,
             @Param("contactName") String contactName, @Param("contactPhone") String contactPhone,
             @Param("province") String province, @Param("city") String city, @Param("district") String district,
-            @Param("address") String address, @Param("status") Integer status, @Param("remark") String remark,
+            @Param("address") String address, @Param("longitude") java.math.BigDecimal longitude,
+            @Param("latitude") java.math.BigDecimal latitude, @Param("pickupRuleJson") String pickupRuleJson,
+            @Param("status") Integer status, @Param("returnEnabled") Integer returnEnabled,
+            @Param("allianceShareEnabled") Integer allianceShareEnabled, @Param("remark") String remark,
             @Param("operator") String operator);
 
     /** 软删除仓库。 */

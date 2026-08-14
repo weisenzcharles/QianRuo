@@ -4,25 +4,35 @@ USE `ry-cloud`;
 
 CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_brand_model` (
   `model_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '标准型号ID',
-  `class_id` BIGINT DEFAULT NULL COMMENT '平台产品类目ID',
-  `category_level1` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '一级分类',
-  `category_level2` VARCHAR(64) DEFAULT NULL COMMENT '二级分类',
-  `category_level3` VARCHAR(64) DEFAULT NULL COMMENT '三级分类',
+  `class_id` BIGINT NOT NULL COMMENT '平台产品类目ID',
   `brand` VARCHAR(64) NOT NULL COMMENT '品牌',
   `model_name` VARCHAR(128) NOT NULL COMMENT '型号',
   `memory_spec` VARCHAR(64) DEFAULT NULL COMMENT '内存/规格',
-  `official_flag` TINYINT NOT NULL DEFAULT 1 COMMENT '是否官方标准',
-  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '状态：0正常 1停用',
+  `official_flag` CHAR(1) NOT NULL DEFAULT '1' COMMENT '是否官方标准：1是 0否',
+  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '状态：0正常 1停用',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `active_class_id` BIGINT GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN `class_id` ELSE NULL END
+  ) STORED COMMENT '有效型号类目唯一键',
+  `active_brand` VARCHAR(64) GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN `brand` ELSE NULL END
+  ) STORED COMMENT '有效型号品牌唯一键',
+  `active_model_name` VARCHAR(128) GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN `model_name` ELSE NULL END
+  ) STORED COMMENT '有效型号名称唯一键',
+  `active_memory_spec` VARCHAR(64) GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN COALESCE(`memory_spec`, '') ELSE NULL END
+  ) STORED COMMENT '有效型号规格唯一键',
   PRIMARY KEY (`model_id`),
+  UNIQUE KEY `uk_rental_brand_model_active_identity`
+    (`active_class_id`, `active_brand`, `active_model_name`, `active_memory_spec`),
   KEY `idx_rental_brand_model_brand` (`brand`, `model_name`),
-  KEY `idx_rental_brand_model_class` (`class_id`, `status`, `is_delete`),
-  KEY `idx_rental_brand_model_category` (`category_level1`, `category_level2`, `category_level3`)
+  KEY `idx_rental_brand_model_class` (`class_id`, `status`, `is_delete`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统标准品牌型号';
 
 CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_member_common_model` (
@@ -119,11 +129,11 @@ INSERT INTO `ry-cloud`.`sys_menu`
  `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `client_type`, `icon`,
  `create_by`, `create_time`, `update_by`, `update_time`, `remark`, `is_delete`)
 VALUES
-(2040, '品牌型号', 2000, 7, 'brand-model', 'rental/brandModel/index', '', '', 1, 0, 'C', '0', '0', 'platform:brandModel:list', 'platform', 'list', 'migration', NOW(), 'migration', NOW(), '平台标准品牌型号管理', 0),
-(2041, '品牌型号查询', 2040, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:query', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0),
-(2042, '品牌型号新增', 2040, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:add', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0),
-(2043, '品牌型号修改', 2040, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:edit', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0),
-(2044, '品牌型号删除', 2040, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:remove', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0)
+(2040, '标准型号', 2000, 7, 'brand-model', 'rental/brandModel/index', '', '', 1, 0, 'C', '0', '0', 'platform:brandModel:list', 'platform', 'list', 'migration', NOW(), 'migration', NOW(), '平台标准型号管理', 0),
+(2041, '标准型号查询', 2040, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:query', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0),
+(2042, '标准型号新增', 2040, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:add', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0),
+(2043, '标准型号修改', 2040, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:edit', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0),
+(2044, '标准型号删除', 2040, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'platform:brandModel:remove', 'platform', '#', 'migration', NOW(), 'migration', NOW(), '', 0)
 ON DUPLICATE KEY UPDATE
     `menu_name` = VALUES(`menu_name`), `parent_id` = VALUES(`parent_id`), `order_num` = VALUES(`order_num`),
     `path` = VALUES(`path`), `component` = VALUES(`component`), `menu_type` = VALUES(`menu_type`),

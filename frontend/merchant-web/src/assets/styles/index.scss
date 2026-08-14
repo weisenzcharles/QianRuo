@@ -125,6 +125,81 @@ aside {
   padding: 20px;
 }
 
+// 商户端列表统一使用订单中心的边界、间距和筛选区规范。
+.merchant-list-page {
+  min-height: calc(100vh - 84px);
+  padding: 20px 24px 32px;
+  color: var(--el-text-color-primary);
+
+  .page-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 18px;
+
+    h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    p:not(.page-kicker) {
+      margin: 7px 0 0;
+      color: var(--el-text-color-secondary);
+      font-size: 13px;
+    }
+  }
+
+  .page-kicker {
+    margin: 0 0 4px;
+    color: var(--el-color-primary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+
+  > .el-form,
+  > .search-form,
+  > form {
+    padding: 16px 18px 2px;
+    margin-bottom: 16px;
+    border: 1px solid var(--el-border-color-light);
+    border-radius: 6px;
+    background: var(--el-bg-color);
+  }
+
+  > .el-table,
+  > .el-card,
+  > .table-container {
+    border: 1px solid var(--el-border-color-light);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--el-bg-color);
+  }
+
+  .el-table {
+    --el-table-header-bg-color: var(--el-fill-color-lighter);
+    --el-table-row-hover-bg-color: var(--el-color-primary-light-9);
+  }
+
+  .el-table th.el-table__cell {
+    height: 48px;
+    color: var(--el-text-color-secondary);
+    font-weight: 600;
+  }
+
+  .el-table td.el-table__cell {
+    height: 54px;
+  }
+
+  > .pagination-container,
+  > .pagination {
+    margin-top: 16px;
+  }
+}
+
 .components-container {
   margin: 30px 50px;
   position: relative;

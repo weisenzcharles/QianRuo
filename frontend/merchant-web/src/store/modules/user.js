@@ -38,7 +38,10 @@ const useUserStore = defineStore(
         const uuid = userInfo.uuid
         const phone = (userInfo.phone || '').trim()
         const smsCode = userInfo.smsCode
-        const loginAction = loginType === 'sms' ? smsLogin(phone, smsCode) : login(username, password, code, uuid)
+        const captchaCode = userInfo.captchaCode
+        const loginAction = loginType === 'sms'
+          ? smsLogin(phone, smsCode, captchaCode, uuid)
+          : login(username, password, code, uuid)
         return new Promise((resolve, reject) => {
           loginAction.then(res => {
             let data = res.data
@@ -64,9 +67,10 @@ const useUserStore = defineStore(
           getInfo().then(res => {
             const user = res.user
             const avatar = (isEmpty(user.avatar)) ? defAva : user.avatar
+            // 角色与操作权限是两组独立的授权结果，即使历史商户账号没有角色副本，也必须保留后端下发的用户级权限。
+            this.permissions = Array.isArray(res.permissions) ? res.permissions : []
             if (res.roles && res.roles.length > 0) { // 验证返回的roles是否是一个非空数组
               this.roles = res.roles
-            this.permissions = res.permissions
             } else {
               this.roles = ['ROLE_DEFAULT']
             }

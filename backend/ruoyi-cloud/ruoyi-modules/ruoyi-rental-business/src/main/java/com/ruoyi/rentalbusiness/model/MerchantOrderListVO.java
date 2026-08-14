@@ -11,12 +11,17 @@ import java.util.List;
  */
 public class MerchantOrderListVO
 {
+    public Long orderId;
+    public String leaseStartDate;
+    public String leaseEndDate;
+    public String externalOrderNo;
     public String orderNo;
     public String model;
     public String packageName;
     public String rentalPeriod;
     public String returnDate;
     public BigDecimal rent;
+    public Long channelId;
     public String channel;
     public String merchant;
     public Customer customer;

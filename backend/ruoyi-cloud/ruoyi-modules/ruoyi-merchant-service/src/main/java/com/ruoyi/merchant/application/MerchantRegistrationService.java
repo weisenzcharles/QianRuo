@@ -77,6 +77,21 @@ public class MerchantRegistrationService
     }
 
     /**
+     * 确认付费注册支付完成。当前为支付渠道接入前的统一确认入口，正式接入后由支付回调调用同一平台状态机。
+     *
+     * @param paymentNo 注册支付单号
+     * @return 注册完成后的申请资料
+     */
+    public MerchantRegistrationVO confirmPayment(String paymentNo)
+    {
+        if (StringUtils.isBlank(paymentNo))
+        {
+            throw new ServiceException("注册支付单号不能为空");
+        }
+        return unwrap(registrationService.confirmPayment(paymentNo, SecurityConstants.INNER));
+    }
+
+    /**
      * 校验公开申请的业务规则，企业商户必须补齐主体、执照和法人证件资料。
      *
      * @param command 待校验的公开申请命令
@@ -84,6 +99,14 @@ public class MerchantRegistrationService
     private void validate(MerchantRegistrationCommand command)
     {
         validateCode(command.getCode());
+        if (!StringUtils.equalsAny(command.getRegistrationMode(), "paid", "invite"))
+        {
+            throw new ServiceException("请选择正确的注册方式");
+        }
+        if ("invite".equals(command.getRegistrationMode()) && StringUtils.isBlank(command.getInviteCode()))
+        {
+            throw new ServiceException("邀请码注册必须填写邀请码");
+        }
         if (!StringUtils.equalsAny(command.getMemberType(), "personal", ENTERPRISE))
         {
             throw new ServiceException("商户类型不正确");

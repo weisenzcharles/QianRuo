@@ -1,7 +1,5 @@
 package com.ruoyi.system.domain.rental;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 
 /**
@@ -17,27 +15,15 @@ public class RentalBrandModel extends BaseEntity
     private Long modelId;
 
     /** 所属平台产品类目主键。 */
-    @NotNull(message = "产品类目不能为空")
     private Long classId;
 
     /** 所属平台产品类目名称，仅用于列表展示。 */
     private String className;
 
-    /** 兼容旧数据的一级分类名称。 */
-    private String categoryLevel1;
-
-    /** 兼容旧数据的二级分类名称。 */
-    private String categoryLevel2;
-
-    /** 兼容旧数据的三级分类名称。 */
-    private String categoryLevel3;
-
     /** 品牌名称。 */
-    @NotBlank(message = "品牌不能为空")
     private String brand;
 
     /** 型号名称。 */
-    @NotBlank(message = "型号不能为空")
     private String modelName;
 
     /** 内存或规格描述。 */
@@ -86,42 +72,6 @@ public class RentalBrandModel extends BaseEntity
     public void setClassName(String className)
     {
         this.className = className;
-    }
-
-    /** @return 一级分类名称 */
-    public String getCategoryLevel1()
-    {
-        return categoryLevel1;
-    }
-
-    /** @param categoryLevel1 一级分类名称 */
-    public void setCategoryLevel1(String categoryLevel1)
-    {
-        this.categoryLevel1 = categoryLevel1;
-    }
-
-    /** @return 二级分类名称 */
-    public String getCategoryLevel2()
-    {
-        return categoryLevel2;
-    }
-
-    /** @param categoryLevel2 二级分类名称 */
-    public void setCategoryLevel2(String categoryLevel2)
-    {
-        this.categoryLevel2 = categoryLevel2;
-    }
-
-    /** @return 三级分类名称 */
-    public String getCategoryLevel3()
-    {
-        return categoryLevel3;
-    }
-
-    /** @param categoryLevel3 三级分类名称 */
-    public void setCategoryLevel3(String categoryLevel3)
-    {
-        this.categoryLevel3 = categoryLevel3;
     }
 
     /** @return 品牌名称 */

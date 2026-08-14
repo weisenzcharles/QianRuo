@@ -13,7 +13,10 @@ public class MerchantOrderRow
 {
     public Long orderId;
     public String orderNo;
+    public String externalOrderNo;
+    public Long channelId;
     public String channelCode;
+    public String channelName;
     public String shopName;
     public String customerName;
     public String customerNickname;
@@ -22,6 +25,13 @@ public class MerchantOrderRow
     public String customerNote;
     public String warehouseName;
     public String warehouseCity;
+    public Long warehouseId;
+    public Long returnWarehouseId;
+    public Long productId;
+    public Long packageId;
+    public Long snId;
+    public String accessoryItemIds;
+    public Integer quantity;
     public Date leaseStartDate;
     public Date leaseEndDate;
     public Date shipDueTime;
@@ -29,7 +39,14 @@ public class MerchantOrderRow
     public Date expectedArriveTime;
     public Date createTime;
     public BigDecimal rentAmount;
+    public BigDecimal depositAmount;
     public String orderStatus;
+    public String payStatus;
+    public String timeEffectStatus;
+    public Integer priorityFlag;
+    public Integer version;
+    public String remark;
+    public String sourceTextSnapshot;
     public Integer weatherRiskFlag;
     public String modelName;
     public String packageName;
@@ -41,5 +58,5 @@ public class MerchantOrderRow
     public BigDecimal shippingFee;
     public String attention;
     public String addonNames;
-    public String createBy;
+    public Long createBy;
 }

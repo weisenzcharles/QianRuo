@@ -1,8 +1,10 @@
 package com.ruoyi.merchant.application;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -10,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.constant.Constants;
 import com.ruoyi.common.core.exception.ServiceException;
 import com.ruoyi.common.core.utils.StringUtils;
+import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.service.TokenService;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.common.security.utils.SecurityUtils;
@@ -36,6 +39,9 @@ public class MerchantRoleService
     @Autowired
     private TokenService tokenService;
 
+    @Autowired
+    private MerchantBusinessAuditRecorder auditRecorder;
+
     public List<MerchantRoleVO> list(MerchantRoleQuery query)
     {
         return roleMapper.selectList(tenantId(), merchantId(), query);
@@ -50,7 +56,7 @@ public class MerchantRoleService
         return role;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public int add(MerchantRoleCommand command)
     {
         validateUnique(command);
@@ -58,13 +64,18 @@ public class MerchantRoleService
         applyDefaults(command);
         int rows = roleMapper.insert(tenantId(), merchantId(), command, SecurityUtils.getUsername());
         insertMenus(command.getRoleId(), menuIds);
+        MerchantRoleVO created = get(command.getRoleId());
+        audit("角色权限", "CREATE", "MERCHANT_ROLE", command.getRoleId(), created.getRoleName(), "创建商户角色",
+                null, created);
         return rows;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public int update(MerchantRoleCommand command)
     {
         MerchantRoleVO existing = requireMutableRole(command.getRoleId());
+        existing.setMenuIds(menuMapper.selectIdsByRole(tenantId(), merchantId(), existing.getRoleId(),
+                Boolean.TRUE.equals(existing.getMenuCheckStrictly())).toArray(new Long[0]));
         validateUnique(command);
         Long[] menuIds = validateMenus(command.getMenuIds());
         applyDefaults(command);
@@ -72,38 +83,53 @@ public class MerchantRoleService
         roleMapper.deleteRoleMenus(tenantId(), merchantId(), existing.getRoleId());
         insertMenus(existing.getRoleId(), menuIds);
         invalidateRoleUsers(existing.getRoleId());
+        MerchantRoleVO updated = get(existing.getRoleId());
+        audit("角色权限", "UPDATE", "MERCHANT_ROLE", existing.getRoleId(), updated.getRoleName(), "编辑角色菜单权限",
+                existing, updated);
         return rows;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public int changeStatus(Long roleId, String status)
     {
-        requireMutableRole(roleId);
+        MerchantRoleVO before = requireMutableRole(roleId);
         if (!StringUtils.equalsAny(status, "0", "1"))
         {
             throw new ServiceException("角色状态不合法");
         }
         int rows = roleMapper.updateStatus(tenantId(), merchantId(), roleId, status, SecurityUtils.getUsername());
         invalidateRoleUsers(roleId);
+        MerchantRoleVO after = get(roleId);
+        audit("角色权限", "UPDATE", "MERCHANT_ROLE", roleId, after.getRoleName(), "修改角色状态", before, after);
         return rows;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public int delete(Long[] roleIds)
     {
         if (roleIds == null || roleIds.length == 0)
         {
             throw new ServiceException("请选择要删除的角色");
         }
+        Map<Long, MerchantRoleVO> beforeByRoleId = new LinkedHashMap<Long, MerchantRoleVO>();
         for (Long roleId : roleIds)
         {
-            requireMutableRole(roleId);
+            MerchantRoleVO existing = requireMutableRole(roleId);
             if (roleMapper.countUsers(tenantId(), merchantId(), roleId) > 0)
             {
                 throw new ServiceException("角色已分配用户，不能删除");
             }
             roleMapper.deleteRoleMenus(tenantId(), merchantId(), roleId);
+            beforeByRoleId.put(roleId, existing);
         }
-        return roleMapper.softDelete(tenantId(), merchantId(), roleIds, SecurityUtils.getUsername());
+        int rows = roleMapper.softDelete(tenantId(), merchantId(), roleIds, SecurityUtils.getUsername());
+        for (Map.Entry<Long, MerchantRoleVO> entry : beforeByRoleId.entrySet())
+        {
+            MerchantRoleVO existing = entry.getValue();
+            audit("角色权限", "DELETE", "MERCHANT_ROLE", entry.getKey(), existing.getRoleName(), "删除商户角色",
+                    existing, null);
+        }
+        return rows;
     }
 
     public List<MerchantRoleUserVO> allocatedUsers(MerchantRoleUserQuery query)
@@ -118,24 +144,49 @@ public class MerchantRoleService
         return roleMapper.selectUnallocatedUsers(tenantId(), merchantId(), query);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public int grantUsers(Long roleId, Long[] userIds)
     {
         requireMutableRole(roleId);
         validateUsers(userIds);
+        List<Long> before = roleMapper.selectUserIdsByRole(tenantId(), merchantId(), roleId);
         int rows = roleMapper.insertUserRole(tenantId(), merchantId(), roleId, unique(userIds));
         invalidateUsers(userIds);
+        audit("角色权限", "GRANT_PERMISSION", "MERCHANT_ROLE", roleId, requireRole(roleId).getRoleName(), "为角色分配用户",
+                before, roleMapper.selectUserIdsByRole(tenantId(), merchantId(), roleId));
         return rows;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public int revokeUsers(Long roleId, Long[] userIds)
     {
         requireMutableRole(roleId);
         validateUsers(userIds);
+        List<Long> before = roleMapper.selectUserIdsByRole(tenantId(), merchantId(), roleId);
         int rows = roleMapper.deleteUserRole(tenantId(), merchantId(), roleId, unique(userIds));
         invalidateUsers(userIds);
+        audit("角色权限", "REVOKE_PERMISSION", "MERCHANT_ROLE", roleId, requireRole(roleId).getRoleName(), "撤销角色用户",
+                before, roleMapper.selectUserIdsByRole(tenantId(), merchantId(), roleId));
         return rows;
+    }
+
+    /**
+     * 记录商户角色、菜单和用户授权变化，平台角色不会经过本服务。
+     *
+     * @param module 业务模块
+     * @param operationType 操作类型
+     * @param targetType 业务对象类型
+     * @param targetId 角色主键
+     * @param targetName 角色名称
+     * @param description 业务描述
+     * @param before 变更前内容
+     * @param after 变更后内容
+     */
+    private void audit(String module, String operationType, String targetType, Long targetId,
+            String targetName, String description, Object before, Object after)
+    {
+        auditRecorder.record(module, operationType, targetType, String.valueOf(targetId), targetName,
+                description, before, after);
     }
 
     private MerchantRoleVO requireRole(Long roleId)

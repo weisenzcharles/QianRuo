@@ -23,7 +23,9 @@
     <select id="selectWarehouses" resultType="map">
         select warehouse_id as id, warehouse_code as code, warehouse_name as name,
                contact_name as contactName, contact_phone as contactPhone,
-               province, city, district, address, status, remark, create_time as createTime,
+               province, city, district, address, longitude, latitude, pickup_rule_json as pickupRuleJson,
+               return_enabled as returnEnabled, alliance_share_enabled as allianceShareEnabled,
+               status, remark, create_time as createTime,
                update_time as updateTime
         from ry_business.ry_rental_warehouse w
         where w.tenant_id = #{tenantId} and w.member_id = #{memberId} and w.is_delete = 0
@@ -39,23 +41,55 @@
         order by w.status, w.warehouse_id desc
     </select>
 
+    <select id="selectWarehousesForInternal" resultType="map">
+        select warehouse_id as warehouseId, tenant_id as tenantId, member_id as memberId,
+               warehouse_code as warehouseCode, warehouse_name as warehouseName, status
+        from ry_business.ry_rental_warehouse
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+        <if test="status != null">and status = #{status}</if>
+        order by warehouse_name, warehouse_id
+    </select>
+
+    <select id="countEnabledWarehouses" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_warehouse
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and status = '0' and is_delete = 0
+          and warehouse_id in
+        <foreach collection="warehouseIds" item="warehouseId" open="(" separator="," close=")">
+            #{warehouseId}
+        </foreach>
+    </select>
+
+    <select id="countModelReferences" resultType="int">
+        select
+          (select count(1) from ry_business.ry_rental_product
+            where model_id = #{modelId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_stock_pool_compatibility
+            where model_id = #{modelId} and is_delete = 0)
+    </select>
+
     <select id="selectWarehouse" resultType="map">
         select warehouse_id as id, warehouse_code as code, warehouse_name as name,
                contact_name as contactName, contact_phone as contactPhone,
-               province, city, district, address, status, remark, create_time as createTime,
+               province, city, district, address, longitude, latitude, pickup_rule_json as pickupRuleJson,
+               return_enabled as returnEnabled, alliance_share_enabled as allianceShareEnabled,
+               status, remark, create_time as createTime,
                update_time as updateTime
         from ry_business.ry_rental_warehouse
         where tenant_id = #{tenantId} and member_id = #{memberId}
           and warehouse_id = #{warehouseId} and is_delete = 0
     </select>
 
-    <insert id="insertWarehouse" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertWarehouse">
         insert into ry_business.ry_rental_warehouse(
             tenant_id, member_id, warehouse_code, warehouse_name, contact_name, contact_phone,
-            province, city, district, address, status, create_by, create_time, update_by, update_time, remark, is_delete
+            province, city, district, address, longitude, latitude, pickup_rule_json, status,
+            return_enabled, alliance_share_enabled, create_by, create_time, update_by, update_time, remark, is_delete
         ) values (
             #{tenantId}, #{memberId}, #{code}, #{name}, #{contactName}, #{contactPhone},
-            #{province}, #{city}, #{district}, #{address}, #{status}, #{operator}, now(), #{operator}, now(), #{remark}, 0
+            #{province}, #{city}, #{district}, #{address}, #{longitude}, #{latitude}, #{pickupRuleJson}, #{status},
+            #{returnEnabled}, #{allianceShareEnabled}, #{operator}, now(), #{operator}, now(), #{remark}, 0
         )
     </insert>
 
@@ -63,7 +97,9 @@
         update ry_business.ry_rental_warehouse
         set warehouse_code = #{code}, warehouse_name = #{name}, contact_name = #{contactName},
             contact_phone = #{contactPhone}, province = #{province}, city = #{city}, district = #{district},
-            address = #{address}, status = #{status}, remark = #{remark}, update_by = #{operator}, update_time = now()
+            address = #{address}, longitude = #{longitude}, latitude = #{latitude}, pickup_rule_json = #{pickupRuleJson},
+            status = #{status}, return_enabled = #{returnEnabled}, alliance_share_enabled = #{allianceShareEnabled},
+            remark = #{remark}, update_by = #{operator}, update_time = now()
         where tenant_id = #{tenantId} and member_id = #{memberId}
           and warehouse_id = #{warehouseId} and is_delete = 0
     </update>
@@ -110,7 +146,7 @@
           and pool_id = #{poolId} and is_delete = 0
     </select>
 
-    <insert id="insertPool" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertPool">
         insert into ry_business.ry_rental_stock_pool(
             tenant_id, member_id, pool_code, pool_name, resource_type, substitutable_flag,
             status, create_by, create_time, update_by, update_time, remark, is_delete
@@ -214,7 +250,7 @@
           and p.product_id = #{productId} and p.is_delete = 0
     </select>
 
-    <insert id="insertProduct" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertProduct">
         insert into ry_business.ry_rental_product(
             tenant_id, member_id, class_id, model_id, stock_pool_id, product_code, product_name,
             category_level1, category_level2, category_level3, brand, model_name, memory_spec,
@@ -249,7 +285,17 @@
         select
           (select count(1) from ry_business.ry_rental_asset_sn where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
         + (select count(1) from ry_business.ry_rental_accessory_item where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_inventory_unit where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
         + (select count(1) from ry_business.ry_rental_inventory_balance where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_package_item where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_package_component pc
+            inner join ry_business.ry_rental_package_version pv on pv.package_version_id = pc.package_version_id
+                and pv.tenant_id = pc.tenant_id and pv.member_id = pc.member_id and pv.is_delete = 0
+            where pc.tenant_id = #{tenantId} and pc.member_id = #{memberId}
+              and pc.pool_id in (select stock_pool_id from ry_business.ry_rental_product
+                  where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId})
+              and pc.is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_package_template where tenant_id = #{tenantId} and member_id = #{memberId} and main_product_id = #{productId} and is_delete = 0)
         + (select count(1) from ry_business.ry_rental_order_item where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0)
     </select>
 
@@ -305,7 +351,7 @@
           <if test="snId != null">and sn_id != #{snId}</if>
     </select>
 
-    <insert id="insertSn" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertSn">
         insert into ry_business.ry_rental_asset_sn(
             tenant_id, member_id, product_id, warehouse_id, sn_code, barcode, asset_status,
             condition_level, create_by, create_time, update_by, update_time, remark, is_delete
@@ -373,7 +419,7 @@
           and a.accessory_item_id = #{accessoryItemId} and a.is_delete = 0
     </select>
 
-    <insert id="insertAccessory" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertAccessory">
         insert into ry_business.ry_rental_accessory_item(
             tenant_id, member_id, product_id, warehouse_id, item_code, stock_mode, item_status,
             create_by, create_time, update_by, update_time, remark, is_delete
@@ -445,7 +491,7 @@
         order by c.sort_no, c.component_id
     </select>
 
-    <insert id="insertPackage" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertPackage">
         insert into ry_business.ry_rental_package_template(
             tenant_id, member_id, platform_code, package_code, package_name, enabled, sort_no,
             create_by, create_time, update_by, update_time, remark, is_delete
@@ -486,7 +532,7 @@
           and package_id = #{packageId} and version_status = 'active' and is_delete = 0
     </update>
 
-    <insert id="insertPackageVersion" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertPackageVersion">
         insert into ry_business.ry_rental_package_version(
             tenant_id, member_id, package_id, version_no, version_status, effective_time,
             bom_hash, create_by, create_time, update_by, update_time, is_delete
@@ -577,7 +623,7 @@
         for update
     </select>
 
-    <insert id="insertBalance" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insertBalance">
         insert into ry_business.ry_rental_inventory_balance(
             tenant_id, member_id, product_id, warehouse_id, stock_status, on_hand_qty, version,
             create_by, create_time, update_by, update_time, remark, is_delete

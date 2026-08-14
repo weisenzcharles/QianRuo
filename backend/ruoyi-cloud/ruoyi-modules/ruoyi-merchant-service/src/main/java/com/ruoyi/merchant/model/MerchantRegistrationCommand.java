@@ -10,6 +10,13 @@ import jakarta.validation.constraints.Size;
 /** 商户公开入驻申请。归属、审核和账号字段均由服务端控制。 */
 public class MerchantRegistrationCommand
 {
+    @NotBlank(message = "请选择注册方式")
+    @Pattern(regexp = "^(paid|invite)$", message = "注册方式不正确")
+    private String registrationMode;
+
+    @Size(max = 32, message = "邀请码长度不能超过32个字符")
+    private String inviteCode;
+
     @NotBlank(message = "验证码不能为空")
     @Pattern(regexp = "^\\d{4}$", message = "请输入四位数字验证码")
     private String code;
@@ -81,6 +88,18 @@ public class MerchantRegistrationCommand
 
     @Size(max = 500, message = "法人身份证国徽面地址长度不能超过500个字符")
     private String legalIdBackUrl;
+
+    /** @return 注册方式 */
+    public String getRegistrationMode() { return registrationMode; }
+
+    /** @param registrationMode 注册方式 */
+    public void setRegistrationMode(String registrationMode) { this.registrationMode = registrationMode; }
+
+    /** @return 邀请码 */
+    public String getInviteCode() { return inviteCode; }
+
+    /** @param inviteCode 邀请码 */
+    public void setInviteCode(String inviteCode) { this.inviteCode = inviteCode; }
 
     /** @return 当前用于提交或重新提交申请的四位验证码 */
     public String getCode() { return code; }

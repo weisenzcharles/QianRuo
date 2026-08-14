@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.MerchantPromotionMapper">
+    <resultMap id="MerchantLevelResult" type="com.ruoyi.system.domain.rental.MerchantLevel">
+        <id property="levelId" column="level_id" />
+        <result property="levelCode" column="level_code" />
+        <result property="levelName" column="level_name" />
+        <result property="levelOrder" column="level_order" />
+        <result property="monthlyOrderRequirement" column="monthly_order_requirement" />
+        <result property="inventoryRequirement" column="inventory_requirement" />
+        <result property="inviteLimit" column="invite_limit" />
+        <result property="registrationFee" column="registration_fee" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="isDelete" column="is_delete" />
+    </resultMap>
+
+    <sql id="levelColumns">level_id, level_code, level_name, level_order, monthly_order_requirement,
+        inventory_requirement, invite_limit, registration_fee, status, create_by, create_time,
+        update_by, update_time, remark, is_delete</sql>
+
+    <select id="selectLevelList" resultMap="MerchantLevelResult">
+        SELECT <include refid="levelColumns" /> FROM ry_rental.ry_rental_merchant_level
+        WHERE is_delete = 0 ORDER BY level_order, level_id
+    </select>
+    <select id="selectLevelById" resultMap="MerchantLevelResult">
+        SELECT <include refid="levelColumns" /> FROM ry_rental.ry_rental_merchant_level
+        WHERE level_id = #{levelId} AND is_delete = 0
+    </select>
+    <select id="selectDefaultLevel" resultMap="MerchantLevelResult">
+        SELECT <include refid="levelColumns" /> FROM ry_rental.ry_rental_merchant_level
+        WHERE status = '0' AND is_delete = 0 ORDER BY level_order, level_id LIMIT 1
+    </select>
+    <insert id="insertLevel" useGeneratedKeys="true" keyProperty="levelId">
+        INSERT INTO ry_rental.ry_rental_merchant_level(level_code, level_name, level_order, monthly_order_requirement,
+            inventory_requirement, invite_limit, registration_fee, status, create_by, create_time,
+            update_by, update_time, remark, is_delete)
+        VALUES(#{levelCode}, #{levelName}, #{levelOrder}, #{monthlyOrderRequirement},
+            #{inventoryRequirement}, #{inviteLimit}, #{registrationFee}, #{status}, #{createBy}, NOW(),
+            #{createBy}, NOW(), #{remark}, 0)
+    </insert>
+    <update id="updateLevel">
+        UPDATE ry_rental.ry_rental_merchant_level SET level_name=#{levelName}, level_order=#{levelOrder},
+            monthly_order_requirement=#{monthlyOrderRequirement}, inventory_requirement=#{inventoryRequirement},
+            invite_limit=#{inviteLimit}, registration_fee=#{registrationFee}, status=#{status},
+            update_by=#{updateBy}, update_time=NOW(), remark=#{remark}
+        WHERE level_id=#{levelId} AND is_delete=0
+    </update>
+    <update id="softDeleteLevel">
+        UPDATE ry_rental.ry_rental_merchant_level SET is_delete=1, update_by=#{operator}, update_time=NOW()
+        WHERE level_id=#{levelId} AND is_delete=0
+    </update>
+    <select id="countMembersByLevel" resultType="int">
+        SELECT COUNT(1) FROM ry_rental.ry_rental_member WHERE level_id=#{levelId} AND is_delete=0
+    </select>
+    <select id="selectInviteCodeForUpdate" resultType="map">
+        SELECT c.invite_code_id inviteCodeId, c.tenant_id tenantId, c.member_id memberId,
+               c.invite_code inviteCode, c.used_count usedCount, l.invite_limit inviteLimit
+        FROM ry_rental.ry_rental_merchant_invite_code c
+        INNER JOIN ry_rental.ry_rental_member m ON m.tenant_id=c.tenant_id AND m.member_id=c.member_id AND m.is_delete=0
+        INNER JOIN ry_rental.ry_rental_merchant_level l ON l.level_id=m.level_id AND l.status='0' AND l.is_delete=0
+        WHERE c.invite_code=#{inviteCode} AND c.status='0' AND c.is_delete=0 FOR UPDATE
+    </select>
+    <select id="selectInvitationOverview" resultType="map">
+        SELECT c.invite_code inviteCode, c.used_count usedCount, l.level_name levelName,
+               l.invite_limit inviteLimit
+        FROM ry_rental.ry_rental_member m
+        INNER JOIN ry_rental.ry_rental_merchant_level l ON l.level_id=m.level_id AND l.is_delete=0
+        LEFT JOIN ry_rental.ry_rental_merchant_invite_code c ON c.tenant_id=m.tenant_id AND c.member_id=m.member_id AND c.is_delete=0
+        WHERE m.tenant_id=#{tenantId} AND m.member_id=#{memberId} AND m.is_delete=0
+    </select>
+    <select id="selectInvitations" resultType="com.ruoyi.system.api.model.MerchantInvitationRecordVO">
+        SELECT i.invitation_id invitationId, m.member_code inviteeMemberCode, m.nickname inviteeName,
+               i.invitee_phone inviteePhone, i.invite_status inviteStatus,
+               DATE_FORMAT(i.registered_time, '%Y-%m-%d %H:%i:%s') registeredTime
+        FROM ry_rental.ry_rental_merchant_invitation i
+        INNER JOIN ry_rental.ry_rental_member m ON m.member_id=i.invitee_member_id AND m.tenant_id=i.tenant_id AND m.is_delete=0
+        WHERE i.tenant_id=#{tenantId} AND i.inviter_member_id=#{memberId} AND i.is_delete=0
+        ORDER BY i.registered_time DESC, i.invitation_id DESC
+    </select>
+    <insert id="insertInviteCode">
+        INSERT INTO ry_rental.ry_rental_merchant_invite_code(tenant_id, member_id, invite_code, used_count, status,
+            create_by, create_time, update_by, update_time, is_delete)
+        VALUES(#{tenantId}, #{memberId}, #{code}, 0, '0', #{operator}, NOW(), #{operator}, NOW(), 0)
+    </insert>
+    <update id="consumeInviteQuota">
+        UPDATE ry_rental.ry_rental_merchant_invite_code SET used_count=used_count+1, update_by='registration', update_time=NOW()
+        WHERE invite_code_id=#{inviteCodeId} AND used_count &lt; #{inviteLimit} AND status='0' AND is_delete=0
+    </update>
+    <insert id="insertInvitation">
+        INSERT INTO ry_rental.ry_rental_merchant_invitation(tenant_id, invite_code_id, invite_code, inviter_member_id,
+            invitee_member_id, invitee_phone, invite_status, registered_time, create_by, create_time,
+            update_by, update_time, is_delete)
+        VALUES(#{tenantId}, #{inviteCodeId}, #{code}, #{inviterId}, #{inviteeId}, #{phone}, 'registered',
+            NOW(), 'registration', NOW(), 'registration', NOW(), 0)
+    </insert>
+    <insert id="insertRegistrationPayment">
+        INSERT INTO ry_rental.ry_rental_registration_payment(payment_no, member_id, contact_phone, amount, payment_status,
+            create_by, create_time, update_by, update_time, is_delete)
+        SELECT #{paymentNo}, member_id, contact_phone, #{amount}, 'pending', 'registration', NOW(), 'registration', NOW(), 0
+        FROM ry_rental.ry_rental_member WHERE member_id=#{memberId} AND is_delete=0
+    </insert>
+    <select id="selectPaymentForUpdate" resultType="map">
+        SELECT p.payment_id paymentId, p.payment_no paymentNo, p.member_id memberId, p.amount amount,
+               p.payment_status paymentStatus, m.registration_status registrationStatus
+        FROM ry_rental.ry_rental_registration_payment p
+        INNER JOIN ry_rental.ry_rental_member m ON m.member_id=p.member_id AND m.is_delete=0
+        WHERE p.payment_no=#{paymentNo} AND p.is_delete=0 FOR UPDATE
+    </select>
+    <select id="selectPaymentByMember" resultType="map">
+        SELECT payment_no paymentNo, amount paymentAmount, payment_status paymentStatus
+        FROM ry_rental.ry_rental_registration_payment
+        WHERE member_id=#{memberId} AND is_delete=0 ORDER BY payment_id DESC LIMIT 1
+    </select>
+    <update id="markPaymentPaid">
+        UPDATE ry_rental.ry_rental_registration_payment SET payment_status='paid', paid_time=NOW(),
+            update_by='payment-confirm', update_time=NOW()
+        WHERE payment_no=#{paymentNo} AND payment_status='pending' AND is_delete=0
+    </update>
+    <update id="completePaidRegistration">
+        UPDATE ry_rental.ry_rental_member SET registration_status='completed', auth_status='pending',
+            update_by='payment-confirm', update_time=NOW()
+        WHERE member_id=#{memberId} AND registration_status='awaiting_payment' AND is_delete=0
+    </update>
+    <select id="selectPromotionList" resultType="map">
+        SELECT c.invite_code inviteCode, c.used_count usedCount, m.member_code inviterMemberCode,
+               m.nickname inviterName, l.level_name levelName, l.invite_limit inviteLimit,
+               i.invitation_id invitationId, invitee.member_code inviteeMemberCode,
+               invitee.nickname inviteeName, i.invitee_phone inviteePhone,
+               DATE_FORMAT(i.registered_time, '%Y-%m-%d %H:%i:%s') registeredTime
+        FROM ry_rental.ry_rental_merchant_invite_code c
+        INNER JOIN ry_rental.ry_rental_member m ON m.tenant_id=c.tenant_id AND m.member_id=c.member_id AND m.is_delete=0
+        INNER JOIN ry_rental.ry_rental_merchant_level l ON l.level_id=m.level_id AND l.is_delete=0
+        LEFT JOIN ry_rental.ry_rental_merchant_invitation i ON i.invite_code_id=c.invite_code_id AND i.is_delete=0
+        LEFT JOIN ry_rental.ry_rental_member invitee ON invitee.member_id=i.invitee_member_id AND invitee.is_delete=0
+        WHERE c.is_delete=0 ORDER BY c.create_time DESC, i.registered_time DESC
+    </select>
+</mapper>

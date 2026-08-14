@@ -10,12 +10,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.rentalbusiness.domain.MerchantOrderRow;
 import com.ruoyi.rentalbusiness.mapper.MerchantOrderMapper;
 import com.ruoyi.rentalbusiness.model.MerchantOrderListVO;
 import com.ruoyi.rentalbusiness.model.MerchantOrderQuery;
+import com.ruoyi.rentalbusiness.model.MerchantOrderCreateCommand;
 
 /**
  * 商户订单列表应用服务。
@@ -36,15 +39,113 @@ public class MerchantOrderService
     private static final Map<String, String> STATUS_TYPES = createStatusTypes();
 
     private final MerchantOrderMapper orderMapper;
+    private final CodeGeneratorClient codeGeneratorClient;
+    private final MerchantBusinessAuditRecorder auditRecorder;
 
     /**
      * 注入商户订单查询数据访问对象。
      *
      * @param orderMapper 商户订单 Mapper
+     * @param codeGeneratorClient 统一业务编码客户端
+     * @param auditRecorder 商户业务审计记录器
      */
-    public MerchantOrderService(MerchantOrderMapper orderMapper)
+    @Autowired
+    public MerchantOrderService(MerchantOrderMapper orderMapper, CodeGeneratorClient codeGeneratorClient,
+            MerchantBusinessAuditRecorder auditRecorder)
     {
         this.orderMapper = orderMapper;
+        this.codeGeneratorClient = codeGeneratorClient;
+        this.auditRecorder = auditRecorder;
+    }
+
+    /** 保留历史构造方式，供仅需要订单读写能力的测试使用。 */
+    public MerchantOrderService(MerchantOrderMapper orderMapper, CodeGeneratorClient codeGeneratorClient)
+    {
+        this(orderMapper, codeGeneratorClient, null);
+    }
+
+    /** 保留查询服务的轻量构造方式，供现有列表单元测试和只读调用使用。 */
+    public MerchantOrderService(MerchantOrderMapper orderMapper)
+    {
+        this(orderMapper, null);
+    }
+
+    /** 校验商户录单并创建订单主表记录。 */
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public void add(MerchantOrderCreateCommand command)
+    {
+        MerchantContextUtils.requireMerchantApproved();
+        if (command == null || command.customerName == null || command.customerName.trim().isEmpty()
+                || command.customerPhone == null || command.customerPhone.trim().isEmpty())
+        {
+            throw new com.ruoyi.common.core.exception.ServiceException("客户姓名和联系电话不能为空");
+        }
+        if (command.channelId == null
+                || command.leaseStartDate == null || command.leaseEndDate == null
+                || command.leaseStartDate.compareTo(command.leaseEndDate) > 0)
+        {
+            throw new com.ruoyi.common.core.exception.ServiceException("订单渠道和租赁日期范围不能为空或不正确");
+        }
+        validateChannel(command.channelId);
+        if (command.warehouseId != null) MerchantContextUtils.checkWarehouseAccess(command.warehouseId);
+        command.orderNo = codeGeneratorClient.next("order");
+        orderMapper.insertMerchantOrder(MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId(), command,
+                com.ruoyi.common.security.utils.SecurityUtils.getUserId());
+        if (command.productId != null || command.packageId != null || command.snId != null)
+        {
+            orderMapper.insertMerchantOrderItem(MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId(), command,
+                    com.ruoyi.common.security.utils.SecurityUtils.getUserId());
+        }
+        MerchantOrderCreateCommand created = get(command.orderId);
+        audit("订单管理", "CREATE", "ORDER", command.orderId, created.orderNo, "创建订单", null, created);
+    }
+
+    /** 校验并更新当前商户订单，避免跨商户修改订单数据。 */
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public void update(MerchantOrderCreateCommand command)
+    {
+        MerchantContextUtils.requireMerchantApproved();
+        if (command == null || command.orderId == null || command.customerName == null
+                || command.customerName.trim().isEmpty() || command.customerPhone == null
+                || command.customerPhone.trim().isEmpty() || command.leaseStartDate == null
+                || command.leaseEndDate == null || command.channelId == null
+                || command.leaseStartDate.compareTo(command.leaseEndDate) > 0)
+        {
+            throw new com.ruoyi.common.core.exception.ServiceException("订单编辑参数不完整或租赁日期范围不正确");
+        }
+        MerchantOrderCreateCommand before = get(command.orderId);
+        // 编辑页面允许旧订单缺少新增字段，服务端统一补齐数据库非空布尔字段，禁止 null 进入更新 SQL。
+        command.weatherRiskFlag = command.weatherRiskFlag == null ? Boolean.FALSE : command.weatherRiskFlag;
+        command.priorityFlag = command.priorityFlag == null ? Boolean.FALSE : command.priorityFlag;
+        command.orderStatus = command.orderStatus == null || command.orderStatus.trim().isEmpty()
+                ? "pending_ship" : command.orderStatus;
+        command.payStatus = command.payStatus == null || command.payStatus.trim().isEmpty()
+                ? "unpaid" : command.payStatus;
+        validateChannel(command.channelId);
+        if (command.warehouseId != null) MerchantContextUtils.checkWarehouseAccess(command.warehouseId);
+        int updated = orderMapper.updateMerchantOrder(MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId(),
+                command, com.ruoyi.common.security.utils.SecurityUtils.getUserId());
+        if (updated == 0) throw new com.ruoyi.common.core.exception.ServiceException("订单不存在或无权编辑");
+        MerchantOrderCreateCommand after = get(command.orderId);
+        audit("订单管理", "UPDATE", "ORDER", command.orderId, after.orderNo, "编辑订单", before, after);
+    }
+
+    /**
+     * 校验订单渠道主键是否属于当前商户可用范围。
+     *
+     * <p>平台启用的联盟渠道允许全部商户引用，商户自定义渠道只能由所属租户和商户引用；校验失败时
+     * 在写入订单前终止请求，避免跨商户伪造 {@code channel_id} 关系。</p>
+     *
+     * @param channelId 待绑定的订单渠道主键
+     */
+    private void validateChannel(Long channelId)
+    {
+        Long tenantId = MerchantContextUtils.getTenantId();
+        Long memberId = MerchantContextUtils.getMemberId();
+        if (channelId == null || orderMapper.countUsableOrderChannel(tenantId, memberId, channelId) != 1)
+        {
+            throw new com.ruoyi.common.core.exception.ServiceException("订单渠道不存在、已停用或无权使用");
+        }
     }
 
     /**
@@ -69,6 +170,47 @@ public class MerchantOrderService
             result.add(toView(row));
         }
         return result;
+    }
+
+    /** 查询当前商户订单详情，编辑页面只能读取当前登录上下文可见的订单。 */
+    public MerchantOrderCreateCommand get(Long orderId)
+    {
+        MerchantOrderRow row = orderMapper.selectMerchantOrderById(MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId(), orderId);
+        if (row == null || row.orderId == null || !MerchantContextUtils.hasAllWarehouseAccess()
+                && row.warehouseId != null && !MerchantContextUtils.hasWarehouseAccess(row.warehouseId))
+        {
+            throw new com.ruoyi.common.core.exception.ServiceException("订单不存在或无权查看");
+        }
+        MerchantOrderCreateCommand command = new MerchantOrderCreateCommand();
+        command.orderId = row.orderId;
+        command.externalOrderNo = row.externalOrderNo;
+        command.channelId = row.channelId;
+        command.shopName = row.shopName;
+        command.customerName = row.customerName;
+        command.customerPhone = row.customerPhone;
+        command.customerAddress = row.customerAddress;
+        command.warehouseId = row.warehouseId;
+        command.returnWarehouseId = row.returnWarehouseId;
+        command.leaseStartDate = formatDate(row.leaseStartDate);
+        command.leaseEndDate = formatDate(row.leaseEndDate);
+        command.shipDueTime = formatDateTime(row.shipDueTime);
+        command.returnDueTime = formatDateTime(row.returnDueTime);
+        command.rentAmount = row.rentAmount;
+        command.depositAmount = row.depositAmount;
+        command.orderStatus = row.orderStatus;
+        command.payStatus = row.payStatus;
+        command.timeEffectStatus = row.timeEffectStatus;
+        command.weatherRiskFlag = row.weatherRiskFlag != null && row.weatherRiskFlag == 1;
+        command.priorityFlag = row.priorityFlag != null && row.priorityFlag == 1;
+        command.sourceTextSnapshot = row.sourceTextSnapshot;
+        command.productId = row.productId;
+        command.packageId = row.packageId;
+        command.snId = row.snId;
+        command.accessoryItemIds = row.accessoryItemIds;
+        command.quantity = row.quantity;
+        command.version = row.version;
+        command.remark = row.remark;
+        return command;
     }
 
     /**
@@ -114,13 +256,18 @@ public class MerchantOrderService
     private MerchantOrderListVO toView(MerchantOrderRow row)
     {
         MerchantOrderListVO view = new MerchantOrderListVO();
+        view.orderId = row.orderId;
+        view.leaseStartDate = formatDate(row.leaseStartDate);
+        view.leaseEndDate = formatDate(row.leaseEndDate);
+        view.externalOrderNo = row.externalOrderNo;
         view.orderNo = row.orderNo;
         view.model = defaultText(row.modelName, "商品待维护");
         view.packageName = defaultText(row.packageName, "未绑定套餐");
         view.rentalPeriod = formatDate(row.leaseStartDate) + " ~ " + formatDate(row.leaseEndDate);
         view.returnDate = formatDate(row.leaseEndDate);
         view.rent = row.rentAmount == null ? BigDecimal.ZERO : row.rentAmount;
-        view.channel = defaultText(row.channelCode, "未设置渠道");
+        view.channelId = row.channelId;
+        view.channel = defaultText(row.channelName, defaultText(row.channelCode, "未设置渠道"));
         view.merchant = defaultText(row.shopName, "未设置店铺");
         view.customer = toCustomer(row);
         view.shipping = toShipping(row);
@@ -134,8 +281,8 @@ public class MerchantOrderService
         view.productCode = defaultText(row.productCode, "待维护");
         view.addOns = splitAddOns(row.addonNames);
         view.attention = row.attention;
-        view.operator = defaultText(row.createBy, "系统");
-        view.coordinator = defaultText(row.createBy, "待分配");
+        view.operator = row.createBy == null ? "系统" : String.valueOf(row.createBy);
+        view.coordinator = row.createBy == null ? "待分配" : String.valueOf(row.createBy);
         return view;
     }
 
@@ -274,6 +421,28 @@ public class MerchantOrderService
     }
 
     /**
+     * 写入订单业务审计；单元测试未提供记录器时跳过审计，不改变订单主流程。
+     *
+     * @param module 业务模块
+     * @param operationType 操作类型
+     * @param targetType 业务对象类型
+     * @param targetId 订单主键
+     * @param targetName 订单编号
+     * @param description 业务描述
+     * @param before 变更前订单
+     * @param after 变更后订单
+     */
+    private void audit(String module, String operationType, String targetType, Long targetId,
+            String targetName, String description, Object before, Object after)
+    {
+        if (auditRecorder != null)
+        {
+            auditRecorder.record(module, operationType, targetType, String.valueOf(targetId), targetName,
+                    description, before, after);
+        }
+    }
+
+    /**
      * 创建数据库状态编码到中文标签的只读映射。
      *
      * @return 订单状态标签映射
@@ -284,8 +453,12 @@ public class MerchantOrderService
         labels.put("pending_ship", "待发货");
         labels.put("prepared", "已备货");
         labels.put("ship_in_transit", "已发货");
+        labels.put("shipped", "已发货");
+        labels.put("shipping", "运输中");
         labels.put("renting", "租用中");
         labels.put("returning", "归还中");
+        labels.put("overdue_return", "归还逾期");
+        labels.put("overdue", "已逾期");
         labels.put("after_sales", "售后中");
         labels.put("completed", "已完成");
         labels.put("cancelled", "已取消");
@@ -303,8 +476,12 @@ public class MerchantOrderService
         types.put("pending_ship", "warning");
         types.put("prepared", "primary");
         types.put("ship_in_transit", "primary");
+        types.put("shipped", "primary");
+        types.put("shipping", "primary");
         types.put("renting", "success");
         types.put("returning", "warning");
+        types.put("overdue_return", "danger");
+        types.put("overdue", "danger");
         types.put("after_sales", "danger");
         types.put("completed", "success");
         types.put("cancelled", "info");

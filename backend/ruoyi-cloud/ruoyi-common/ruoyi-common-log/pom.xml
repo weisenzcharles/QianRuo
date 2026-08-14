@@ -16,6 +16,12 @@
     </description>
 
     <dependencies>
+
+        <!-- 商户业务审计内部契约，供各业务服务复用统一记录器。 -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-api-merchant</artifactId>
+        </dependency>
 		
         <!-- RuoYi Common Security -->
         <dependency>

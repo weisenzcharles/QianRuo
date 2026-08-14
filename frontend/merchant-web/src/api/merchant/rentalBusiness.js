@@ -58,6 +58,14 @@ function remove(resource, id) {
 /** 查询仓库。 */
 export function listMerchantWarehouses(params) { return list('warehouse', params) }
 
+/** 查询当前商户仓库详情，用于编辑页面完整回显负责人、地址和仓库配置。 */
+export function getMerchantWarehouse(id) { return get('warehouse', id) }
+
+/** 查询本地数据库中的省、市、区县行政区划。 */
+export function listMerchantRegionChildren(parentCode) {
+  return request({ url: '/merchant/region/children', method: 'get', params: { parentCode: parentCode || '0' } })
+}
+
 /** 新增仓库。 */
 export function addMerchantWarehouse(data) { return add('warehouse', data) }
 
@@ -81,6 +89,17 @@ export function deleteMerchantPool(id) { return remove('pool', id) }
 
 /** 查询商品。 */
 export function listMerchantProducts(params) { return list('product', params) }
+
+/**
+ * 查询当前登录商户的商品详情。
+ *
+ * <p>商品归属由 rental-business 从可信登录上下文解析，前端只提交商品主键，
+ * 不携带也不拼接 tenantId、memberId 等隔离字段。</p>
+ *
+ * @param {number} id 商品主键
+ * @returns {Promise} 当前商户商品详情
+ */
+export function getMerchantProduct(id) { return get('product', id) }
 
 /** 新增商品。 */
 export function addMerchantProduct(data) { return add('product', data) }

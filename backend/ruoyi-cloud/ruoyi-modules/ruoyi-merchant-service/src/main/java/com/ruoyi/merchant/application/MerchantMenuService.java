@@ -64,7 +64,11 @@ public class MerchantMenuService
      */
     public List<MerchantRouterVO> currentRouters()
     {
-        List<MerchantMenu> menus = MerchantContextUtils.isMerchantApproved()
+        // 商户所有者是商户管理员，平台启用菜单变更后必须实时获得全部可显示菜单，不能依赖历史授权快照。
+        boolean owner = "owner".equals(MerchantContextUtils.getMemberRole());
+        List<MerchantMenu> menus = owner
+                ? menuMapper.selectDefaultPreviewMenus()
+                : MerchantContextUtils.isMerchantApproved()
                 ? menuMapper.selectByUser(MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId(),
                         SecurityUtils.getUserId())
                 : menuMapper.selectDefaultPreviewMenus();

@@ -17,6 +17,12 @@ public class SmsLoginBody
      */
     private String code;
 
+    /** 图形验证码文本，由网关统一校验。 */
+    private String captchaCode;
+
+    /** 图形验证码唯一标识，由网关统一校验。 */
+    private String uuid;
+
     public String getPhone()
     {
         return phone;
@@ -35,5 +41,29 @@ public class SmsLoginBody
     public void setCode(String code)
     {
         this.code = code;
+    }
+
+    /** 获取图形验证码文本。 */
+    public String getCaptchaCode()
+    {
+        return captchaCode;
+    }
+
+    /** 设置图形验证码文本。 */
+    public void setCaptchaCode(String captchaCode)
+    {
+        this.captchaCode = captchaCode;
+    }
+
+    /** 获取图形验证码唯一标识。 */
+    public String getUuid()
+    {
+        return uuid;
+    }
+
+    /** 设置图形验证码唯一标识。 */
+    public void setUuid(String uuid)
+    {
+        this.uuid = uuid;
     }
 }

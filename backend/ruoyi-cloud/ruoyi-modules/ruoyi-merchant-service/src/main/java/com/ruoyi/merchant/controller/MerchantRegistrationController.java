@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.merchant.application.MerchantRegistrationService;
@@ -68,5 +69,17 @@ public class MerchantRegistrationController
     public R<MerchantRegistrationVO> resubmit(@Valid @RequestBody MerchantRegistrationCommand command)
     {
         return R.ok(registrationService.resubmit(command));
+    }
+
+    /**
+     * 确认付费注册支付完成并进入注册完成状态。
+     *
+     * @param paymentNo 注册支付单号
+     * @return 注册完成后的申请资料
+     */
+    @PostMapping("/payment/{paymentNo}/confirm")
+    public R<MerchantRegistrationVO> confirmPayment(@PathVariable String paymentNo)
+    {
+        return R.ok(registrationService.confirmPayment(paymentNo));
     }
 }

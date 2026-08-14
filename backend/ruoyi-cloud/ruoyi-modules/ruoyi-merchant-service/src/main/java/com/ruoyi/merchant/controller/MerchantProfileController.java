@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.constant.UserConstants;
 import com.ruoyi.common.core.exception.ServiceException;
 import com.ruoyi.common.core.utils.StringUtils;
@@ -18,6 +19,7 @@ import com.ruoyi.common.core.utils.file.MimeTypeUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.common.security.utils.SecurityUtils;
 import com.ruoyi.merchant.api.model.MerchantLoginIdentity;
@@ -48,6 +50,9 @@ public class MerchantProfileController
     @Autowired
     private RemoteMerchantFileService remoteFileService;
 
+    @Autowired
+    private MerchantBusinessAuditRecorder auditRecorder;
+
     @GetMapping
     public AjaxResult profile()
     {
@@ -59,6 +64,7 @@ public class MerchantProfileController
     }
 
     @Log(title = "商户个人信息", businessType = BusinessType.UPDATE)
+    @Transactional(rollbackFor = Exception.class)
     @PutMapping
     public AjaxResult update(@RequestBody MerchantProfileUpdateCommand command)
     {
@@ -84,10 +90,14 @@ public class MerchantProfileController
             return AjaxResult.error("修改个人信息异常，请联系管理员");
         }
         refreshSession();
+        MerchantAccount updated = requireCurrentAccount();
+        auditRecorder.record("个人中心", "UPDATE", "MERCHANT_USER", String.valueOf(current.getUserId()), current.getUsername(),
+                "修改个人资料", current, updated);
         return AjaxResult.success();
     }
 
     @Log(title = "商户个人信息", businessType = BusinessType.UPDATE)
+    @Transactional(rollbackFor = Exception.class)
     @PutMapping("/updatePwd")
     public AjaxResult updatePassword(@RequestBody MerchantPasswordCommand command)
     {
@@ -113,6 +123,7 @@ public class MerchantProfileController
     }
 
     @Log(title = "商户个人信息", businessType = BusinessType.UPDATE)
+    @Transactional(rollbackFor = Exception.class)
     @PutMapping("/initPassword")
     public AjaxResult initializePassword(@RequestBody MerchantPasswordCommand command)
     {
@@ -125,6 +136,7 @@ public class MerchantProfileController
     }
 
     @Log(title = "商户用户头像", businessType = BusinessType.UPDATE)
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/avatar")
     public AjaxResult avatar(@RequestParam("avatarfile") MultipartFile file)
     {
@@ -157,6 +169,9 @@ public class MerchantProfileController
             remoteFileService.delete(oldAvatar);
         }
         refreshSession();
+        MerchantAccount updated = requireCurrentAccount();
+        auditRecorder.record("个人中心", "UPDATE", "MERCHANT_USER", String.valueOf(account.getUserId()), account.getUsername(),
+                "修改用户头像", account, updated);
         AjaxResult result = AjaxResult.success();
         result.put("imgUrl", avatar);
         return result;
@@ -164,6 +179,7 @@ public class MerchantProfileController
 
     private AjaxResult savePassword(String password, boolean initialOnly)
     {
+        MerchantAccount account = requireCurrentAccount();
         if (!validPassword(password))
         {
             return AjaxResult.error("用户密码长度必须在5到20个字符之间");
@@ -176,6 +192,9 @@ public class MerchantProfileController
             return AjaxResult.error(initialOnly ? "设置密码异常，请联系管理员" : "修改密码异常，请联系管理员");
         }
         refreshSession();
+        MerchantAccount updated = requireCurrentAccount();
+        auditRecorder.record("个人中心", "CHANGE_PASSWORD", "MERCHANT_USER", String.valueOf(updated.getUserId()), updated.getUsername(),
+                initialOnly ? "设置初始密码" : "修改登录密码", account, updated);
         return AjaxResult.success();
     }
 

@@ -39,8 +39,20 @@ public class MerchantMapperIsolationContractTest
     public void profileAndWarehouseOperationsAreMerchantScoped() throws Exception
     {
         Document mapper = load("mapper/merchant/MerchantIdentityMapper.xml");
-        assertScoped(mapper, "selectWarehouseIds", "selectRoleKeys", "selectPermissions", "selectWarehouses",
+        assertScoped(mapper, "selectWarehouseIds", "selectRoleKeys", "selectPermissions",
                 "updateProfile", "updateAvatar", "updatePassword");
+    }
+
+    /** 验证商户管理员权限查询会实时覆盖平台当前有效的商户权限项。 */
+    @Test
+    public void merchantAdminPermissionsUseCurrentCatalog() throws Exception
+    {
+        Document mapper = load("mapper/merchant/MerchantIdentityMapper.xml");
+        String permissionSql = statement(mapper, "selectPermissions").replaceAll("\\s+", " ").toLowerCase();
+        require(permissionSql.contains("r.role_key = 'merchant_admin'"),
+                "merchant admin permissions must include the current merchant menu catalog");
+        require(permissionSql.contains("m.tenant_id = 0") && permissionSql.contains("m.member_id = 0"),
+                "merchant admin permissions must only read global merchant menu templates");
     }
 
     /** 验证登录必须关联有效商户绑定，未审核账号使用默认只读权限，且平台开户写操作带有商户归属约束。 */
@@ -64,12 +76,42 @@ public class MerchantMapperIsolationContractTest
                 "insertAdminRoleMenus", "insertAdminUserRole");
     }
 
-    /** 验证商户操作日志读写始终包含租户及商户条件。 */
+    /** 验证商户业务审计日志读写始终包含租户及商户条件，且列表查询不读取大体积快照。 */
     @Test
     public void operationLogReadsAndWritesAreMerchantScoped() throws Exception
     {
-        Document mapper = load("mapper/merchant/MerchantOperLogMapper.xml");
-        assertScoped(mapper, "insert", "selectList");
+        Document mapper = load("mapper/merchant/MerchantBusinessAuditMapper.xml");
+        assertScoped(mapper, "insert", "selectList", "selectById", "selectBusinessModules", "selectOperatorNames");
+        String listSql = statement(mapper, "selectList").replaceAll("\\s+", " ").toLowerCase();
+        require(!listSql.contains("before_content") && !listSql.contains("after_content"),
+                "audit list must not load full before/after snapshots");
+        require(listSql.contains("from `ry_rental`.`ry_rental_audit_log`"),
+                "merchant audit list must read the unified rental business audit source");
+        require(listSql.contains("actor_name") && listSql.contains("client_ip")
+                && listSql.contains("create_time"),
+                "merchant audit filters must use unified rental audit column names");
+        require(listSql.contains("left join `ry_rental`.`ry_rental_merchant_user` u")
+                && listSql.contains("u.merchant_user_id = a.actor_id")
+                && listSql.contains("u.tenant_id = a.tenant_id")
+                && listSql.contains("u.member_id = a.member_id")
+                && listSql.contains("u.user_name") && listSql.contains("u.nick_name"),
+                "merchant audit list must resolve username and nickname from the scoped merchant user table");
+        require(listSql.contains("actor_type = 'merchant_user'"),
+                "merchant audit list must only read merchant user business events");
+        String operatorOptionsSql = statement(mapper, "selectOperatorNames")
+                .replaceAll("\\s+", " ").toLowerCase();
+        require(operatorOptionsSql.contains("u.nick_name")
+                && operatorOptionsSql.contains("left join `ry_rental`.`ry_rental_merchant_user` u")
+                && operatorOptionsSql.contains("nullif(u.nick_name, '')"),
+                "merchant operator options must resolve nickname from the scoped merchant user table");
+        String insertSql = statement(mapper, "insert").replaceAll("\\s+", " ").toLowerCase();
+        require(insertSql.contains("into `ry_rental`.`ry_rental_audit_log`"),
+                "merchant audit writes must use the unified rental business audit source");
+        require(insertSql.contains("actor_id") && insertSql.contains("object_type")
+                && insertSql.contains("before_json") && insertSql.contains("after_json"),
+                "merchant audit writes must map operator, object and snapshot fields");
+        require(!insertSql.contains("ry_rental_merchant_business_audit_log"),
+                "merchant audit writes must not use the retired duplicate audit table");
     }
 
     /** 验证商户产品类目选择的查询、删除和恢复操作始终包含租户及商户条件。 */
@@ -103,8 +145,9 @@ public class MerchantMapperIsolationContractTest
                     || sql.contains("#{record.tenantid}"),
                     statementId + " must include tenantId");
             require(sql.contains("member_id = #{merchantid}") || sql.contains("#{merchantid}")
-                    || sql.contains("#{record.merchantid}"),
-                    statementId + " must include merchantId");
+                    || sql.contains("member_id = #{memberid}") || sql.contains("#{memberid}")
+                    || sql.contains("#{record.merchantid}") || sql.contains("#{record.memberid}"),
+                    statementId + " must include memberId");
         }
     }
 

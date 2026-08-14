@@ -157,6 +157,10 @@ public class AuthFilter implements GlobalFilter, Ordered
         {
             return Constants.CLIENT_TYPE_MERCHANT.equals(clientType);
         }
+        if (path.equals("/platform") || path.startsWith("/platform/"))
+        {
+            return Constants.CLIENT_TYPE_PLATFORM.equals(clientType);
+        }
         return true;
     }
 

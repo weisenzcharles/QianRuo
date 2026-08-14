@@ -46,6 +46,12 @@ public class RemoteMerchantRegistrationFallbackFactory implements FallbackFactor
             {
                 return R.fail("平台商户入驻服务不可用");
             }
+
+            @Override
+            public R<MerchantRegistrationApplicationVO> confirmPayment(String paymentNo, String source)
+            {
+                return R.fail("平台商户入驻支付服务不可用");
+            }
         };
     }
 }

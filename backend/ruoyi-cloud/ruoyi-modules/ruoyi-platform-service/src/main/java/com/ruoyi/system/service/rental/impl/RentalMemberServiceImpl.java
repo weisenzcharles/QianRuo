@@ -13,7 +13,9 @@ import com.ruoyi.common.core.utils.StringUtils;
 import com.ruoyi.merchant.api.RemoteMerchantUserService;
 import com.ruoyi.merchant.api.model.MerchantOwnerProvisionCommand;
 import com.ruoyi.system.domain.rental.RentalMember;
+import com.ruoyi.system.domain.rental.MerchantLevel;
 import com.ruoyi.system.mapper.rental.RentalMemberMapper;
+import com.ruoyi.system.mapper.rental.MerchantPromotionMapper;
 import com.ruoyi.system.model.rental.RentalMemberAuditCommand;
 import com.ruoyi.system.service.rental.IRentalMemberService;
 import com.ruoyi.system.service.rental.RentalMemberCertificationService;
@@ -42,6 +44,9 @@ public class RentalMemberServiceImpl implements IRentalMemberService
 
     @Autowired
     private SysCodeRuleService codeRuleService;
+
+    @Autowired
+    private MerchantPromotionMapper promotionMapper;
 
     /**
      * 查询租赁商户列表
@@ -90,6 +95,9 @@ public class RentalMemberServiceImpl implements IRentalMemberService
             member.setMembershipType(defaultMembershipType(member.getMemberType()));
         }
         member.setMemberCode(codeRuleService.nextCode("merchant"));
+        applyMerchantLevel(member, null);
+        member.setRegistrationMode("paid");
+        member.setRegistrationStatus("completed");
         member.setAuthStatus("pending");
         member.setAuditRemark(null);
         lifecyclePolicy.prepareForCreate(member, DateUtils.getNowDate());
@@ -141,8 +149,35 @@ public class RentalMemberServiceImpl implements IRentalMemberService
         }
         // 修改资料时始终沿用数据库中的系统编码，避免客户端通过空值或自定义值覆盖唯一标识。
         member.setMemberCode(previous.getMemberCode());
+        applyMerchantLevel(member, previous);
+        member.setRegistrationMode(previous.getRegistrationMode());
+        member.setRegistrationStatus(previous.getRegistrationStatus());
+        member.setInviterMemberId(previous.getInviterMemberId());
         lifecyclePolicy.prepareForUpdate(previous, member, DateUtils.getNowDate());
         return memberMapper.updateRentalMember(member);
+    }
+
+    /**
+     * 校验并应用平台选择的商户等级，同时把稳定等级编码同步到历史等级快照字段。
+     *
+     * @param member 待保存商户
+     * @param previous 修改前商户，新增时为空
+     */
+    private void applyMerchantLevel(RentalMember member, RentalMember previous)
+    {
+        Long levelId = member.getLevelId();
+        if (levelId == null && previous != null)
+        {
+            levelId = previous.getLevelId();
+        }
+        MerchantLevel level = levelId == null ? promotionMapper.selectDefaultLevel()
+                : promotionMapper.selectLevelById(levelId);
+        if (level == null || !"0".equals(level.getStatus()))
+        {
+            throw new ServiceException("请选择有效的商户等级");
+        }
+        member.setLevelId(level.getLevelId());
+        member.setVipLevel(level.getLevelCode());
     }
 
     /**

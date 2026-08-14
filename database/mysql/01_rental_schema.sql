@@ -314,7 +314,34 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_oper_log` (
   KEY `idx_merchant_oper_log_scope_status` (`tenant_id`, `member_id`, `status`, `oper_time`),
   KEY `idx_merchant_oper_log_scope_user` (`tenant_id`, `member_id`, `operator_user_id`, `oper_time`),
   KEY `idx_merchant_oper_log_trace` (`trace_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户操作日志';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商户请求级日志兼容保留表（商户业务日志由独立审计表保存）';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_business_audit_log` (
+  `audit_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '审计主键',
+  `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
+  `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `operator_user_id` BIGINT DEFAULT NULL COMMENT '商户用户ID',
+  `operator_name` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '操作人',
+  `business_module` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '业务模块',
+  `operation_type` VARCHAR(32) NOT NULL DEFAULT '' COMMENT '操作类型',
+  `target_type` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '操作对象类型',
+  `target_id` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '操作对象主键或业务编码',
+  `target_name` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '操作对象名称',
+  `description` VARCHAR(1000) NOT NULL DEFAULT '' COMMENT '业务描述',
+  `before_content` JSON DEFAULT NULL COMMENT '变更前脱敏JSON',
+  `after_content` JSON DEFAULT NULL COMMENT '变更后脱敏JSON',
+  `ip_address` VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'IP地址',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '操作状态：0成功 1失败',
+  `error_message` VARCHAR(2000) NOT NULL DEFAULT '' COMMENT '失败原因',
+  `trace_id` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '调用链跟踪号',
+  `operation_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  `is_delete` TINYINT NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`audit_id`),
+  KEY `idx_merchant_business_audit_scope_time` (`tenant_id`, `member_id`, `operation_time`),
+  KEY `idx_merchant_business_audit_module_type` (`tenant_id`, `member_id`, `business_module`, `operation_type`),
+  KEY `idx_merchant_business_audit_operator` (`tenant_id`, `member_id`, `operator_user_id`, `operation_time`),
+  KEY `idx_merchant_business_audit_target` (`tenant_id`, `member_id`, `target_type`, `target_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='历史重复商户业务审计表（已停用，商户日志读取 ry_rental_audit_log）';
 
 CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role` (
   `role_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商户角色ID',
@@ -419,7 +446,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member_product_class` (
 -- 2. 仓库与基础资料
 -- ----------------------------
 
-CREATE TABLE IF NOT EXISTS `ry_rental_warehouse` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_warehouse` (
   `warehouse_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '仓库ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -447,29 +475,39 @@ CREATE TABLE IF NOT EXISTS `ry_rental_warehouse` (
   UNIQUE KEY `uk_rental_warehouse_code` (`member_id`, `warehouse_code`),
   KEY `idx_rental_warehouse_tenant_member` (`tenant_id`, `member_id`),
   KEY `idx_rental_warehouse_city` (`city`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='仓库';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='仓库'; */
 
 CREATE TABLE IF NOT EXISTS `ry_rental_brand_model` (
   `model_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '标准型号ID',
-  `class_id` BIGINT DEFAULT NULL COMMENT '平台产品类目ID',
-  `category_level1` VARCHAR(64) NOT NULL COMMENT '一级分类',
-  `category_level2` VARCHAR(64) DEFAULT NULL COMMENT '二级分类',
-  `category_level3` VARCHAR(64) DEFAULT NULL COMMENT '三级分类',
+  `class_id` BIGINT NOT NULL COMMENT '平台产品类目ID',
   `brand` VARCHAR(64) NOT NULL COMMENT '品牌',
   `model_name` VARCHAR(128) NOT NULL COMMENT '型号',
   `memory_spec` VARCHAR(64) DEFAULT NULL COMMENT '内存/规格',
-  `official_flag` TINYINT NOT NULL DEFAULT 1 COMMENT '是否官方标准',
-  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '状态',
+  `official_flag` CHAR(1) NOT NULL DEFAULT '1' COMMENT '是否官方标准：1是 0否',
+  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '状态：0正常 1停用',
   `create_by` VARCHAR(64) DEFAULT '',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_by` VARCHAR(64) DEFAULT '',
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `remark` VARCHAR(500) DEFAULT NULL,
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
+  `active_class_id` BIGINT GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN `class_id` ELSE NULL END
+  ) STORED COMMENT '有效型号类目唯一键',
+  `active_brand` VARCHAR(64) GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN `brand` ELSE NULL END
+  ) STORED COMMENT '有效型号品牌唯一键',
+  `active_model_name` VARCHAR(128) GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN `model_name` ELSE NULL END
+  ) STORED COMMENT '有效型号名称唯一键',
+  `active_memory_spec` VARCHAR(64) GENERATED ALWAYS AS (
+    CASE WHEN `is_delete` = 0 THEN COALESCE(`memory_spec`, '') ELSE NULL END
+  ) STORED COMMENT '有效型号规格唯一键',
   PRIMARY KEY (`model_id`),
+  UNIQUE KEY `uk_rental_brand_model_active_identity`
+    (`active_class_id`, `active_brand`, `active_model_name`, `active_memory_spec`),
   KEY `idx_rental_brand_model_brand` (`brand`, `model_name`),
-  KEY `idx_rental_brand_model_class` (`class_id`, `status`, `is_delete`),
-  KEY `idx_rental_brand_model_category` (`category_level1`, `category_level2`, `category_level3`)
+  KEY `idx_rental_brand_model_class` (`class_id`, `status`, `is_delete`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统标准品牌型号';
 
 CREATE TABLE IF NOT EXISTS `ry_rental_member_common_model` (
@@ -493,7 +531,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental_member_common_model` (
 -- 3. 商品、SN、配件、套餐
 -- ----------------------------
 
-CREATE TABLE IF NOT EXISTS `ry_rental_product` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_product` (
   `product_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商品ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -528,9 +567,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_product` (
   KEY `idx_rental_product_member_class` (`member_id`, `class_id`, `status`, `is_delete`),
   KEY `idx_rental_product_model` (`model_id`),
   KEY `idx_rental_product_type` (`product_type`, `stock_mode`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品'; */
 
-CREATE TABLE IF NOT EXISTS `ry_rental_asset_sn` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_asset_sn` (
   `sn_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'SN设备ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -563,7 +603,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_asset_sn` (
   KEY `idx_rental_asset_product` (`product_id`),
   KEY `idx_rental_asset_warehouse_status` (`warehouse_id`, `asset_status`),
   KEY `idx_rental_asset_insurance` (`insurance_until`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备SN';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备SN'; */
 
 CREATE TABLE IF NOT EXISTS `ry_rental_asset_photo` (
   `photo_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '照片ID',
@@ -581,7 +621,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental_asset_photo` (
   KEY `idx_rental_asset_photo_tenant` (`tenant_id`, `member_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备照片';
 
-CREATE TABLE IF NOT EXISTS `ry_rental_accessory_item` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_accessory_item` (
   `accessory_item_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '配件实例ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -603,9 +644,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_accessory_item` (
   UNIQUE KEY `uk_rental_accessory_item` (`member_id`, `item_code`),
   KEY `idx_rental_accessory_product` (`product_id`),
   KEY `idx_rental_accessory_warehouse_status` (`warehouse_id`, `item_status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='配件实例';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='配件实例'; */
 
-CREATE TABLE IF NOT EXISTS `ry_rental_package_template` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_package_template` (
   `package_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '套餐ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -624,9 +666,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_package_template` (
   PRIMARY KEY (`package_id`),
   UNIQUE KEY `uk_rental_package_code` (`member_id`, `package_code`),
   KEY `idx_rental_package_tenant_member` (`tenant_id`, `member_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='套餐模板';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='套餐模板'; */
 
-CREATE TABLE IF NOT EXISTS `ry_rental_package_item` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_package_item` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -642,13 +685,14 @@ CREATE TABLE IF NOT EXISTS `ry_rental_package_item` (
   PRIMARY KEY (`id`),
   KEY `idx_rental_package_item_package` (`package_id`),
   KEY `idx_rental_package_item_product` (`product_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='套餐物料明细';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='套餐物料明细'; */
 
 -- ----------------------------
 -- 4. 客户、订单、订单明细
 -- ----------------------------
 
-CREATE TABLE IF NOT EXISTS `ry_rental_customer` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_customer` (
   `customer_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '客户ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -673,9 +717,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_customer` (
   KEY `idx_rental_customer_member_phone` (`member_id`, `phone`),
   KEY `idx_rental_customer_tenant` (`tenant_id`, `member_id`),
   KEY `idx_rental_customer_openid` (`wechat_openid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁客户';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁客户'; */
 
-CREATE TABLE IF NOT EXISTS `ry_rental_order` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_order` (
   `order_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '订单ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -718,9 +763,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order` (
   KEY `idx_rental_order_return_due` (`member_id`, `return_warehouse_id`, `return_due_time`),
   KEY `idx_rental_order_customer` (`customer_id`),
   KEY `idx_rental_order_external` (`channel_code`, `external_order_no`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁订单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁订单'; */
 
-CREATE TABLE IF NOT EXISTS `ry_rental_order_item` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_order_item` (
   `order_item_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '订单明细ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -741,7 +787,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order_item` (
   KEY `idx_rental_order_item_order` (`order_id`),
   KEY `idx_rental_order_item_sn` (`sn_id`),
   KEY `idx_rental_order_item_product` (`product_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单商品明细';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单商品明细'; */
 
 CREATE TABLE IF NOT EXISTS `ry_rental_order_edit_log` (
   `log_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '编辑日志ID',
@@ -763,7 +809,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order_edit_log` (
   KEY `idx_rental_order_edit_tenant` (`tenant_id`, `member_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单编辑日志';
 
-CREATE TABLE IF NOT EXISTS `ry_rental_order_note` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_order_note` (
   `note_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '批注ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -778,13 +825,14 @@ CREATE TABLE IF NOT EXISTS `ry_rental_order_note` (
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`note_id`),
   KEY `idx_rental_order_note_order` (`order_id`, `pinned_flag`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单批注';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单批注'; */
 
 -- ----------------------------
 -- 5. 库存、预占、调货、盘点
 -- ----------------------------
 
-CREATE TABLE IF NOT EXISTS `ry_rental_inventory_reservation` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_inventory_reservation` (
   `reservation_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '库存预占ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -806,9 +854,10 @@ CREATE TABLE IF NOT EXISTS `ry_rental_inventory_reservation` (
   KEY `idx_rental_reservation_order` (`order_id`),
   KEY `idx_rental_reservation_stock` (`member_id`, `warehouse_id`, `product_id`, `reservation_status`),
   KEY `idx_rental_reservation_expire` (`expire_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存预占';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存预占'; */
 
-CREATE TABLE IF NOT EXISTS `ry_rental_inventory_ledger` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_inventory_ledger` (
   `ledger_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '库存流水ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -833,7 +882,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_inventory_ledger` (
   KEY `idx_rental_inventory_ledger_sn` (`sn_id`, `create_time`),
   KEY `idx_rental_inventory_ledger_ref` (`ref_type`, `ref_id`),
   KEY `idx_rental_inventory_ledger_wh_product` (`warehouse_id`, `product_id`, `create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存状态流水';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存状态流水'; */
 
 CREATE TABLE IF NOT EXISTS `ry_rental_inventory_snapshot` (
   `snapshot_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '库存快照ID',
@@ -928,7 +977,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental_stocktaking_item` (
 -- 6. 物流、媒体、售后
 -- ----------------------------
 
-CREATE TABLE IF NOT EXISTS `ry_rental_logistics_order` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_logistics_order` (
   `logistics_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '物流单ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
@@ -956,7 +1006,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_logistics_order` (
   KEY `idx_rental_logistics_order` (`order_id`, `direction`),
   KEY `idx_rental_logistics_member_status` (`member_id`, `route_status`),
   KEY `idx_rental_logistics_pickup` (`pickup_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物流单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物流单'; */
 
 CREATE TABLE IF NOT EXISTS `ry_rental_logistics_route` (
   `route_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '路由ID',
@@ -1323,7 +1373,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental_deposit_free_code` (
 -- 11. 幂等、审计、风控
 -- ----------------------------
 
-CREATE TABLE IF NOT EXISTS `ry_rental_idempotent_request` (
+/* 历史执行面表已迁入 ry_business；新环境不再创建。 */
+/* CREATE TABLE IF NOT EXISTS `ry_rental_idempotent_request` (
   `request_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '幂等请求ID',
   `idempotent_key` VARCHAR(128) NOT NULL COMMENT '幂等Key',
   `tenant_id` BIGINT DEFAULT NULL COMMENT '租户ID',
@@ -1339,7 +1390,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_idempotent_request` (
   PRIMARY KEY (`request_id`),
   UNIQUE KEY `uk_rental_idempotent_key` (`idempotent_key`),
   KEY `idx_rental_idempotent_expire` (`expire_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='接口幂等记录';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='接口幂等记录'; */
 
 CREATE TABLE IF NOT EXISTS `ry_rental_audit_log` (
   `audit_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '审计ID',
@@ -1349,12 +1400,19 @@ CREATE TABLE IF NOT EXISTS `ry_rental_audit_log` (
   `actor_name` VARCHAR(64) DEFAULT NULL COMMENT '操作人',
   `actor_type` VARCHAR(32) DEFAULT NULL COMMENT '操作人类型',
   `action_code` VARCHAR(128) NOT NULL COMMENT '动作编码',
+  `business_module` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '业务模块',
+  `operation_type` VARCHAR(32) NOT NULL DEFAULT '' COMMENT '业务操作类型',
   `object_type` VARCHAR(64) NOT NULL COMMENT '对象类型',
   `object_id` VARCHAR(64) DEFAULT NULL COMMENT '对象ID',
+  `target_name` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '业务对象名称',
+  `description` VARCHAR(1000) NOT NULL DEFAULT '' COMMENT '业务操作描述',
   `before_json` JSON COMMENT '变更前',
   `after_json` JSON COMMENT '变更后',
   `sensitive_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否敏感操作',
   `client_ip` VARCHAR(64) DEFAULT NULL COMMENT 'IP',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '操作状态：0成功 1失败',
+  `error_message` VARCHAR(2000) NOT NULL DEFAULT '' COMMENT '失败原因',
+  `trace_id` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '调用链跟踪号',
   `user_agent` VARCHAR(500) DEFAULT NULL COMMENT 'UA',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
@@ -1363,7 +1421,8 @@ CREATE TABLE IF NOT EXISTS `ry_rental_audit_log` (
   KEY `idx_rental_audit_actor` (`actor_id`, `create_time`),
   KEY `idx_rental_audit_object` (`object_type`, `object_id`),
   KEY `idx_rental_audit_tenant` (`tenant_id`, `member_id`, `create_time`),
+  KEY `idx_rental_audit_business_scope_time` (`tenant_id`, `member_id`, `business_module`, `operation_type`, `create_time`, `is_delete`),
   KEY `idx_rental_audit_sensitive` (`sensitive_flag`, `create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁业务审计日志';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='租赁域统一业务审计日志（商户业务日志页面事实来源）';
 
 SET FOREIGN_KEY_CHECKS = 1;

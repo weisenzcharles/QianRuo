@@ -35,9 +35,9 @@
           <el-form-item label="支付宝账号" prop="alipayAccount">
             <el-input v-model="form.alipayAccount" placeholder="请输入支付宝账号" />
           </el-form-item>
-          <el-form-item label="会员等级" prop="vipLevel">
-            <el-select v-model="form.vipLevel" style="width: 100%">
-              <el-option v-for="item in rentalVipLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
+          <el-form-item label="会员等级" prop="levelId">
+            <el-select v-model="form.levelId" style="width: 100%">
+              <el-option v-for="item in levelOptions" :key="item.levelId" :label="item.levelName" :value="item.levelId" :disabled="item.status !== '0'" />
             </el-select>
           </el-form-item>
           <el-form-item label="存储额度MB" prop="storageQuotaMb">
@@ -153,7 +153,9 @@
 </template>
 
 <script setup>
-import { rentalAuthStatusOptions, rentalMemberTypeOptions, rentalVipLevelOptions } from '@/utils/rental/options'
+import { rentalAuthStatusOptions, rentalMemberTypeOptions } from '@/utils/rental/options'
+
+defineProps({ levelOptions: { type: Array, default: () => [] } })
 
 const form = defineModel({ type: Object, required: true })
 const editorFormRef = ref()
@@ -173,7 +175,7 @@ const rules = {
   licenseValidTo: [{ validator: validateLicensePeriod, trigger: 'change' }],
   contractValidTo: [{ validator: validateContractPeriod, trigger: 'change' }],
   authStatus: [{ required: true, message: '认证状态不能为空', trigger: 'change' }],
-  vipLevel: [{ required: true, message: '会员等级不能为空', trigger: 'change' }],
+  levelId: [{ required: true, message: '会员等级不能为空', trigger: 'change' }],
   storageQuotaMb: [{ required: true, message: '存储额度不能为空', trigger: 'blur' }],
   externalAcceptEnabled: [{ required: true, message: '对外接单状态不能为空', trigger: 'change' }],
   status: [{ required: true, message: '冻结状态不能为空', trigger: 'change' }]

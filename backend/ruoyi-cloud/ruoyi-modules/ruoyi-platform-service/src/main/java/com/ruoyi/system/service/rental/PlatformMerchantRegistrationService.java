@@ -1,6 +1,8 @@
 package com.ruoyi.system.service.rental;
 
 import java.util.Date;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,8 @@ import com.ruoyi.system.api.model.MerchantRegistrationApplicationCommand;
 import com.ruoyi.system.api.model.MerchantRegistrationApplicationVO;
 import com.ruoyi.system.domain.rental.RentalMember;
 import com.ruoyi.system.mapper.rental.RentalMemberMapper;
+import com.ruoyi.system.mapper.rental.MerchantPromotionMapper;
+import com.ruoyi.system.domain.rental.MerchantLevel;
 import com.ruoyi.system.service.SysCodeRuleService;
 
 /** 平台持有的商户入驻申请应用服务。 */
@@ -27,6 +31,10 @@ public class PlatformMerchantRegistrationService
     private static final String REJECTED = "rejected";
     private static final String VERIFIED = "verified";
     private static final String REGISTRATION_OPERATOR = "merchant-registration";
+    private static final String PAID = "paid";
+    private static final String INVITE = "invite";
+    private static final String AWAITING_PAYMENT = "awaiting_payment";
+    private static final String COMPLETED = "completed";
 
     @Autowired
     private RentalMemberMapper memberMapper;
@@ -42,6 +50,9 @@ public class PlatformMerchantRegistrationService
 
     @Autowired
     private SysCodeRuleService codeRuleService;
+
+    @Autowired
+    private MerchantPromotionMapper promotionMapper;
 
     /**
      * 创建一条新的商户入驻申请。商户编码、租户、审核状态及默认配额均由平台服务生成，
@@ -60,22 +71,95 @@ public class PlatformMerchantRegistrationService
             throw new ServiceException(statusMessage(existing.getAuthStatus()));
         }
 
+        MerchantLevel defaultLevel = promotionMapper.selectDefaultLevel();
+        if (defaultLevel == null)
+        {
+            throw new ServiceException("平台未配置可用的商户等级");
+        }
+        Map<String, Object> invite = null;
+        if (INVITE.equals(command.getRegistrationMode()))
+        {
+            invite = promotionMapper.selectInviteCodeForUpdate(command.getInviteCode().trim().toUpperCase());
+            if (invite == null)
+            {
+                throw new ServiceException("邀请码无效或已停用");
+            }
+            if (intValue(invite.get("usedCount")) >= intValue(invite.get("inviteLimit")))
+            {
+                throw new ServiceException("该邀请码的邀请名额已用完");
+            }
+        }
+
         RentalMember member = new RentalMember();
         copyApplication(command, member);
         member.setTenantId(DEFAULT_TENANT_ID);
         member.setMemberCode(codeRuleService.nextCode("merchant"));
         member.setMembershipType(defaultMembershipType(member.getMemberType()));
-        member.setAuthStatus(PENDING);
-        member.setVipLevel("free");
+        member.setAuthStatus(PAID.equals(command.getRegistrationMode()) ? "payment_pending" : PENDING);
+        member.setVipLevel(defaultLevel.getLevelCode());
+        member.setLevelId(defaultLevel.getLevelId());
+        member.setRegistrationMode(command.getRegistrationMode());
+        member.setRegistrationStatus(PAID.equals(command.getRegistrationMode()) ? AWAITING_PAYMENT : COMPLETED);
+        member.setInviterMemberId(invite == null ? null : longValue(invite.get("memberId")));
         member.setStorageQuotaMb(1024L);
         member.setExternalAcceptEnabled(0);
         member.setStatus("0");
         member.setCreateBy(REGISTRATION_OPERATOR);
         lifecyclePolicy.prepareForCreate(member, DateUtils.getNowDate());
         memberMapper.insertRentalMember(member);
-        certificationService.createPendingCertification(member, REGISTRATION_OPERATOR);
-        provisionMerchantOwner(member);
-        return toVO(member);
+        MerchantRegistrationApplicationVO result = toVO(member);
+        if (PAID.equals(command.getRegistrationMode()))
+        {
+            String paymentNo = "REG" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
+            promotionMapper.insertRegistrationPayment(member.getMemberId(), paymentNo, defaultLevel.getRegistrationFee());
+            result.setPaymentNo(paymentNo);
+            result.setPaymentAmount(defaultLevel.getRegistrationFee());
+        }
+        else
+        {
+            Long inviteCodeId = longValue(invite.get("inviteCodeId"));
+            Integer inviteLimit = intValue(invite.get("inviteLimit"));
+            if (promotionMapper.consumeInviteQuota(inviteCodeId, inviteLimit) == 0)
+            {
+                throw new ServiceException("邀请码名额已被使用完，请更换邀请码");
+            }
+            promotionMapper.insertInvitation(longValue(invite.get("tenantId")), inviteCodeId,
+                    String.valueOf(invite.get("inviteCode")), longValue(invite.get("memberId")),
+                    member.getMemberId(), member.getContactPhone());
+            certificationService.createPendingCertification(member, REGISTRATION_OPERATOR);
+            provisionMerchantOwner(member);
+        }
+        return result;
+    }
+
+    /**
+     * 幂等确认注册支付单，并在首次支付成功时创建认证申请和商户所有者账号。
+     *
+     * @param paymentNo 注册支付单号
+     * @return 注册完成后的申请资料
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public MerchantRegistrationApplicationVO confirmPayment(String paymentNo)
+    {
+        Map<String, Object> payment = promotionMapper.selectPaymentForUpdate(paymentNo);
+        if (payment == null)
+        {
+            throw new ServiceException("注册支付单不存在");
+        }
+        Long memberId = longValue(payment.get("memberId"));
+        RentalMember member = memberMapper.selectRentalMemberById(memberId);
+        if (!"paid".equals(String.valueOf(payment.get("paymentStatus"))))
+        {
+            promotionMapper.markPaymentPaid(paymentNo);
+            if (promotionMapper.completePaidRegistration(memberId) == 0)
+            {
+                throw new ServiceException("注册状态已变化，请重新查询");
+            }
+            member = memberMapper.selectRentalMemberById(memberId);
+            certificationService.createPendingCertification(member, REGISTRATION_OPERATOR);
+            provisionMerchantOwner(member);
+        }
+        return toVO(memberMapper.selectRentalMemberById(memberId));
     }
 
     /**
@@ -151,6 +235,14 @@ public class PlatformMerchantRegistrationService
         require(command.getNickname(), "店铺名称不能为空");
         require(command.getContactName(), "联系人不能为空");
         requirePhone(command.getContactPhone());
+        if (!StringUtils.equalsAny(command.getRegistrationMode(), PAID, INVITE))
+        {
+            throw new ServiceException("注册方式不正确");
+        }
+        if (INVITE.equals(command.getRegistrationMode()))
+        {
+            require(command.getInviteCode(), "邀请码不能为空");
+        }
         if (!StringUtils.equalsAny(command.getMemberType(), "personal", "enterprise"))
         {
             throw new ServiceException("商户类型不正确");
@@ -238,8 +330,22 @@ public class PlatformMerchantRegistrationService
         result.setLegalRepresentativeIdNo(member.getLegalRepresentativeIdNo());
         result.setLegalIdFrontUrl(member.getLegalIdFrontUrl());
         result.setLegalIdBackUrl(member.getLegalIdBackUrl());
+        result.setRegistrationMode(member.getRegistrationMode());
+        result.setRegistrationStatus(member.getRegistrationStatus());
+        Map<String, Object> payment = promotionMapper.selectPaymentByMember(member.getMemberId());
+        if (payment != null)
+        {
+            result.setPaymentNo(String.valueOf(payment.get("paymentNo")));
+            result.setPaymentAmount((java.math.BigDecimal) payment.get("paymentAmount"));
+        }
         return result;
     }
+
+    /** @param value 数据库数值 @return 长整数 */
+    private Long longValue(Object value) { return value == null ? null : ((Number) value).longValue(); }
+
+    /** @param value 数据库数值 @return 整数 */
+    private int intValue(Object value) { return value == null ? 0 : ((Number) value).intValue(); }
 
     /**
      * 解析申请中的日期文本，空值保留为空，格式错误时返回明确业务提示。

@@ -53,4 +53,15 @@ public interface RemoteMerchantRegistrationService
     @PutMapping(INTERNAL_PREFIX)
     R<MerchantRegistrationApplicationVO> resubmit(@RequestBody MerchantRegistrationApplicationCommand command,
             @RequestHeader(SecurityConstants.FROM_SOURCE) String source);
+
+    /**
+     * 确认注册支付单已完成支付。
+     *
+     * @param paymentNo 注册支付单号
+     * @param source 内部调用标识
+     * @return 完成注册后的申请资料
+     */
+    @PostMapping(INTERNAL_PREFIX + "/payment/{paymentNo}/confirm")
+    R<MerchantRegistrationApplicationVO> confirmPayment(@PathVariable("paymentNo") String paymentNo,
+            @RequestHeader(SecurityConstants.FROM_SOURCE) String source);
 }

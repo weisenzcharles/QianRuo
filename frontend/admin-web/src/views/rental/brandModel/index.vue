@@ -36,11 +36,17 @@
       <el-table-column label="型号" prop="modelName" min-width="180" />
       <el-table-column label="内存/规格" prop="memorySpec" min-width="130" show-overflow-tooltip />
       <el-table-column label="官方标准" prop="officialFlag" width="100" align="center">
-        <template #default="scope">{{ scope.row.officialFlag === '1' ? '是' : '否' }}</template>
+        <template #default="scope">
+          <el-tag :type="flagValue(scope.row.officialFlag) === '1' ? 'primary' : 'info'">
+            {{ flagValue(scope.row.officialFlag) === '1' ? '是' : '否' }}
+          </el-tag>
+        </template>
       </el-table-column>
       <el-table-column label="状态" prop="status" width="90" align="center">
         <template #default="scope">
-          <el-tag :type="scope.row.status === '0' ? 'success' : 'info'">{{ scope.row.status === '0' ? '正常' : '停用' }}</el-tag>
+          <el-tag :type="flagValue(scope.row.status) === '0' ? 'success' : 'info'">
+            {{ flagValue(scope.row.status) === '0' ? '正常' : '停用' }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" prop="createTime" width="180" align="center" />
@@ -57,16 +63,16 @@
     <el-dialog v-model="dialogOpen" :title="dialogTitle" width="620px" append-to-body>
       <el-form ref="modelFormRef" :model="form" :rules="rules" label-width="110px">
         <el-form-item label="产品类目" prop="classId">
-          <el-tree-select v-model="form.classId" :data="classOptions" :props="treeProps" check-strictly filterable placeholder="请选择产品类目" style="width: 100%" />
+          <el-tree-select v-model="form.classId" :data="classOptions" :props="treeProps" check-strictly filterable default-expand-all placeholder="请选择产品类目" style="width: 100%" />
         </el-form-item>
         <el-row :gutter="16">
-          <el-col :span="12"><el-form-item label="品牌" prop="brand"><el-input v-model="form.brand" maxlength="64" placeholder="请输入品牌" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="型号" prop="modelName"><el-input v-model="form.modelName" maxlength="128" placeholder="请输入型号" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="内存/规格" prop="memorySpec"><el-input v-model="form.memorySpec" maxlength="64" placeholder="可选" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="品牌" prop="brand"><el-input v-model="form.brand" maxlength="64" show-word-limit placeholder="请输入品牌" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="型号" prop="modelName"><el-input v-model="form.modelName" maxlength="128" show-word-limit placeholder="请输入型号" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="内存/规格" prop="memorySpec"><el-input v-model="form.memorySpec" maxlength="64" show-word-limit placeholder="可选" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="官方标准" prop="officialFlag"><el-radio-group v-model="form.officialFlag"><el-radio value="1">是</el-radio><el-radio value="0">否</el-radio></el-radio-group></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="状态" prop="status"><el-radio-group v-model="form.status"><el-radio value="0">正常</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item></el-col>
         </el-row>
-        <el-form-item label="备注" prop="remark"><el-input v-model="form.remark" type="textarea" maxlength="500" show-word-limit /></el-form-item>
+        <el-form-item label="备注" prop="remark"><el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="请输入维护备注" /></el-form-item>
       </el-form>
       <template #footer><el-button type="primary" @click="submitForm">确定</el-button><el-button @click="cancel">取消</el-button></template>
     </el-dialog>
@@ -85,13 +91,14 @@ const loading = ref(false)
 const showSearch = ref(true)
 const dialogOpen = ref(false)
 const dialogTitle = ref('')
-const treeProps = { value: 'classId', label: 'className', children: 'children' }
+const treeProps = { value: 'classId', label: 'classLabel', children: 'children' }
 const queryParams = reactive({ pageNum: 1, pageSize: 10, brand: undefined, modelName: undefined, classId: undefined, status: undefined })
 const form = ref({})
 const rules = {
   classId: [{ required: true, message: '产品类目不能为空', trigger: 'change' }],
   brand: [{ required: true, message: '品牌不能为空', trigger: 'blur' }],
   modelName: [{ required: true, message: '型号不能为空', trigger: 'blur' }],
+  officialFlag: [{ required: true, message: '官方标准标识不能为空', trigger: 'change' }],
   status: [{ required: true, message: '状态不能为空', trigger: 'change' }]
 }
 
@@ -106,7 +113,9 @@ function getList() {
 
 /** 加载正常产品类目，作为型号归属选择。 */
 function loadClassOptions() {
-  listProductClass({ status: '0' }).then(response => { classOptions.value = response.data || [] })
+  listProductClass({ status: '0' }).then(response => {
+    classOptions.value = buildClassOptions(response.data || [], [])
+  })
 }
 
 /** 重置查询条件并回到第一页。 */
@@ -124,16 +133,29 @@ function handleQuery() {
 
 /** 打开新增标准型号表单。 */
 function handleAdd() {
-  form.value = { classId: undefined, brand: undefined, modelName: undefined, memorySpec: undefined, officialFlag: '1', status: '0', remark: undefined }
-  dialogTitle.value = '新增标准品牌型号'
+  if (classOptions.value.length === 0) {
+    proxy.$modal.msgWarning('请先新增并启用产品类目')
+    return
+  }
+  form.value = emptyForm()
+  dialogTitle.value = '新增标准型号'
   dialogOpen.value = true
 }
 
 /** 加载指定标准型号详情并打开编辑表单。 */
 function handleUpdate(row) {
   getBrandModel(row.modelId).then(response => {
-    form.value = response.data
-    dialogTitle.value = '修改标准品牌型号'
+    form.value = {
+      modelId: response.data.modelId,
+      classId: response.data.classId,
+      brand: response.data.brand,
+      modelName: response.data.modelName,
+      memorySpec: response.data.memorySpec,
+      officialFlag: flagValue(response.data.officialFlag, '1'),
+      status: flagValue(response.data.status, '0'),
+      remark: response.data.remark
+    }
+    dialogTitle.value = '修改标准型号'
     dialogOpen.value = true
   })
 }
@@ -150,7 +172,17 @@ function handleDelete(row) {
 function submitForm() {
   proxy.$refs.modelFormRef.validate(valid => {
     if (!valid) return
-    const request = form.value.modelId ? updateBrandModel(form.value) : addBrandModel(form.value)
+    const payload = {
+      modelId: form.value.modelId,
+      classId: form.value.classId,
+      brand: form.value.brand,
+      modelName: form.value.modelName,
+      memorySpec: form.value.memorySpec,
+      officialFlag: flagValue(form.value.officialFlag, '1'),
+      status: flagValue(form.value.status, '0'),
+      remark: form.value.remark
+    }
+    const request = form.value.modelId ? updateBrandModel(payload) : addBrandModel(payload)
     request.then(() => {
       proxy.$modal.msgSuccess(form.value.modelId ? '修改成功' : '新增成功')
       dialogOpen.value = false
@@ -163,6 +195,51 @@ function submitForm() {
 function cancel() {
   dialogOpen.value = false
   proxy.resetForm('modelFormRef')
+}
+
+/** 创建标准型号录入表单的稳定初始值，避免新增操作复用上一次编辑数据。 */
+function emptyForm() {
+  return {
+    modelId: undefined,
+    classId: undefined,
+    brand: '',
+    modelName: '',
+    memorySpec: '',
+    officialFlag: '1',
+    status: '0',
+    remark: ''
+  }
+}
+
+/**
+ * 将产品类目树转换为带完整层级路径的下拉选项，避免同名子类目无法区分。
+ *
+ * @param {Array<object>} nodes 当前层级的产品类目节点
+ * @param {Array<string>} parentNames 当前节点之前的类目名称路径
+ * @returns {Array<object>} 带 classLabel 的产品类目树
+ */
+function buildClassOptions(nodes, parentNames) {
+  return nodes.map(node => {
+    const names = parentNames.concat(node.className)
+    return {
+      ...node,
+      classLabel: names.join(' / '),
+      children: buildClassOptions(node.children || [], names)
+    }
+  })
+}
+
+/**
+ * 将后端可能返回的布尔值或数字标识统一转换为字符串 0/1。
+ *
+ * @param {string|number|boolean|null|undefined} value 待转换的状态值
+ * @param {string} fallback 值为空时使用的默认标识
+ * @returns {string} 可供单选框和状态标签稳定使用的字符串标识
+ */
+function flagValue(value, fallback = '0') {
+  if (value === undefined || value === null || value === '') return fallback
+  if (value === true || value === 1 || value === '1' || value === 'true') return '1'
+  return '0'
 }
 
 loadClassOptions()

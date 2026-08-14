@@ -18,6 +18,11 @@ public class ServiceNameConstants
     public static final String PLATFORM_SERVICE = "platform-service";
 
     /**
+     * 租赁业务服务的 serviceid。
+     */
+    public static final String RENTAL_BUSINESS_SERVICE = "rental-business";
+
+    /**
      * 文件服务的serviceid
      */
     public static final String FILE_SERVICE = "ruoyi-file";
