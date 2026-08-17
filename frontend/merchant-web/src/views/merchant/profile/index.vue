@@ -27,7 +27,13 @@
         <el-table-column label="资格" prop="qualificationCode">
           <template #default="scope">{{ qualificationLabel(scope.row.qualificationCode) }}</template>
         </el-table-column>
-        <el-table-column label="状态" prop="qualificationStatus" width="120" />
+        <el-table-column label="状态" width="120">
+          <template #default="scope">
+            <el-tag :type="getQualificationStatusTagType(scope.row.qualificationStatus)">
+              {{ getQualificationStatusLabel(scope.row.qualificationStatus) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="审核时间" width="190">
           <template #default="scope">{{ formatTime(scope.row.reviewedAt) }}</template>
         </el-table-column>
@@ -58,6 +64,7 @@
 <script setup>
 import { getMerchantCertification } from '@/api/merchant/certification'
 import { parseTime } from '@/utils/ruoyi'
+import { getQualificationStatusLabel, getQualificationStatusTagType } from '@/utils/rental/options'
 
 const certification = ref({
   authStatus: 'pending',

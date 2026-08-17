@@ -68,6 +68,7 @@ BEGIN
     DECLARE current_table VARCHAR(64);
     DECLARE has_isdeleted INT DEFAULT 0;
     DECLARE has_del_flag INT DEFAULT 0;
+    DECLARE needs_normalize INT DEFAULT 0;
     DECLARE application_tables CURSOR FOR
         SELECT table_schema, table_name
         FROM information_schema.tables
@@ -128,22 +129,27 @@ BEGIN
             DEALLOCATE PREPARE drop_del_flag_statement;
         END IF;
 
-        SET @normalize_isdeleted_sql = CONCAT(
-            'UPDATE `', current_schema, '`.`', current_table,
-            '` SET `is_delete` = CASE WHEN COALESCE(`is_delete`, 0) = 0 THEN 0 ELSE 1 END'
-        );
-        PREPARE normalize_isdeleted_statement FROM @normalize_isdeleted_sql;
-        EXECUTE normalize_isdeleted_statement;
-        DEALLOCATE PREPARE normalize_isdeleted_statement;
+        -- 部署脚本会重复执行幂等迁移；没有新增字段或遗留 del_flag 时跳过全表 UPDATE/ALTER，
+        -- 避免每次部署重复写 binlog 并长时间锁表。
+        SET needs_normalize = CASE WHEN has_isdeleted = 0 OR has_del_flag > 0 THEN 1 ELSE 0 END;
+        IF needs_normalize = 1 THEN
+            SET @normalize_isdeleted_sql = CONCAT(
+                'UPDATE `', current_schema, '`.`', current_table,
+                '` SET `is_delete` = CASE WHEN COALESCE(`is_delete`, 0) = 0 THEN 0 ELSE 1 END'
+            );
+            PREPARE normalize_isdeleted_statement FROM @normalize_isdeleted_sql;
+            EXECUTE normalize_isdeleted_statement;
+            DEALLOCATE PREPARE normalize_isdeleted_statement;
 
-        SET @normalize_isdeleted_type_sql = CONCAT(
-            'ALTER TABLE `', current_schema, '`.`', current_table,
-            '` MODIFY COLUMN `is_delete` TINYINT(1) NOT NULL DEFAULT 0 ',
-            'COMMENT ''软删除标识：0正常 1删除'''
-        );
-        PREPARE normalize_isdeleted_type_statement FROM @normalize_isdeleted_type_sql;
-        EXECUTE normalize_isdeleted_type_statement;
-        DEALLOCATE PREPARE normalize_isdeleted_type_statement;
+            SET @normalize_isdeleted_type_sql = CONCAT(
+                'ALTER TABLE `', current_schema, '`.`', current_table,
+                '` MODIFY COLUMN `is_delete` TINYINT(1) NOT NULL DEFAULT 0 ',
+                'COMMENT ''软删除标识：0正常 1删除'''
+            );
+            PREPARE normalize_isdeleted_type_statement FROM @normalize_isdeleted_type_sql;
+            EXECUTE normalize_isdeleted_type_statement;
+            DEALLOCATE PREPARE normalize_isdeleted_type_statement;
+        END IF;
     END LOOP;
     CLOSE application_tables;
 END$$

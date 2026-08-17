@@ -22,6 +22,20 @@ export function getMerchantWarehouseOptions(memberId) {
   })
 }
 
+export function listMerchantUserRoleOptions(memberId) {
+  return request({
+    url: '/admin/rental/merchantUser/roleOptions/' + memberId,
+    method: 'get'
+  })
+}
+
+export function merchantUserMenuTreeselect(memberId) {
+  return request({
+    url: '/admin/rental/merchantUser/menuTreeselect/' + memberId,
+    method: 'get'
+  })
+}
+
 export function addMerchantUser(data) {
   return request({
     url: '/admin/rental/merchantUser',

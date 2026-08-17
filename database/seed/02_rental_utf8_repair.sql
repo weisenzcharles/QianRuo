@@ -104,18 +104,18 @@ SET menu_name = CASE menu_id
   WHEN 2010 THEN '商户用户修改'
   WHEN 2011 THEN '商户用户删除'
   WHEN 2012 THEN '商户用户重置密码'
-  WHEN 2020 THEN '商户权限'
-  WHEN 2021 THEN '商户权限查询'
-  WHEN 2022 THEN '商户权限新增'
-  WHEN 2023 THEN '商户权限修改'
-  WHEN 2024 THEN '商户权限删除'
+  WHEN 2020 THEN '商户角色'
+  WHEN 2021 THEN '商户角色查询'
+  WHEN 2022 THEN '商户角色新增'
+  WHEN 2023 THEN '商户角色修改'
+  WHEN 2024 THEN '商户角色删除'
   ELSE menu_name
 END,
 remark = CASE menu_id
   WHEN 2000 THEN '租赁商户后台管理目录'
   WHEN 2001 THEN '租赁商户主体管理'
   WHEN 2007 THEN '平台商户用户管理'
-  WHEN 2020 THEN '平台商户角色权限管理'
+  WHEN 2020 THEN '平台维护所有商户可用的全局角色模板'
   ELSE remark
 END
 WHERE menu_id BETWEEN 2000 AND 2024;

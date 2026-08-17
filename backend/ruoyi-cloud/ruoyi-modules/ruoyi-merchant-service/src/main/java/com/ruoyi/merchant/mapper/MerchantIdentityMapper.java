@@ -224,6 +224,27 @@ public interface MerchantIdentityMapper
             @Param("userId") Long userId, @Param("operator") String operator);
 
     /**
+     * 为审核通过的商户幂等复制平台启用的全局角色模板。
+     *
+     * @param tenantId 可信租户主键
+     * @param merchantId 可信商户主键
+     * @param operator 执行复制的系统操作人
+     * @return 新增的商户运行角色数量
+     */
+    int insertMerchantRolesFromTemplates(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("operator") String operator);
+
+    /**
+     * 为商户运行角色幂等复制全局角色模板的菜单权限。
+     *
+     * @param tenantId 可信租户主键
+     * @param merchantId 可信商户主键
+     * @return 新增或恢复的角色菜单数量
+     */
+    int insertMerchantRoleMenusFromTemplates(@Param("tenantId") Long tenantId,
+            @Param("merchantId") Long merchantId);
+
+    /**
      * 查询当前商户已经存在的管理员角色。
      *
      * @param tenantId 可信租户主键

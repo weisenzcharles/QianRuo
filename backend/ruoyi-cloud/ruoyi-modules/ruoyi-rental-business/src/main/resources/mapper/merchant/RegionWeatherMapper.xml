@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.RegionWeatherMapper">
+    <resultMap id="regionWeatherRecord" type="com.ruoyi.rentalbusiness.domain.RegionWeatherRecord">
+        <id property="weatherId" column="weather_id" />
+        <result property="regionCode" column="region_code" />
+        <result property="regionName" column="region_name" />
+        <result property="cityCode" column="city_code" />
+        <result property="cityName" column="city_name" />
+        <result property="provinceCode" column="province_code" />
+        <result property="provinceName" column="province_name" />
+        <result property="amapCityCode" column="amap_city_code" />
+        <result property="weatherDate" column="weather_date" />
+        <result property="dayWeather" column="day_weather" />
+        <result property="nightWeather" column="night_weather" />
+        <result property="dayTemperature" column="day_temperature" />
+        <result property="nightTemperature" column="night_temperature" />
+        <result property="dayWindDirection" column="day_wind_direction" />
+        <result property="nightWindDirection" column="night_wind_direction" />
+        <result property="dayWindPower" column="day_wind_power" />
+        <result property="nightWindPower" column="night_wind_power" />
+        <result property="weatherIcon" column="weather_icon" />
+        <result property="riskFlag" column="risk_flag" />
+        <result property="queryStatus" column="query_status" />
+        <result property="queryMessage" column="query_message" />
+        <result property="reportTime" column="report_time" />
+        <result property="rawDataJson" column="raw_data_json" />
+    </resultMap>
+
+    <!-- 唯一键保证多实例任务重复执行时不产生重复市级天气记录，并恢复被软删除的同一快照。 -->
+    <insert id="upsert">
+        insert into ry_business.ry_rental_region_weather
+        (region_code, region_name, city_code, city_name, province_code, province_name,
+         amap_city_code, weather_date, day_weather, night_weather, day_temperature,
+         night_temperature, day_wind_direction, night_wind_direction, day_wind_power,
+         night_wind_power, weather_icon, risk_flag, query_status, query_message, report_time,
+         raw_data_json, create_by, create_time, update_by, update_time, is_delete)
+        values
+        (#{record.regionCode}, #{record.regionName}, #{record.cityCode}, #{record.cityName},
+         #{record.provinceCode}, #{record.provinceName}, #{record.amapCityCode}, #{record.weatherDate},
+         #{record.dayWeather}, #{record.nightWeather}, #{record.dayTemperature}, #{record.nightTemperature},
+         #{record.dayWindDirection}, #{record.nightWindDirection}, #{record.dayWindPower},
+         #{record.nightWindPower}, #{record.weatherIcon}, coalesce(#{record.riskFlag}, 0),
+         coalesce(#{record.queryStatus}, 'failed'), #{record.queryMessage}, #{record.reportTime},
+         nullif(trim(#{record.rawDataJson}), ''), #{operatorId}, now(), #{operatorId}, now(), 0)
+        on duplicate key update
+            region_name = values(region_name),
+            city_code = values(city_code),
+            city_name = values(city_name),
+            province_code = values(province_code),
+            province_name = values(province_name),
+            amap_city_code = values(amap_city_code),
+            day_weather = values(day_weather),
+            night_weather = values(night_weather),
+            day_temperature = values(day_temperature),
+            night_temperature = values(night_temperature),
+            day_wind_direction = values(day_wind_direction),
+            night_wind_direction = values(night_wind_direction),
+            day_wind_power = values(day_wind_power),
+            night_wind_power = values(night_wind_power),
+            weather_icon = values(weather_icon),
+            risk_flag = values(risk_flag),
+            query_status = values(query_status),
+            query_message = values(query_message),
+            report_time = values(report_time),
+            raw_data_json = values(raw_data_json),
+            update_by = values(update_by),
+            update_time = now(),
+            is_delete = 0
+    </insert>
+
+    <!-- 批量写入市级天气记录，减少天气任务的数据库往返次数。 -->
+    <insert id="upsertBatch">
+        insert into ry_business.ry_rental_region_weather
+        (region_code, region_name, city_code, city_name, province_code, province_name,
+         amap_city_code, weather_date, day_weather, night_weather, day_temperature,
+         night_temperature, day_wind_direction, night_wind_direction, day_wind_power,
+         night_wind_power, weather_icon, risk_flag, query_status, query_message, report_time,
+         raw_data_json, create_by, create_time, update_by, update_time, is_delete)
+        values
+        <foreach collection="records" item="record" separator=",">
+            (#{record.regionCode}, #{record.regionName}, #{record.cityCode}, #{record.cityName},
+             #{record.provinceCode}, #{record.provinceName}, #{record.amapCityCode}, #{record.weatherDate},
+             #{record.dayWeather}, #{record.nightWeather}, #{record.dayTemperature}, #{record.nightTemperature},
+             #{record.dayWindDirection}, #{record.nightWindDirection}, #{record.dayWindPower},
+             #{record.nightWindPower}, #{record.weatherIcon}, coalesce(#{record.riskFlag}, 0),
+             coalesce(#{record.queryStatus}, 'failed'), #{record.queryMessage}, #{record.reportTime},
+             nullif(trim(#{record.rawDataJson}), ''), #{operatorId}, now(), #{operatorId}, now(), 0)
+        </foreach>
+        on duplicate key update
+            region_name = values(region_name),
+            city_code = values(city_code),
+            city_name = values(city_name),
+            province_code = values(province_code),
+            province_name = values(province_name),
+            amap_city_code = values(amap_city_code),
+            day_weather = values(day_weather),
+            night_weather = values(night_weather),
+            day_temperature = values(day_temperature),
+            night_temperature = values(night_temperature),
+            day_wind_direction = values(day_wind_direction),
+            night_wind_direction = values(night_wind_direction),
+            day_wind_power = values(day_wind_power),
+            night_wind_power = values(night_wind_power),
+            weather_icon = values(weather_icon),
+            risk_flag = values(risk_flag),
+            query_status = values(query_status),
+            query_message = values(query_message),
+            report_time = values(report_time),
+            raw_data_json = values(raw_data_json),
+            update_by = values(update_by),
+            update_time = now(),
+            is_delete = 0
+    </insert>
+
+    <select id="selectByRegionAndDate" resultMap="regionWeatherRecord">
+        select weather.weather_id, weather.region_code, weather.region_name, weather.city_code,
+               weather.city_name, weather.province_code, weather.province_name, weather.amap_city_code,
+               weather.weather_date, weather.day_weather, weather.night_weather, weather.day_temperature,
+               weather.night_temperature, weather.day_wind_direction, weather.night_wind_direction,
+               weather.day_wind_power, weather.night_wind_power, weather.weather_icon, weather.risk_flag,
+               weather.query_status, weather.query_message, weather.report_time, weather.raw_data_json
+        from ry_business.ry_rental_region requested
+        inner join ry_business.ry_rental_region city
+            on city.region_level = 2
+           and city.is_delete = 0
+           and (city.region_code = requested.region_code
+                or (requested.region_level > 2 and city.region_code = requested.parent_code))
+        inner join ry_business.ry_rental_region_weather weather
+            on weather.region_code = city.region_code
+           and weather.weather_date = #{weatherDate}
+           and weather.is_delete = 0
+        where requested.region_code = #{regionCode}
+          and requested.is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectByDate" resultMap="regionWeatherRecord">
+        select weather_id, region_code, region_name, city_code, city_name, province_code, province_name,
+               amap_city_code, weather_date, day_weather, night_weather, day_temperature, night_temperature,
+               day_wind_direction, night_wind_direction, day_wind_power, night_wind_power, weather_icon,
+               risk_flag, query_status, query_message, report_time, raw_data_json
+        from ry_business.ry_rental_region_weather
+        where weather_date = #{weatherDate}
+          and is_delete = 0
+        order by province_code, city_code, region_code
+    </select>
+</mapper>

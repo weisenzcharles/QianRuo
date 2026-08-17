@@ -2,10 +2,12 @@ package com.ruoyi.system.service.impl;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ruoyi.common.core.constant.CacheConstants;
+import com.ruoyi.common.core.constant.GlobalConfigConstants;
 import com.ruoyi.common.core.constant.UserConstants;
 import com.ruoyi.common.core.exception.ServiceException;
 import com.ruoyi.common.core.text.Convert;
@@ -61,17 +63,17 @@ public class SysConfigServiceImpl implements ISysConfigService
     @Override
     public String selectConfigByKey(String configKey)
     {
-        String configValue = Convert.toStr(redisService.getCacheObject(getCacheKey(configKey)));
-        if (StringUtils.isNotEmpty(configValue))
+        Object cachedObject = redisService.getCacheObject(getCacheKey(configKey));
+        if (cachedObject != null)
         {
-            return configValue;
+            return Convert.toStr(cachedObject);
         }
         SysConfig config = new SysConfig();
         config.setConfigKey(configKey);
         SysConfig retConfig = configMapper.selectConfig(config);
         if (StringUtils.isNotNull(retConfig))
         {
-            redisService.setCacheObject(getCacheKey(configKey), retConfig.getConfigValue());
+            cacheConfigValue(configKey, retConfig.getConfigValue());
             return retConfig.getConfigValue();
         }
         return StringUtils.EMPTY;
@@ -101,7 +103,7 @@ public class SysConfigServiceImpl implements ISysConfigService
         int row = configMapper.insertConfig(config);
         if (row > 0)
         {
-            redisService.setCacheObject(getCacheKey(config.getConfigKey()), config.getConfigValue());
+            cacheConfigValue(config.getConfigKey(), config.getConfigValue());
         }
         return row;
     }
@@ -124,7 +126,7 @@ public class SysConfigServiceImpl implements ISysConfigService
         int row = configMapper.updateConfig(config);
         if (row > 0)
         {
-            redisService.setCacheObject(getCacheKey(config.getConfigKey()), config.getConfigValue());
+            cacheConfigValue(config.getConfigKey(), config.getConfigValue());
         }
         return row;
     }
@@ -158,7 +160,7 @@ public class SysConfigServiceImpl implements ISysConfigService
         List<SysConfig> configsList = configMapper.selectConfigList(new SysConfig());
         for (SysConfig config : configsList)
         {
-            redisService.setCacheObject(getCacheKey(config.getConfigKey()), config.getConfigValue());
+            cacheConfigValue(config.getConfigKey(), config.getConfigValue());
         }
     }
 
@@ -208,6 +210,53 @@ public class SysConfigServiceImpl implements ISysConfigService
      */
     private String getCacheKey(String configKey)
     {
-        return CacheConstants.SYS_CONFIG_KEY + configKey;
+        return CacheConstants.GLOBAL_CONFIG_CACHE_KEY + configKey;
+    }
+
+    /**
+     * 使用统一七天有效期写入全局配置缓存。
+     *
+     * <p>无论是启动加载、首次读取、新增还是修改，均通过该方法写入；修改配置时重新
+     * set 会刷新 Redis TTL，避免平台与商户服务长期读取旧值。</p>
+     *
+     * @param configKey 配置键
+     * @param configValue 配置值
+     */
+    private void cacheConfigValue(String configKey, String configValue)
+    {
+        long cacheTtlDays = GlobalConfigConstants.CACHE_TTL_DAYS.equals(configKey)
+                ? CacheConstants.GLOBAL_CONFIG_CACHE_TTL_DAYS : getConfiguredCacheTtlDays();
+        redisService.setCacheObject(getCacheKey(configKey), configValue,
+                cacheTtlDays, TimeUnit.DAYS);
+    }
+
+    /**
+     * 读取全局配置缓存有效期。
+     *
+     * <p>缓存有效期配置本身使用代码默认值读取，避免读取该配置时产生递归；其他配置
+     * 优先使用 Redis 中的值，缓存未命中时再查询数据库。非法、零值或负值均回退到七天。</p>
+     *
+     * @return 配置缓存有效期，单位为天
+     */
+    private long getConfiguredCacheTtlDays()
+    {
+        String configuredValue = Convert.toStr(redisService.getCacheObject(
+                getCacheKey(GlobalConfigConstants.CACHE_TTL_DAYS)));
+        if (!StringUtils.isNotEmpty(configuredValue))
+        {
+            SysConfig ttlConfig = new SysConfig();
+            ttlConfig.setConfigKey(GlobalConfigConstants.CACHE_TTL_DAYS);
+            SysConfig storedConfig = configMapper.selectConfig(ttlConfig);
+            configuredValue = storedConfig == null ? null : storedConfig.getConfigValue();
+        }
+        try
+        {
+            long cacheTtlDays = Long.parseLong(configuredValue);
+            return cacheTtlDays > 0 ? cacheTtlDays : CacheConstants.GLOBAL_CONFIG_CACHE_TTL_DAYS;
+        }
+        catch (Exception exception)
+        {
+            return CacheConstants.GLOBAL_CONFIG_CACHE_TTL_DAYS;
+        }
     }
 }

@@ -8,9 +8,9 @@ export function listMerchantRole(query) {
   })
 }
 
-export function getMerchantRole(memberId, roleId) {
+export function getMerchantRole(roleTemplateId) {
   return request({
-    url: `/admin/rental/merchantRole/${memberId}/${roleId}`,
+    url: `/admin/rental/merchantRole/${roleTemplateId}`,
     method: 'get'
   })
 }
@@ -31,23 +31,23 @@ export function updateMerchantRole(data) {
   })
 }
 
-export function delMerchantRole(memberId, roleIds) {
+export function delMerchantRole(roleTemplateIds) {
   return request({
-    url: `/admin/rental/merchantRole/${memberId}/${roleIds}`,
+    url: `/admin/rental/merchantRole/${roleTemplateIds}`,
     method: 'delete'
   })
 }
 
-export function merchantMenuTreeselect(memberId) {
+export function merchantMenuTreeselect() {
   return request({
-    url: `/admin/rental/merchantRole/menuTreeselect/${memberId}`,
+    url: '/admin/rental/merchantRole/menuTreeselect',
     method: 'get'
   })
 }
 
-export function merchantRoleMenuTreeselect(memberId, roleId) {
+export function merchantRoleMenuTreeselect(roleTemplateId) {
   return request({
-    url: `/admin/rental/merchantRole/roleMenuTreeselect/${memberId}/${roleId}`,
+    url: `/admin/rental/merchantRole/roleMenuTreeselect/${roleTemplateId}`,
     method: 'get'
   })
 }

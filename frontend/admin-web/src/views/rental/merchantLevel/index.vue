@@ -27,7 +27,7 @@
         <el-form-item label="库存数量要求" prop="inventoryRequirement"><el-input-number v-model="form.inventoryRequirement" :min="0" /></el-form-item>
         <el-form-item label="可邀请人数" prop="inviteLimit"><el-input-number v-model="form.inviteLimit" :min="0" /></el-form-item>
         <el-form-item label="付费注册金额" prop="registrationFee"><el-input-number v-model="form.registrationFee" :min="0" :precision="2" /></el-form-item>
-        <el-form-item label="状态"><el-radio-group v-model="form.status"><el-radio value="0">启用</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item>
+        <el-form-item label="状态"><el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="启用" inactive-text="停用" inline-prompt /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" maxlength="500" /></el-form-item>
       </el-form>
       <template #footer><el-button @click="open=false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存</el-button></template>

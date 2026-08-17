@@ -16,8 +16,14 @@
     </description>
 
     <dependencies>
+		<!-- 平台内部服务契约，供平台调度 Bean 调用租赁业务服务天气接口 -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-api-platform</artifactId>
+        </dependency>
+
     	
-    	<!-- SpringCloud Alibaba Nacos -->
+		<!-- SpringCloud Alibaba Nacos -->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>

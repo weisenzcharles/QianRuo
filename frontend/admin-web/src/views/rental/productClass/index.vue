@@ -124,10 +124,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="状态" prop="status">
-              <el-radio-group v-model="form.status">
-                <el-radio value="0">正常</el-radio>
-                <el-radio value="1">停用</el-radio>
-              </el-radio-group>
+              <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="正常" inactive-text="停用" inline-prompt />
             </el-form-item>
           </el-col>
         </el-row>

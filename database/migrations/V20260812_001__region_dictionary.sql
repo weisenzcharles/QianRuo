@@ -1,6 +1,6 @@
 -- 行政区划数据来源：modood/Administrative-divisions-of-China（MIT），离线固化，运行时不依赖外网。
-CREATE TABLE IF NOT EXISTS ry_business.ry_region (region_code varchar(12) NOT NULL,parent_code varchar(12) NOT NULL,region_level tinyint NOT NULL,region_name varchar(64) NOT NULL,sort_no int NOT NULL default 0,is_delete tinyint NOT NULL default 0,PRIMARY KEY(region_code),KEY idx_region_parent(parent_code,is_delete)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT="省市区行政区划";
-INSERT INTO ry_business.ry_region(region_code,parent_code,region_level,region_name,sort_no,is_delete) VALUES
+CREATE TABLE IF NOT EXISTS ry_business.ry_rental_region (region_code varchar(12) NOT NULL,parent_code varchar(12) NOT NULL,region_level tinyint NOT NULL,region_name varchar(64) NOT NULL,sort_no int NOT NULL default 0,is_delete tinyint NOT NULL default 0,PRIMARY KEY(region_code),KEY idx_region_parent(parent_code,is_delete)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT="省市区行政区划";
+INSERT INTO ry_business.ry_rental_region(region_code,parent_code,region_level,region_name,sort_no,is_delete) VALUES
 ("11","0",1,"北京市",0,0),
 ("1101","11",2,"市辖区",0,0),
 ("110101","1101",3,"东城区",0,0),

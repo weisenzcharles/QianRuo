@@ -347,6 +347,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role` (
   `role_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商户角色ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `role_template_id` BIGINT DEFAULT NULL COMMENT '全局商户角色模板ID',
   `role_name` VARCHAR(30) NOT NULL COMMENT '角色名称',
   `role_key` VARCHAR(100) NOT NULL COMMENT '角色权限字符串',
   `role_sort` INT NOT NULL COMMENT '显示顺序',
@@ -361,8 +362,36 @@ CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role` (
   PRIMARY KEY (`role_id`),
   UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `is_delete`),
   UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `is_delete`),
-  KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`)
+  KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_merchant_role_template` (`role_template_id`, `is_delete`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端角色';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role_template` (
+  `role_template_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '全局商户角色模板ID',
+  `role_name` VARCHAR(30) NOT NULL COMMENT '角色名称',
+  `role_key` VARCHAR(100) NOT NULL COMMENT '角色权限字符',
+  `role_sort` INT NOT NULL DEFAULT 0 COMMENT '显示顺序',
+  `menu_check_strictly` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '菜单树是否父子联动',
+  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '角色状态：0正常 1停用',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建人',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` VARCHAR(64) DEFAULT '' COMMENT '修改人',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (`role_template_id`),
+  UNIQUE KEY `uk_merchant_role_template_name` (`role_name`, `is_delete`),
+  UNIQUE KEY `uk_merchant_role_template_key` (`role_key`, `is_delete`),
+  KEY `idx_merchant_role_template_status` (`status`, `is_delete`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台全局商户角色模板';
+
+CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role_template_menu` (
+  `role_template_id` BIGINT NOT NULL COMMENT '全局商户角色模板ID',
+  `menu_id` BIGINT NOT NULL COMMENT '商户菜单ID',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`role_template_id`, `menu_id`),
+  KEY `idx_role_template_menu_menu` (`menu_id`, `is_delete`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局商户角色模板菜单授权';
 
 CREATE TABLE IF NOT EXISTS `ry_rental_merchant_role_menu` (
   `role_id` BIGINT NOT NULL COMMENT '商户角色ID',

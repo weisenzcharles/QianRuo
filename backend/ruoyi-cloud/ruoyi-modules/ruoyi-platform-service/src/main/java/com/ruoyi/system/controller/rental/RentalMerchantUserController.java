@@ -134,6 +134,42 @@ public class RentalMerchantUserController extends BaseController
         return success(rentalBusinessGateway.listEnabledWarehouses(member.getTenantId(), member.getMemberId()));
     }
 
+    /**
+     * 查询指定商户当前可分配的运行角色，供平台用户管理页面使用。
+     *
+     * <p>该接口属于商户用户管理上下文，使用商户运行角色关系；平台全局“商户角色”
+     * 页面使用独立的角色模板接口，不共享本接口的商户筛选逻辑。</p>
+     *
+     * @param memberId 商户主键
+     * @return 指定商户的运行角色列表
+     */
+    @RequiresPermissions("admin:merchantUser:query")
+    @GetMapping("/roleOptions/{memberId}")
+    public AjaxResult roleOptions(@PathVariable Long memberId)
+    {
+        assertAdminClient();
+        RentalMember member = requireMember(memberId);
+        SysRole roleQuery = new SysRole();
+        roleQuery.getParams().put("tenantId", member.getTenantId());
+        roleQuery.getParams().put("memberId", member.getMemberId());
+        return success(merchantRoleMapper.selectRoleList(roleQuery));
+    }
+
+    /**
+     * 查询指定商户的菜单授权树，供平台用户管理页面配置用户级菜单。
+     *
+     * @param memberId 商户主键
+     * @return 商户菜单树
+     */
+    @RequiresPermissions("admin:merchantUser:query")
+    @GetMapping("/menuTreeselect/{memberId}")
+    public AjaxResult menuTreeselect(@PathVariable Long memberId)
+    {
+        assertAdminClient();
+        requireMember(memberId);
+        return success(menuService.buildMenuTreeSelect(merchantMenuMapper.selectMenuList(new SysMenu())));
+    }
+
     @RequiresPermissions("admin:merchantUser:add")
     @Log(title = "商户用户", businessType = BusinessType.INSERT)
     @PostMapping

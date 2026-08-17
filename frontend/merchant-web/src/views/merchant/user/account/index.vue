@@ -1,11 +1,13 @@
 <template>
   <div class="app-container merchant-list-page">
-    <el-form v-show="showSearch" :model="query" inline @submit.prevent>
-      <el-form-item label="用户名"><el-input v-model="query.userName" clearable @keyup.enter="load" /></el-form-item>
-      <el-form-item label="手机号"><el-input v-model="query.phone" clearable @keyup.enter="load" /></el-form-item>
-      <el-form-item label="状态"><el-select v-model="query.status" clearable><el-option label="正常" value="0" /><el-option label="停用" value="1" /></el-select></el-form-item>
-      <el-button type="primary" icon="Search" @click="load">查询</el-button>
-      <el-button icon="Refresh" @click="reset">重置</el-button>
+    <el-form ref="queryRef" v-show="showSearch" :model="query" :inline="true" label-width="68px" class="account-query-form" @submit.prevent>
+      <el-form-item label="用户名" prop="userName"><el-input v-model="query.userName" clearable @keyup.enter="load" /></el-form-item>
+      <el-form-item label="手机号" prop="phone"><el-input v-model="query.phone" clearable @keyup.enter="load" /></el-form-item>
+      <el-form-item label="状态" prop="status"><el-select v-model="query.status" clearable><el-option label="正常" value="0" /><el-option label="停用" value="1" /></el-select></el-form-item>
+      <el-form-item label-width="0" class="query-actions">
+        <el-button type="primary" icon="Search" @click="load">查询</el-button>
+        <el-button icon="Refresh" @click="reset">重置</el-button>
+      </el-form-item>
     </el-form>
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5"><el-button type="primary" icon="Plus" @click="openAdd">添加用户</el-button></el-col>
@@ -19,10 +21,12 @@
       <el-table-column label="状态" width="90"><template #default="scope"><el-tag :type="scope.row.status === '0' ? 'success' : 'danger'">{{ scope.row.status === '0' ? '正常' : '停用' }}</el-tag></template></el-table-column>
       <el-table-column label="初始化密码" width="110"><template #default="scope">{{ scope.row.mustChangePassword ? '待初始化' : '已设置' }}</template></el-table-column>
       <el-table-column prop="createTime" label="创建时间" min-width="170" />
-      <el-table-column label="操作" fixed="right" width="190">
+      <el-table-column label="操作" align="center" fixed="right" width="230">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="openEdit(scope.row)">编辑权限</el-button>
-          <el-button link type="warning" icon="Refresh" @click="resetPassword(scope.row)">重置密码</el-button>
+          <div class="account-action-buttons">
+            <el-button link type="primary" icon="Edit" @click="openEdit(scope.row)">编辑权限</el-button>
+            <el-button link type="warning" icon="Refresh" @click="resetPassword(scope.row)">重置密码</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -34,7 +38,7 @@
         <el-form-item label="手机号"><el-input v-model="form.phone" /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
         <el-form-item v-if="!editing" label="初始密码"><el-input v-model="form.password" type="password" show-password placeholder="默认 123456" /></el-form-item>
-        <el-form-item label="状态"><el-radio-group v-model="form.status"><el-radio value="0">正常</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item>
+        <el-form-item label="状态"><el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="正常" inactive-text="停用" inline-prompt /></el-form-item>
         <el-form-item label="角色"><el-select v-model="form.roleIds" multiple placeholder="请选择角色" style="width: 100%"><el-option v-for="role in roles" :key="role.roleId" :label="role.roleName" :value="role.roleId" /></el-select></el-form-item>
         <el-alert title="角色对应菜单权限，用户首次登录后需要初始化密码。" type="info" :closable="false" />
       </el-form>
@@ -69,3 +73,45 @@ function save() { saving.value = true; const action = editing.value ? updateMerc
 function resetPassword(row) { ElMessageBox.confirm(`确认将 ${row.userName} 的密码重置为初始密码吗？`, '操作确认', { type: 'warning' }).then(() => resetMerchantUserPassword(row.userId)).then(() => { ElMessage.success('密码已重置'); load() }) }
 load()
 </script>
+
+<style scoped>
+/* 筛选按钮必须作为表单项参与布局，保证与输入框垂直居中并保持统一间距。 */
+.query-actions {
+  margin-right: 0;
+}
+
+.query-actions :deep(.el-button) {
+  margin-left: 0;
+}
+
+.query-actions :deep(.el-button + .el-button) {
+  margin-left: 10px;
+}
+
+/* 操作列使用固定间距，避免 Element Plus 默认按钮外边距造成意外换行。 */
+.account-action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 204px;
+  white-space: nowrap;
+}
+
+.account-action-buttons :deep(.el-button) {
+  margin-left: 0;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+@media (max-width: 768px) {
+  .account-query-form :deep(.el-form-item) {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .account-query-form .query-actions {
+    justify-content: flex-end;
+  }
+}
+</style>

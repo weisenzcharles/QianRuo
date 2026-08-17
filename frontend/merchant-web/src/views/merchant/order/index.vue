@@ -817,9 +817,9 @@ loadOrderOptions()
 
 .detail-list { margin: 0; font-size: 12px; line-height: 1.55; }
 .detail-list > div { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 5px; margin-bottom: 5px; }
-.detail-list dt { color: var(--el-text-color-secondary); }
+.detail-list dt { color: var(--el-text-color-secondary); white-space: nowrap; }
 .detail-list dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.detail-list em { display: block; color: var(--el-text-color-secondary); font-style: normal; }
+.detail-list em { display: inline; margin-left: 8px; color: var(--el-text-color-secondary); font-style: normal; white-space: nowrap; }
 .money { color: var(--el-color-danger); font-weight: 650; }
 
 .customer-name { gap: 5px; margin-bottom: 12px; font-size: 14px; font-weight: 650; }
@@ -881,6 +881,7 @@ loadOrderOptions()
 .delivery-after { margin-top: 7px; color: var(--el-text-color-secondary); font-size: 12px; }
 
 .status-tag { margin-bottom: 12px; }
+.status-cell .detail-list > div { grid-template-columns: 52px minmax(0, 1fr); }
 .status-cell .detail-list dd { white-space: nowrap; }
 .product-list-cell strong { display: block; line-height: 1.5; }
 .product-list-cell p { margin: 8px 0 0; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.5; }

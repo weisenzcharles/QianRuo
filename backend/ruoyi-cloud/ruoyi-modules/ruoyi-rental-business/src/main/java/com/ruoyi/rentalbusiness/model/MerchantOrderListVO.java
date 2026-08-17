@@ -67,6 +67,10 @@ public class MerchantOrderListVO
         public String arrive;
         public String departIcon;
         public String arriveIcon;
+        public String departCity;
+        public String arriveCity;
+        public String departReportTime;
+        public String arriveReportTime;
         public boolean risk;
     }
 

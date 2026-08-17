@@ -132,10 +132,7 @@
             <el-input v-model="form.auditRemark" type="textarea" :rows="3" disabled />
           </el-form-item>
           <el-form-item label="是否冻结" prop="status">
-            <el-radio-group v-model="form.status">
-              <el-radio value="0">未冻结</el-radio>
-              <el-radio value="1">冻结</el-radio>
-            </el-radio-group>
+            <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="未冻结" inactive-text="冻结" inline-prompt />
           </el-form-item>
           <el-form-item label="冻结时间">
             <el-date-picker v-model="form.freezeTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" disabled style="width: 100%" />

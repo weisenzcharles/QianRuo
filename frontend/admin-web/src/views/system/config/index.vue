@@ -1,19 +1,19 @@
 <template>
    <div class="app-container">
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-         <el-form-item label="参数名称" prop="configName">
+         <el-form-item label="配置名称" prop="configName">
             <el-input
                v-model="queryParams.configName"
-               placeholder="请输入参数名称"
+               placeholder="请输入配置名称"
                clearable
                style="width: 240px"
                @keyup.enter="handleQuery"
             />
          </el-form-item>
-         <el-form-item label="参数键名" prop="configKey">
+         <el-form-item label="配置键名" prop="configKey">
             <el-input
                v-model="queryParams.configKey"
-               placeholder="请输入参数键名"
+               placeholder="请输入配置键名"
                clearable
                style="width: 240px"
                @keyup.enter="handleQuery"
@@ -98,10 +98,10 @@
 
       <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
          <el-table-column type="selection" width="55" align="center" />
-         <el-table-column label="参数主键" align="center" prop="configId" />
-         <el-table-column label="参数名称" align="center" prop="configName" :show-overflow-tooltip="true" />
-         <el-table-column label="参数键名" align="center" prop="configKey" :show-overflow-tooltip="true" />
-         <el-table-column label="参数键值" align="center" prop="configValue" :show-overflow-tooltip="true" />
+         <el-table-column label="配置主键" align="center" prop="configId" />
+         <el-table-column label="配置名称" align="center" prop="configName" :show-overflow-tooltip="true" />
+         <el-table-column label="配置键名" align="center" prop="configKey" :show-overflow-tooltip="true" />
+         <el-table-column label="配置键值" align="center" prop="configValue" :show-overflow-tooltip="true" />
          <el-table-column label="系统内置" align="center" prop="configType">
             <template #default="scope">
                <dict-tag :options="sys_yes_no" :value="scope.row.configType" />
@@ -129,17 +129,17 @@
          @pagination="getList"
       />
 
-      <!-- 添加或修改参数配置对话框 -->
+      <!-- 添加或修改系统配置对话框 -->
       <el-dialog :title="title" v-model="open" width="500px" append-to-body>
          <el-form ref="configRef" :model="form" :rules="rules" label-width="80px">
-            <el-form-item label="参数名称" prop="configName">
-               <el-input v-model="form.configName" placeholder="请输入参数名称" />
+            <el-form-item label="配置名称" prop="configName">
+               <el-input v-model="form.configName" placeholder="请输入配置名称" />
             </el-form-item>
-            <el-form-item label="参数键名" prop="configKey">
-               <el-input v-model="form.configKey" placeholder="请输入参数键名" />
+            <el-form-item label="配置键名" prop="configKey">
+               <el-input v-model="form.configKey" placeholder="请输入配置键名" />
             </el-form-item>
-            <el-form-item label="参数键值" prop="configValue">
-               <el-input v-model="form.configValue" type="textarea" placeholder="请输入参数键值" />
+            <el-form-item label="配置键值" prop="configValue">
+               <el-input v-model="form.configValue" type="textarea" placeholder="请输入配置键值" />
             </el-form-item>
             <el-form-item label="系统内置" prop="configType">
                <el-radio-group v-model="form.configType">
@@ -191,15 +191,15 @@ const data = reactive({
     configType: undefined
   },
   rules: {
-    configName: [{ required: true, message: "参数名称不能为空", trigger: "blur" }],
-    configKey: [{ required: true, message: "参数键名不能为空", trigger: "blur" }],
-    configValue: [{ required: true, message: "参数键值不能为空", trigger: "blur" }]
+    configName: [{ required: true, message: "配置名称不能为空", trigger: "blur" }],
+    configKey: [{ required: true, message: "配置键名不能为空", trigger: "blur" }],
+    configValue: [{ required: true, message: "配置键值不能为空", trigger: "blur" }]
   }
 })
 
 const { queryParams, form, rules } = toRefs(data)
 
-/** 查询参数列表 */
+/** 查询系统配置列表。 */
 function getList() {
   loading.value = true
   listConfig(proxy.addDateRange(queryParams.value, dateRange.value)).then(response => {
@@ -252,7 +252,7 @@ function handleSelectionChange(selection) {
 function handleAdd() {
   reset()
   open.value = true
-  title.value = "添加参数"
+  title.value = "添加系统配置"
 }
 
 /** 修改按钮操作 */
@@ -262,7 +262,7 @@ function handleUpdate(row) {
   getConfig(configId).then(response => {
     form.value = response.data
     open.value = true
-    title.value = "修改参数"
+    title.value = "修改系统配置"
   })
 }
 
@@ -290,7 +290,7 @@ function submitForm() {
 /** 删除按钮操作 */
 function handleDelete(row) {
   const configIds = row.configId || ids.value
-  proxy.$modal.confirm('是否确认删除参数编号为"' + configIds + '"的数据项？').then(function () {
+  proxy.$modal.confirm('是否确认删除配置编号为"' + configIds + '"的数据项？').then(function () {
     return delConfig(configIds)
   }).then(() => {
     getList()

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_role` (
   `role_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '商户角色ID',
   `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
   `member_id` BIGINT NOT NULL COMMENT '商户ID',
+  `role_template_id` BIGINT DEFAULT NULL COMMENT '全局商户角色模板ID',
   `role_name` VARCHAR(30) NOT NULL COMMENT '角色名称',
   `role_key` VARCHAR(100) NOT NULL COMMENT '角色权限字符串',
   `role_sort` INT NOT NULL COMMENT '显示顺序',
@@ -95,8 +96,36 @@ CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_role` (
   PRIMARY KEY (`role_id`),
   UNIQUE KEY `uk_rental_merchant_role_name` (`member_id`, `role_name`, `is_delete`),
   UNIQUE KEY `uk_rental_merchant_role_key` (`member_id`, `role_key`, `is_delete`),
-  KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`)
+  KEY `idx_rental_merchant_role_member` (`tenant_id`, `member_id`),
+  KEY `idx_rental_merchant_role_template` (`role_template_id`, `is_delete`)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000 DEFAULT CHARSET=utf8mb4 COMMENT='商户端角色';
+
+CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_role_template` (
+  `role_template_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '全局商户角色模板ID',
+  `role_name` VARCHAR(30) NOT NULL COMMENT '角色名称',
+  `role_key` VARCHAR(100) NOT NULL COMMENT '角色权限字符',
+  `role_sort` INT NOT NULL DEFAULT 0 COMMENT '显示顺序',
+  `menu_check_strictly` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '菜单树是否父子联动',
+  `status` CHAR(1) NOT NULL DEFAULT '0' COMMENT '角色状态：0正常 1停用',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  `create_by` VARCHAR(64) DEFAULT '' COMMENT '创建人',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by` VARCHAR(64) DEFAULT '' COMMENT '修改人',
+  `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (`role_template_id`),
+  UNIQUE KEY `uk_merchant_role_template_name` (`role_name`, `is_delete`),
+  UNIQUE KEY `uk_merchant_role_template_key` (`role_key`, `is_delete`),
+  KEY `idx_merchant_role_template_status` (`status`, `is_delete`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台全局商户角色模板';
+
+CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_role_template_menu` (
+  `role_template_id` BIGINT NOT NULL COMMENT '全局商户角色模板ID',
+  `menu_id` BIGINT NOT NULL COMMENT '商户菜单ID',
+  `is_delete` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标识：0正常 1删除',
+  PRIMARY KEY (`role_template_id`, `menu_id`),
+  KEY `idx_role_template_menu_menu` (`menu_id`, `is_delete`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局商户角色模板菜单授权';
 
 CREATE TABLE IF NOT EXISTS `ry_rental`.`ry_rental_merchant_role_menu` (
   `role_id` BIGINT NOT NULL COMMENT '商户角色ID',
@@ -370,23 +399,23 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2012);
 UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2012;
 
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-SELECT 2020, '商户权限', 2000, 3, 'merchant-role', 'rental/merchantRole/index', '', '', 1, 0, 'C', '0', '0', 'admin:merchantRole:list', 'peoples', 'system', NOW(), '', NULL, '平台商户角色权限管理'
+SELECT 2020, '商户角色', 2000, 3, 'merchant-role', 'rental/merchantRole/index', '', '', 1, 0, 'C', '0', '0', 'admin:merchantRole:list', 'peoples', 'system', NOW(), '', NULL, '平台维护所有商户可用的全局角色模板'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2020);
 UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2020;
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-SELECT 2021, '商户权限查询', 2020, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:query', '#', 'system', NOW(), '', NULL, ''
+SELECT 2021, '商户角色查询', 2020, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:query', '#', 'system', NOW(), '', NULL, ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2021);
 UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2021;
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-SELECT 2022, '商户权限新增', 2020, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:add', '#', 'system', NOW(), '', NULL, ''
+SELECT 2022, '商户角色新增', 2020, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:add', '#', 'system', NOW(), '', NULL, ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2022);
 UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2022;
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-SELECT 2023, '商户权限修改', 2020, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:edit', '#', 'system', NOW(), '', NULL, ''
+SELECT 2023, '商户角色修改', 2020, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:edit', '#', 'system', NOW(), '', NULL, ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2023);
 UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2023;
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
-SELECT 2024, '商户权限删除', 2020, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:remove', '#', 'system', NOW(), '', NULL, ''
+SELECT 2024, '商户角色删除', 2020, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'admin:merchantRole:remove', '#', 'system', NOW(), '', NULL, ''
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 2024);
 UPDATE sys_menu SET client_type = 'platform' WHERE menu_id = 2024;
 

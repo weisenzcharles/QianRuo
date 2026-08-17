@@ -103,9 +103,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="状态">
-              <el-radio-group v-model="form.status">
-                <el-radio v-for="dict in sys_normal_disable" :key="dict.value" :value="dict.value">{{ dict.label }}</el-radio>
-              </el-radio-group>
+              <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="正常" inactive-text="停用" inline-prompt />
             </el-form-item>
           </el-col>
           <el-col :span="12" v-if="!form.merchantUserId">
@@ -174,14 +172,15 @@
 
 <script setup name="RentalMerchantUser">
 import { listMember } from '@/api/rental/member'
-import { listMerchantRole, merchantMenuTreeselect } from '@/api/rental/merchantRole'
 import {
   addMerchantUser,
   changeMerchantUserStatus,
   delMerchantUser,
   getMerchantUser,
   getMerchantWarehouseOptions,
+  listMerchantUserRoleOptions,
   listMerchantUser,
+  merchantUserMenuTreeselect,
   resetMerchantUserPwd,
   updateMerchantUser
 } from '@/api/rental/merchantUser'
@@ -245,8 +244,8 @@ function getRoles(memberId) {
     roleOptions.value = []
     return Promise.resolve()
   }
-  return listMerchantRole({ pageNum: 1, pageSize: 1000, 'params[memberId]': memberId }).then(response => {
-    roleOptions.value = response.rows || []
+  return listMerchantUserRoleOptions(memberId).then(response => {
+    roleOptions.value = response.data || []
   })
 }
 
@@ -255,7 +254,7 @@ function getMenuTreeselect(memberId) {
     menuOptions.value = []
     return Promise.resolve()
   }
-  return merchantMenuTreeselect(memberId).then(response => {
+  return merchantUserMenuTreeselect(memberId).then(response => {
     menuOptions.value = response.data || []
   })
 }

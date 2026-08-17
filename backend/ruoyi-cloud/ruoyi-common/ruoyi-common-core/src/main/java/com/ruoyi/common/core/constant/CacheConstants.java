@@ -65,6 +65,16 @@ public class CacheConstants
     public static final String SYS_CONFIG_KEY = "sys_config:";
 
     /**
+     * 全局配置缓存前缀，平台端和商户业务服务共用系统配置缓存命名空间。
+     */
+    public static final String GLOBAL_CONFIG_CACHE_KEY = SYS_CONFIG_KEY;
+
+    /**
+     * 全局配置缓存默认有效期，统一使用七天，配置更新时重新写入会自动刷新有效期。
+     */
+    public static final long GLOBAL_CONFIG_CACHE_TTL_DAYS = 7L;
+
+    /**
      * 字典管理 cache key
      */
     public static final String SYS_DICT_KEY = "sys_dict:";

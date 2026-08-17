@@ -12,12 +12,12 @@ SET @city_code_exists := (
     SELECT COUNT(*)
     FROM information_schema.columns
     WHERE table_schema = 'ry_business'
-      AND table_name = 'ry_region'
+      AND table_name = 'ry_rental_region'
       AND column_name = 'city_code'
 );
 SET @alter_city_code_sql := IF(
     @city_code_exists = 0,
-    'ALTER TABLE ry_business.ry_region ADD COLUMN city_code varchar(8) NULL COMMENT ''高德城市编码'' AFTER region_name',
+    'ALTER TABLE ry_business.ry_rental_region ADD COLUMN city_code varchar(8) NULL COMMENT ''高德城市编码'' AFTER region_name',
     'SELECT 1'
 );
 PREPARE alter_city_code_statement FROM @alter_city_code_sql;
@@ -28,12 +28,12 @@ SET @city_code_index_exists := (
     SELECT COUNT(*)
     FROM information_schema.statistics
     WHERE table_schema = 'ry_business'
-      AND table_name = 'ry_region'
+      AND table_name = 'ry_rental_region'
       AND index_name = 'idx_region_city_code'
 );
 SET @add_city_code_index_sql := IF(
     @city_code_index_exists = 0,
-    'ALTER TABLE ry_business.ry_region ADD KEY idx_region_city_code (city_code, is_delete)',
+    'ALTER TABLE ry_business.ry_rental_region ADD KEY idx_region_city_code (city_code, is_delete)',
     'SELECT 1'
 );
 PREPARE add_city_code_index_statement FROM @add_city_code_index_sql;
@@ -42,11 +42,11 @@ DEALLOCATE PREPARE add_city_code_index_statement;
 
 START TRANSACTION;
 
-UPDATE ry_business.ry_region
+UPDATE ry_business.ry_rental_region
 SET is_delete = 1
 WHERE is_delete = 0;
 
-INSERT INTO ry_business.ry_region
+INSERT INTO ry_business.ry_rental_region
     (region_code, parent_code, region_level, region_name, city_code, sort_no, is_delete)
 VALUES
 ('110000','0',1,'北京市','010',0,0),

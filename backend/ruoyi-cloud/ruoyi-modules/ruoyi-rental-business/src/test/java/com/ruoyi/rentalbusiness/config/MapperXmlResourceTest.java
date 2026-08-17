@@ -134,6 +134,81 @@ public class MapperXmlResourceTest
         }
     }
 
+    /**
+     * 校验天气任务使用市级行政区划 adcode，而不是导入数据中的 citycode。
+     *
+     * 高德天气接口的 city 参数只接受 adcode；两类编码混用时接口可能返回成功状态但没有
+     * casts，任务会把所有记录写成失败快照，页面最终只能显示“待查询”。
+     */
+    @Test
+    public void weatherMapperMustUseRegionAdcode() throws Exception
+    {
+        Path mapper = Paths.get(getClass().getClassLoader().getResource(
+                "mapper/merchant/RegionMapper.xml").toURI());
+        String xml = Files.readString(mapper);
+        require(xml.contains("city.region_code as weatherAdcode"),
+                "weather mapper must use the level-two region adcode");
+        require(!xml.contains("district.region_code as weatherAdcode"),
+                "weather mapper must not request weather for level-three districts");
+        require(xml.contains("where city.region_level = 2"),
+                "weather mapper must query level-two administrative regions only");
+    }
+
+    /**
+     * 校验区县天气查询会沿父级关系解析到市级天气快照，不会按区县编码读取独立天气记录。
+     */
+    @Test
+    public void regionWeatherMapperMustReuseCityWeatherForLowerLevels() throws Exception
+    {
+        Path mapper = Paths.get(getClass().getClassLoader().getResource(
+                "mapper/merchant/RegionWeatherMapper.xml").toURI());
+        String xml = Files.readString(mapper);
+        require(xml.contains("requested.parent_code"),
+                "region weather mapper must resolve lower-level regions through parent_code");
+        require(xml.contains("city.region_level = 2"),
+                "region weather mapper must resolve to a level-two region");
+        require(xml.contains("ry_business.ry_rental_region_weather"),
+                "region weather mapper must read the unified weather table");
+    }
+
+    /**
+     * 校验天气快照使用原子创建或更新语义：无唯一键记录时插入，已有记录时更新且恢复软删除状态。
+     */
+    @Test
+    public void regionWeatherMapperMustCreateOrUpdateByRegionAndDate() throws Exception
+    {
+        Path mapper = Paths.get(getClass().getClassLoader().getResource(
+                "mapper/merchant/RegionWeatherMapper.xml").toURI());
+        String xml = Files.readString(mapper);
+        require(xml.contains("on duplicate key update"),
+                "region weather mapper must update an existing region-date snapshot atomically");
+        require(xml.contains("update_time = now()"),
+                "region weather mapper must refresh update time when an existing snapshot is updated");
+        require(xml.contains("is_delete = 0"),
+                "region weather mapper must restore a soft-deleted snapshot when it is refreshed");
+
+        Path migration = findRepositoryFile("database/migrations/V20260815_002__region_weather.sql");
+        String migrationSql = Files.readString(migration);
+        require(migrationSql.contains("uk_region_weather_region_date"),
+                "region weather table must enforce one snapshot per region and date");
+    }
+
+    /** 从当前 Maven 或 IDE 工作目录向上查找仓库文件，避免测试依赖固定执行目录。 */
+    private Path findRepositoryFile(String relativePath)
+    {
+        Path current = Paths.get("").toAbsolutePath().normalize();
+        while (current != null)
+        {
+            Path candidate = current.resolve(relativePath);
+            if (Files.isRegularFile(candidate))
+            {
+                return candidate;
+            }
+            current = current.getParent();
+        }
+        throw new AssertionError("repository file must exist: " + relativePath);
+    }
+
     /** 从测试类路径中收集本模块的 mapper 资源目录。 */
     private List<URL> findMapperRoots() throws Exception
     {

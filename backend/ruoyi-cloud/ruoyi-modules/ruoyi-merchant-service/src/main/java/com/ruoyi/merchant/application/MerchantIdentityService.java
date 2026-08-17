@@ -102,6 +102,9 @@ public class MerchantIdentityService
                     command.getOperator());
         }
 
+        identityMapper.insertMerchantRolesFromTemplates(command.getTenantId(), command.getMerchantId(),
+                command.getOperator());
+        identityMapper.insertMerchantRoleMenusFromTemplates(command.getTenantId(), command.getMerchantId());
         Long roleId = identityMapper.selectAdminRoleId(command.getTenantId(), command.getMerchantId());
         if (roleId == null)
         {

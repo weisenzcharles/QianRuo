@@ -1,11 +1,6 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
-      <el-form-item label="所属商户" prop="memberId">
-        <el-select v-model="queryParams.memberId" placeholder="请选择商户" filterable clearable style="width: 260px" @change="handleQuery">
-          <el-option v-for="item in memberOptions" :key="item.memberId" :label="formatMember(item)" :value="item.memberId" />
-        </el-select>
-      </el-form-item>
       <el-form-item label="角色名称" prop="roleName">
         <el-input v-model="queryParams.roleName" placeholder="请输入角色名称" clearable style="width: 180px" @keyup.enter="handleQuery" />
       </el-form-item>
@@ -22,7 +17,7 @@
 
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button type="primary" plain icon="Plus" :disabled="!queryParams.memberId" @click="handleAdd" v-hasPermi="['admin:merchantRole:add']">新增</el-button>
+        <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['admin:merchantRole:add']">新增</el-button>
       </el-col>
       <el-col :span="1.5">
         <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['admin:merchantRole:edit']">修改</el-button>
@@ -35,7 +30,7 @@
 
     <el-table v-loading="loading" :data="roleList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="角色ID" prop="roleId" width="90" align="center" />
+      <el-table-column label="角色模板ID" prop="roleTemplateId" width="110" align="center" />
       <el-table-column label="角色名称" prop="roleName" min-width="160" />
       <el-table-column label="权限标识" prop="roleKey" min-width="180" />
       <el-table-column label="显示顺序" prop="roleSort" width="100" align="center" />
@@ -75,9 +70,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="角色状态">
-              <el-radio-group v-model="form.status">
-                <el-radio v-for="dict in sys_normal_disable" :key="dict.value" :value="dict.value">{{ dict.label }}</el-radio>
-              </el-radio-group>
+              <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="正常" inactive-text="停用" inline-prompt />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -113,7 +106,6 @@
 </template>
 
 <script setup name="RentalMerchantRole">
-import { listMember } from '@/api/rental/member'
 import {
   addMerchantRole,
   delMerchantRole,
@@ -127,7 +119,6 @@ import {
 const { proxy } = getCurrentInstance()
 const { sys_normal_disable } = proxy.useDict('sys_normal_disable')
 
-const memberOptions = ref([])
 const roleList = ref([])
 const menuOptions = ref([])
 const open = ref(false)
@@ -144,7 +135,6 @@ const data = reactive({
   queryParams: {
     pageNum: 1,
     pageSize: 10,
-    memberId: undefined,
     roleName: undefined,
     status: undefined
   },
@@ -162,23 +152,11 @@ function buildQuery() {
     pageNum: queryParams.value.pageNum,
     pageSize: queryParams.value.pageSize,
     roleName: queryParams.value.roleName,
-    status: queryParams.value.status,
-    'params[memberId]': queryParams.value.memberId
+    status: queryParams.value.status
   }
-}
-
-function getMembers() {
-  listMember({ pageNum: 1, pageSize: 1000, status: '0' }).then(response => {
-    memberOptions.value = response.rows || []
-  })
 }
 
 function getList() {
-  if (!queryParams.value.memberId) {
-    roleList.value = []
-    total.value = 0
-    return
-  }
   loading.value = true
   listMerchantRole(buildQuery()).then(response => {
     roleList.value = response.rows || []
@@ -188,13 +166,13 @@ function getList() {
 }
 
 function getMenuTreeselect() {
-  return merchantMenuTreeselect(queryParams.value.memberId).then(response => {
+  return merchantMenuTreeselect().then(response => {
     menuOptions.value = response.data
   })
 }
 
-function getRoleMenuTreeselect(roleId) {
-  return merchantRoleMenuTreeselect(queryParams.value.memberId, roleId).then(response => {
+function getRoleMenuTreeselect(roleTemplateId) {
+  return merchantRoleMenuTreeselect(roleTemplateId).then(response => {
     menuOptions.value = response.menus
     return response
   })
@@ -202,16 +180,14 @@ function getRoleMenuTreeselect(roleId) {
 
 function reset() {
   form.value = {
-    roleId: undefined,
+    roleTemplateId: undefined,
     roleName: undefined,
     roleKey: undefined,
     roleSort: 1,
     menuIds: [],
     menuCheckStrictly: true,
-    deptCheckStrictly: true,
     status: '0',
-    remark: undefined,
-    params: { memberId: queryParams.value.memberId }
+    remark: undefined
   }
   proxy.resetForm('roleRef')
 }
@@ -227,7 +203,7 @@ function resetQuery() {
 }
 
 function handleSelectionChange(selection) {
-  ids.value = selection.map(item => item.roleId)
+  ids.value = selection.map(item => item.roleTemplateId)
   single.value = selection.length !== 1
   multiple.value = !selection.length
 }
@@ -241,10 +217,10 @@ function handleAdd() {
 
 function handleUpdate(row) {
   reset()
-  const roleId = row.roleId || ids.value[0]
-  const roleMenu = getRoleMenuTreeselect(roleId)
-  getMerchantRole(queryParams.value.memberId, roleId).then(response => {
-    form.value = { ...response.data, params: { memberId: queryParams.value.memberId } }
+  const roleTemplateId = row.roleTemplateId || ids.value[0]
+  const roleMenu = getRoleMenuTreeselect(roleTemplateId)
+  getMerchantRole(roleTemplateId).then(response => {
+    form.value = { ...response.data }
     open.value = true
     title.value = '修改商户角色'
     nextTick(() => {
@@ -266,8 +242,7 @@ function submitForm() {
   proxy.$refs.roleRef.validate(valid => {
     if (!valid) return
     form.value.menuIds = getMenuAllCheckedKeys()
-    form.value.params = { memberId: queryParams.value.memberId }
-    const action = form.value.roleId ? updateMerchantRole : addMerchantRole
+    const action = form.value.roleTemplateId ? updateMerchantRole : addMerchantRole
     action(form.value).then(() => {
       proxy.$modal.msgSuccess('保存成功')
       open.value = false
@@ -282,18 +257,14 @@ function cancel() {
 }
 
 function handleDelete(row) {
-  const roleIds = row.roleId || ids.value
-  proxy.$modal.confirm('是否确认删除商户角色编号为"' + roleIds + '"的数据项？').then(() => {
-    return delMerchantRole(queryParams.value.memberId, roleIds)
+  const roleTemplateIds = row.roleTemplateId || ids.value
+  proxy.$modal.confirm('是否确认删除商户角色模板编号为"' + roleTemplateIds + '"的数据项？').then(() => {
+    return delMerchantRole(roleTemplateIds)
   }).then(() => {
     getList()
     proxy.$modal.msgSuccess('删除成功')
   }).catch(() => {})
 }
 
-function formatMember(item) {
-  return `${item.legalSubjectName || item.nickname || item.memberCode} / ${item.memberCode}`
-}
-
-getMembers()
+getList()
 </script>

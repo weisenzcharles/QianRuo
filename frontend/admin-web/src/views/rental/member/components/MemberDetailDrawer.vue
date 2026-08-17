@@ -86,7 +86,13 @@
           <el-table-column label="资格" min-width="150">
             <template #default="scope">{{ qualificationLabel(scope.row.qualificationCode) }}</template>
           </el-table-column>
-          <el-table-column label="状态" prop="qualificationStatus" width="100" />
+          <el-table-column label="状态" width="100">
+            <template #default="scope">
+              <el-tag :type="getRentalQualificationStatusTagType(scope.row.qualificationStatus)">
+                {{ getRentalQualificationStatusLabel(scope.row.qualificationStatus) }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="审核人" prop="reviewedBy" width="130" />
           <el-table-column label="审核时间" width="180">
             <template #default="scope">{{ formatDateTime(scope.row.reviewedTime) }}</template>
@@ -128,7 +134,13 @@
             <el-table-column label="资格" min-width="130">
               <template #default="scope">{{ qualificationLabel(scope.row.qualificationCode) }}</template>
             </el-table-column>
-            <el-table-column label="状态" prop="qualificationStatus" width="90" />
+            <el-table-column label="状态" width="90">
+              <template #default="scope">
+                <el-tag :type="getRentalQualificationStatusTagType(scope.row.qualificationStatus)">
+                  {{ getRentalQualificationStatusLabel(scope.row.qualificationStatus) }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column label="时间" width="170">
               <template #default="scope">{{ formatDateTime(scope.row.operatedTime) }}</template>
             </el-table-column>
@@ -141,7 +153,7 @@
 
 <script setup>
 import { parseTime } from '@/utils/ruoyi'
-import { getRentalOptionLabel, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalMembershipTypeOptions, rentalQualificationOptions, rentalVipLevelOptions } from '@/utils/rental/options'
+import { getRentalOptionLabel, getRentalQualificationStatusLabel, getRentalQualificationStatusTagType, rentalAuthStatusOptions, rentalMemberTypeOptions, rentalMembershipTypeOptions, rentalQualificationOptions, rentalVipLevelOptions } from '@/utils/rental/options'
 import { useWindowSize } from '@vueuse/core'
 
 const visible = defineModel({ type: Boolean, default: false })

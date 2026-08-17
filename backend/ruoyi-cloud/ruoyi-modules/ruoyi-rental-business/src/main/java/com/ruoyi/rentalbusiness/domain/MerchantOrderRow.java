@@ -25,6 +25,13 @@ public class MerchantOrderRow
     public String customerNote;
     public String warehouseName;
     public String warehouseCity;
+    public String recipientProvinceCode;
+    public String recipientCityCode;
+    public String recipientDistrictCode;
+    public String recipientAmapCityCode;
+    public String recipientProvinceName;
+    public String recipientCityName;
+    public String recipientDistrictName;
     public Long warehouseId;
     public Long returnWarehouseId;
     public Long productId;

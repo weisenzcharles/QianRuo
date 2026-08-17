@@ -6,30 +6,40 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.security.annotation.InnerAuth;
 import com.ruoyi.rentalbusiness.service.RentalBusinessService;
+import com.ruoyi.rentalbusiness.task.RegionWeatherRefreshTask;
 import com.ruoyi.system.api.model.PlatformWarehouseView;
 
 /**
- * 租赁业务服务内部探活接口。
+ * 租赁业务服务内部契约接口。
  *
- * 该接口仅用于网关、部署脚本或其他服务验证服务注册与内部鉴权是否正常，不承载
- * 商品、订单等业务能力，也不允许浏览器端直接调用。
+ * 该接口用于服务探活、跨服务校验和平台调度触发，不承载浏览器端业务能力。所有
+ * 方法都必须通过内部请求头和 {@link InnerAuth} 校验后才能执行。
  */
 @RestController
 @RequestMapping("/internal/rental-business")
 public class InternalRentalBusinessController
 {
     private final RentalBusinessService rentalBusinessService;
+    private final RegionWeatherRefreshTask regionWeatherRefreshTask;
 
-    /** 注入租赁业务应用服务，内部控制器不直接操作 Mapper。 */
-    public InternalRentalBusinessController(RentalBusinessService rentalBusinessService)
+    /**
+     * 注入租赁业务应用服务和天气刷新任务，确保内部控制器只编排应用能力，不直接操作 Mapper。
+     *
+     * @param rentalBusinessService 租赁业务应用服务
+     * @param regionWeatherRefreshTask 市级天气刷新任务
+     */
+    public InternalRentalBusinessController(RentalBusinessService rentalBusinessService,
+            RegionWeatherRefreshTask regionWeatherRefreshTask)
     {
         this.rentalBusinessService = rentalBusinessService;
+        this.regionWeatherRefreshTask = regionWeatherRefreshTask;
     }
 
     /**
@@ -87,6 +97,23 @@ public class InternalRentalBusinessController
     public R<Boolean> modelReferences(@PathVariable("modelId") Long modelId)
     {
         return R.ok(rentalBusinessService.hasModelReferencesForInternal(modelId));
+    }
+
+    /**
+     * 由平台定时任务触发全部市级行政区三日天气刷新。
+     *
+     * <p>该方法直接调用与业务服务任务相同的 Spring Bean，天气任务内部负责上海时区、
+     * Redis 分布式锁、城市请求去重、三日数据写入和异常记录；平台端不会绕过业务服务直接访问
+     * {@code ry_business} 数据库。</p>
+     *
+     * @return 任务调用完成结果；任务内部的单城市失败会记录失败天气快照并继续处理
+     */
+    @InnerAuth
+    @PostMapping("/weather/refresh")
+    public R<Void> refreshThreeDayWeather()
+    {
+        regionWeatherRefreshTask.refreshThreeDayWeather();
+        return R.ok();
     }
 
     /**

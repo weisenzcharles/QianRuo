@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Import;
 import com.ruoyi.common.security.annotation.EnableCustomConfig;
 import com.ruoyi.common.security.annotation.EnableRyFeignClients;
 import com.ruoyi.system.api.factory.RemoteLogFallbackFactory;
+import com.ruoyi.system.api.factory.RemoteRentalWeatherFallbackFactory;
 
 /**
  * 定时任务
@@ -17,7 +18,7 @@ import com.ruoyi.system.api.factory.RemoteLogFallbackFactory;
  */
 @EnableCustomConfig
 @EnableRyFeignClients
-@Import(RemoteLogFallbackFactory.class)
+@Import({ RemoteLogFallbackFactory.class, RemoteRentalWeatherFallbackFactory.class })
 @SpringBootApplication
 public class RuoYiJobApplication
 {

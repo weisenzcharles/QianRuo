@@ -160,13 +160,7 @@
                <el-input-number v-model="form.roleSort" controls-position="right" :min="0" />
             </el-form-item>
             <el-form-item label="状态">
-               <el-radio-group v-model="form.status">
-                  <el-radio
-                     v-for="dict in sys_normal_disable"
-                     :key="dict.value"
-                     :value="dict.value"
-                  >{{ dict.label }}</el-radio>
-               </el-radio-group>
+               <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="正常" inactive-text="停用" inline-prompt />
             </el-form-item>
             <el-form-item label="菜单权限">
                <el-checkbox v-model="menuExpand" @change="handleCheckedTreeExpand($event, 'menu')">展开/折叠</el-checkbox>

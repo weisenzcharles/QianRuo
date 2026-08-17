@@ -125,6 +125,17 @@ DATABASE_MIGRATIONS=(
   "database/migrations/V20260814_005__restore_merchant_master_data_menus.sql"
   "database/migrations/V20260814_006__unify_merchant_business_audit_source.sql"
   "database/migrations/V20260814_007__import_amap_region_dictionary.sql"
+  "database/migrations/V20260814_008__order_recipient_history_global_config.sql"
+  "database/migrations/V20260814_009__repair_platform_menu_encoding.sql"
+  "database/migrations/V20260814_010__platform_menu_structure.sql"
+  "database/migrations/V20260814_011__rename_platform_product_model_menu.sql"
+  "database/migrations/V20260814_012__global_merchant_role_template.sql"
+  "database/migrations/V20260814_013__rename_merchant_file_quota_menu.sql"
+  "database/migrations/V20260815_001__order_recipient_history_used.sql"
+  "database/migrations/V20260815_002__region_weather.sql"
+  "database/migrations/V20260815_004__platform_region_weather_job.sql"
+  "database/migrations/V20260817_001__city_weather_scope_and_amap_api_keys.sql"
+  "database/migrations/V20260817_002__drop_deprecated_region_tables.sql"
 )
 
 usage() {
@@ -242,7 +253,9 @@ build_backend_artifacts() {
   [[ "$BUILD_BACKEND" == "true" ]] || return 0
   need_cmd mvn
   log "Packaging backend services"
-  mvn -f "$ROOT_DIR/backend/ruoyi-cloud/pom.xml" package
+  # Always clean first: incremental Maven output can leave newly added common classes
+  # out of a dependent service JAR while still producing a seemingly valid image.
+  mvn -f "$ROOT_DIR/backend/ruoyi-cloud/pom.xml" clean package
 }
 
 # 校验指定服务的 JAR 文件已经完成打包，避免 jar 命令对不存在的文件输出无关的 Java 异常堆栈。
@@ -469,12 +482,13 @@ migrate_db() {
   for migration in "${DATABASE_MIGRATIONS[@]}"; do
     run_sql_file "$migration"
   done
-  log "Reloading Nacos, gateway and platform configuration"
-  kubectl -n "$K8S_NAMESPACE" rollout restart deployment/ruoyi-nacos deployment/ruoyi-gateway deployment/platform-service deployment/rental-business
+  log "Reloading Nacos, gateway, platform and scheduled-job configuration"
+  kubectl -n "$K8S_NAMESPACE" rollout restart deployment/ruoyi-nacos deployment/ruoyi-gateway deployment/platform-service deployment/rental-business deployment/ruoyi-job
   wait_deployment ruoyi-nacos
   wait_deployment ruoyi-gateway
   wait_deployment platform-service
   wait_deployment rental-business
+  wait_deployment ruoyi-job
 }
 
 show_status() {
@@ -701,6 +715,11 @@ local_reload_gateway_config() {
     log "Reloading local rental business configuration"
     compose restart rental-business
     local_wait_rental_business_service
+  fi
+  if docker inspect qianruo-job --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
+    log "Reloading local scheduled-job configuration"
+    compose restart ruoyi-job
+    local_wait_job_service
   fi
   if docker inspect qianruo-gateway --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
     local_verify_merchant_routes

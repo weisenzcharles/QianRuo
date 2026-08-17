@@ -1,0 +1,133 @@
+package com.ruoyi.rentalbusiness.service;
+
+import java.util.Objects;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.rentalbusiness.domain.OrderRecipientHistoryRecord;
+import com.ruoyi.rentalbusiness.mapper.OrderRecipientHistoryMapper;
+import com.ruoyi.rentalbusiness.model.RegionAddressInfo;
+
+/** 订单收件人历史快照应用服务。 */
+@Service
+public class OrderRecipientHistoryService
+{
+    private final OrderRecipientHistoryMapper historyMapper;
+    private final RegionAddressParser regionAddressParser;
+
+    /**
+     * 注入历史快照 Mapper 和地址解析公共服务。
+     *
+     * @param historyMapper 收件人历史快照 Mapper
+     * @param regionAddressParser 地址解析器
+     */
+    public OrderRecipientHistoryService(OrderRecipientHistoryMapper historyMapper,
+            RegionAddressParser regionAddressParser)
+    {
+        this.historyMapper = historyMapper;
+        this.regionAddressParser = regionAddressParser;
+    }
+
+    /**
+     * 记录订单一次收件人保存快照。
+     *
+     * <p>地址解析失败只记录失败状态和原始地址，不阻断订单主流程；这样不完整的自由文本地址
+     * 仍可先保存，后续补全地址后再次编辑即可形成新的成功快照。</p>
+     *
+     * @param tenantId 租户主键
+     * @param memberId 商户主键
+     * @param orderId 订单主键
+     * @param orderNo 订单编号
+     * @param contactName 联系人
+     * @param contactPhone 联系电话
+     * @param contactAddress 详细地址
+     * @param operatorId 操作人用户主键
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void record(Long tenantId, Long memberId, Long orderId, String orderNo,
+            String contactName, String contactPhone, String contactAddress, Long operatorId)
+    {
+        if (tenantId == null || memberId == null || orderId == null || orderNo == null || orderNo.trim().isEmpty())
+        {
+            return;
+        }
+        String normalizedOrderNo = orderNo.trim();
+        RegionAddressInfo parsed = regionAddressParser.parse(contactAddress);
+        OrderRecipientHistoryRecord record = new OrderRecipientHistoryRecord();
+        record.contactName = contactName;
+        record.contactPhone = contactPhone;
+        record.contactAddress = contactAddress;
+        record.provinceCode = parsed.provinceCode;
+        record.cityCode = parsed.cityCode;
+        record.districtCode = parsed.districtCode;
+        record.amapCityCode = parsed.amapCityCode;
+        record.provinceName = parsed.provinceName;
+        record.cityName = parsed.cityName;
+        record.districtName = parsed.districtName;
+        record.parseStatus = parsed.parseStatus;
+        record.parseMessage = parsed.parseMessage;
+        OrderRecipientHistoryRecord current = historyMapper.selectLatest(tenantId, memberId, normalizedOrderNo);
+        if (sameRecipientInfo(current, record))
+        {
+            return;
+        }
+        historyMapper.clearUsedSnapshots(tenantId, memberId, normalizedOrderNo, operatorId);
+        historyMapper.insertSnapshot(tenantId, memberId, orderId, normalizedOrderNo, record, operatorId);
+    }
+
+    /**
+     * 比较两个收件人快照的业务字段，避免订单重复保存时产生无意义的历史记录。
+     *
+     * <p>解析说明属于诊断信息，不属于收件人业务数据，因此不参与去重；联系人、电话、
+     * 地址以及行政区划编码和名称发生变化时，才会创建新的当前快照。</p>
+     *
+     * @param current 当前订单正在使用的快照
+     * @param candidate 本次订单保存解析出的候选快照
+     * @return 收件人业务信息是否一致
+     */
+    private boolean sameRecipientInfo(OrderRecipientHistoryRecord current,
+            OrderRecipientHistoryRecord candidate)
+    {
+        if (current == null || candidate == null)
+        {
+            return false;
+        }
+        return sameText(current.contactName, candidate.contactName)
+                && sameText(current.contactPhone, candidate.contactPhone)
+                && sameText(current.contactAddress, candidate.contactAddress)
+                && sameText(current.provinceCode, candidate.provinceCode)
+                && sameText(current.cityCode, candidate.cityCode)
+                && sameText(current.districtCode, candidate.districtCode)
+                && sameText(current.amapCityCode, candidate.amapCityCode)
+                && sameText(current.provinceName, candidate.provinceName)
+                && sameText(current.cityName, candidate.cityName)
+                && sameText(current.districtName, candidate.districtName);
+    }
+
+    /**
+     * 按业务语义比较文本字段，将 null、空字符串和首尾空白视为同一值。
+     *
+     * @param left 第一个文本值
+     * @param right 第二个文本值
+     * @return 两个文本值是否相同
+     */
+    private boolean sameText(String left, String right)
+    {
+        return Objects.equals(normalizeText(left), normalizeText(right));
+    }
+
+    /**
+     * 规范化收件人文本，避免前端控件把空白值提交为不同的字符串而误生成快照。
+     *
+     * @param value 原始文本
+     * @return 去除首尾空白后的文本，空文本返回 null
+     */
+    private String normalizeText(String value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+}

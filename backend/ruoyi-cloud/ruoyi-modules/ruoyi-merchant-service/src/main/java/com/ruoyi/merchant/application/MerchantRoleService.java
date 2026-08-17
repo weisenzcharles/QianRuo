@@ -42,9 +42,23 @@ public class MerchantRoleService
     @Autowired
     private MerchantBusinessAuditRecorder auditRecorder;
 
+    @Transactional(rollbackFor = Exception.class)
     public List<MerchantRoleVO> list(MerchantRoleQuery query)
     {
+        syncRoleTemplates();
         return roleMapper.selectList(tenantId(), merchantId(), query);
+    }
+
+    /**
+     * 将平台新增的全局角色模板补齐为当前商户的运行角色，并恢复默认菜单授权。
+     *
+     * <p>模板本身不携带商户归属；这里生成的运行角色才属于当前商户，后续商户管理员
+     * 修改菜单权限时只会影响当前商户，不会改变平台模板或其他商户。</p>
+     */
+    private void syncRoleTemplates()
+    {
+        roleMapper.insertMissingTemplateRoles(tenantId(), merchantId(), SecurityUtils.getUsername());
+        roleMapper.insertTemplateRoleMenus(tenantId(), merchantId());
     }
 
     public MerchantRoleVO get(Long roleId)

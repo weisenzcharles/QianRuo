@@ -47,6 +47,24 @@ public interface MerchantRoleMapper
             @Param("roleId") Long roleId);
     int insertRoleMenus(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
             @Param("roleId") Long roleId, @Param("menuIds") Long[] menuIds);
+    /**
+     * 为当前商户补齐平台新增的全局角色模板。
+     *
+     * @param tenantId 当前商户租户主键
+     * @param merchantId 当前商户主键
+     * @param operator 当前操作人
+     * @return 新增角色数量
+     */
+    int insertMissingTemplateRoles(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId,
+            @Param("operator") String operator);
+    /**
+     * 将当前商户角色模板的默认菜单权限幂等写入运行角色。
+     *
+     * @param tenantId 当前商户租户主键
+     * @param merchantId 当前商户主键
+     * @return 新增或恢复的角色菜单数量
+     */
+    int insertTemplateRoleMenus(@Param("tenantId") Long tenantId, @Param("merchantId") Long merchantId);
     List<MerchantRoleUserVO> selectAllocatedUsers(@Param("tenantId") Long tenantId,
             @Param("merchantId") Long merchantId, @Param("query") MerchantRoleUserQuery query);
     List<MerchantRoleUserVO> selectUnallocatedUsers(@Param("tenantId") Long tenantId,

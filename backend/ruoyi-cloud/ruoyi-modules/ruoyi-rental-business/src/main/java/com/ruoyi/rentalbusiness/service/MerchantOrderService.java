@@ -15,7 +15,10 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.log.service.MerchantBusinessAuditRecorder;
 import com.ruoyi.common.security.utils.MerchantContextUtils;
 import com.ruoyi.rentalbusiness.domain.MerchantOrderRow;
+import com.ruoyi.rentalbusiness.integration.amap.AmapWeatherClient;
+import com.ruoyi.rentalbusiness.integration.amap.AmapWeatherSnapshot;
 import com.ruoyi.rentalbusiness.mapper.MerchantOrderMapper;
+import com.ruoyi.rentalbusiness.model.RegionAddressInfo;
 import com.ruoyi.rentalbusiness.model.MerchantOrderListVO;
 import com.ruoyi.rentalbusiness.model.MerchantOrderQuery;
 import com.ruoyi.rentalbusiness.model.MerchantOrderCreateCommand;
@@ -41,6 +44,9 @@ public class MerchantOrderService
     private final MerchantOrderMapper orderMapper;
     private final CodeGeneratorClient codeGeneratorClient;
     private final MerchantBusinessAuditRecorder auditRecorder;
+    private final OrderRecipientHistoryService recipientHistoryService;
+    private final RegionAddressParser regionAddressParser;
+    private final AmapWeatherClient amapWeatherClient;
 
     /**
      * 注入商户订单查询数据访问对象。
@@ -48,20 +54,27 @@ public class MerchantOrderService
      * @param orderMapper 商户订单 Mapper
      * @param codeGeneratorClient 统一业务编码客户端
      * @param auditRecorder 商户业务审计记录器
+     * @param recipientHistoryService 收件人历史快照服务
+     * @param regionAddressParser 行政区划解析公共服务
+     * @param amapWeatherClient 高德天气客户端
      */
     @Autowired
     public MerchantOrderService(MerchantOrderMapper orderMapper, CodeGeneratorClient codeGeneratorClient,
-            MerchantBusinessAuditRecorder auditRecorder)
+            MerchantBusinessAuditRecorder auditRecorder, OrderRecipientHistoryService recipientHistoryService,
+            RegionAddressParser regionAddressParser, AmapWeatherClient amapWeatherClient)
     {
         this.orderMapper = orderMapper;
         this.codeGeneratorClient = codeGeneratorClient;
         this.auditRecorder = auditRecorder;
+        this.recipientHistoryService = recipientHistoryService;
+        this.regionAddressParser = regionAddressParser;
+        this.amapWeatherClient = amapWeatherClient;
     }
 
     /** 保留历史构造方式，供仅需要订单读写能力的测试使用。 */
     public MerchantOrderService(MerchantOrderMapper orderMapper, CodeGeneratorClient codeGeneratorClient)
     {
-        this(orderMapper, codeGeneratorClient, null);
+        this(orderMapper, codeGeneratorClient, null, null, null, null);
     }
 
     /** 保留查询服务的轻量构造方式，供现有列表单元测试和只读调用使用。 */
@@ -97,6 +110,7 @@ public class MerchantOrderService
                     com.ruoyi.common.security.utils.SecurityUtils.getUserId());
         }
         MerchantOrderCreateCommand created = get(command.orderId);
+        recordRecipientSnapshot(created, com.ruoyi.common.security.utils.SecurityUtils.getUserId());
         audit("订单管理", "CREATE", "ORDER", command.orderId, created.orderNo, "创建订单", null, created);
     }
 
@@ -127,6 +141,7 @@ public class MerchantOrderService
                 command, com.ruoyi.common.security.utils.SecurityUtils.getUserId());
         if (updated == 0) throw new com.ruoyi.common.core.exception.ServiceException("订单不存在或无权编辑");
         MerchantOrderCreateCommand after = get(command.orderId);
+        recordRecipientSnapshot(after, com.ruoyi.common.security.utils.SecurityUtils.getUserId());
         audit("订单管理", "UPDATE", "ORDER", command.orderId, after.orderNo, "编辑订单", before, after);
     }
 
@@ -183,6 +198,7 @@ public class MerchantOrderService
         }
         MerchantOrderCreateCommand command = new MerchantOrderCreateCommand();
         command.orderId = row.orderId;
+        command.orderNo = row.orderNo;
         command.externalOrderNo = row.externalOrderNo;
         command.channelId = row.channelId;
         command.shopName = row.shopName;
@@ -321,7 +337,8 @@ public class MerchantOrderService
     }
 
     /**
-     * 转换气象风险信息，当前阶段使用订单风险标识和仓库城市生成稳定展示结构。
+     * 转换气象风险信息，先用统一地址解析器得到发货地和收货地的行政区划 adcode，再调用
+     * 高德天气客户端获取实际天气；高德未配置或调用失败时保留稳定的“待查询”展示。
      *
      * @param row 数据库查询行
      * @return 气象风险展示对象
@@ -329,13 +346,98 @@ public class MerchantOrderService
     private MerchantOrderListVO.Weather toWeather(MerchantOrderRow row)
     {
         MerchantOrderListVO.Weather weather = new MerchantOrderListVO.Weather();
-        weather.route = defaultText(row.warehouseCity, "发货地") + " → 收货地";
-        weather.depart = row.weatherRiskFlag != null && row.weatherRiskFlag == 1 ? "存在风险" : "待查询";
-        weather.arrive = row.weatherRiskFlag != null && row.weatherRiskFlag == 1 ? "请关注天气" : "待查询";
-        weather.departIcon = "sunny";
-        weather.arriveIcon = "rain";
-        weather.risk = row.weatherRiskFlag != null && row.weatherRiskFlag == 1;
+        RegionAddressInfo departureRegion = regionAddressParser == null ? null
+                : regionAddressParser.parse(row.warehouseCity);
+        RegionAddressInfo arrivalRegion = recipientRegion(row);
+        String departureAdcode = weatherAdcode(departureRegion);
+        String arrivalAdcode = weatherAdcode(arrivalRegion);
+        AmapWeatherSnapshot departureWeather = amapWeatherClient == null
+                ? AmapWeatherSnapshot.unavailable(departureAdcode, "天气服务未启用")
+                : amapWeatherClient.query(departureAdcode);
+        AmapWeatherSnapshot arrivalWeather = amapWeatherClient == null
+                ? AmapWeatherSnapshot.unavailable(arrivalAdcode, "天气服务未启用")
+                : amapWeatherClient.query(arrivalAdcode);
+
+        weather.departCity = defaultText(departureRegion == null ? null : departureRegion.cityName,
+                defaultText(row.warehouseCity, "发货地"));
+        weather.arriveCity = defaultText(row.recipientCityName,
+                defaultText(arrivalRegion == null ? null : arrivalRegion.cityName, "收货地"));
+        weather.route = weather.departCity + " → " + weather.arriveCity;
+        weather.depart = weatherText(departureWeather);
+        weather.arrive = weatherText(arrivalWeather);
+        weather.departIcon = defaultText(departureWeather.icon, "cloudy");
+        weather.arriveIcon = defaultText(arrivalWeather.icon, "cloudy");
+        weather.departReportTime = departureWeather.reportTime;
+        weather.arriveReportTime = arrivalWeather.reportTime;
+        weather.risk = row.weatherRiskFlag != null && row.weatherRiskFlag == 1
+                || departureWeather.risk || arrivalWeather.risk;
         return weather;
+    }
+
+    /**
+     * 取得订单收件地址的行政区划结果，历史快照缺失时兼容解析当前订单地址。
+     *
+     * @param row 订单查询行
+     * @return 收件地址解析结果
+     */
+    private RegionAddressInfo recipientRegion(MerchantOrderRow row)
+    {
+        RegionAddressInfo result = new RegionAddressInfo();
+        result.provinceCode = row.recipientProvinceCode;
+        result.cityCode = row.recipientCityCode;
+        result.districtCode = row.recipientDistrictCode;
+        result.amapCityCode = row.recipientAmapCityCode;
+        result.provinceName = row.recipientProvinceName;
+        result.cityName = row.recipientCityName;
+        result.districtName = row.recipientDistrictName;
+        if (result.weatherAdcode() == null && regionAddressParser != null)
+        {
+            return regionAddressParser.parse(row.customerAddress);
+        }
+        return result;
+    }
+
+    /**
+     * 取得天气服务应使用的行政区划 adcode，禁止把 citycode 误作为天气接口参数。
+     *
+     * @param region 地址解析结果
+     * @return 区县、市或省级 adcode；解析结果为空时返回 null
+     */
+    private String weatherAdcode(RegionAddressInfo region)
+    {
+        return region == null ? null : region.weatherAdcode();
+    }
+
+    /**
+     * 将高德天气快照转换为订单列表中的简短天气文本。
+     *
+     * @param snapshot 天气快照
+     * @return 天气和温度展示文本
+     */
+    private String weatherText(AmapWeatherSnapshot snapshot)
+    {
+        if (snapshot == null || !snapshot.available || snapshot.weather == null || snapshot.weather.trim().isEmpty())
+        {
+            return "待查询";
+        }
+        return snapshot.temperature == null || snapshot.temperature.trim().isEmpty()
+                ? snapshot.weather : snapshot.weather + " " + snapshot.temperature + "℃";
+    }
+
+    /**
+     * 在订单主表保存成功后记录收件人历史快照。
+     *
+     * @param command 已保存订单命令
+     * @param operatorId 操作人用户主键
+     */
+    private void recordRecipientSnapshot(MerchantOrderCreateCommand command, Long operatorId)
+    {
+        if (recipientHistoryService != null && command != null)
+        {
+            recipientHistoryService.record(MerchantContextUtils.getTenantId(), MerchantContextUtils.getMemberId(),
+                    command.orderId, command.orderNo, command.customerName, command.customerPhone,
+                    command.customerAddress, operatorId);
+        }
     }
 
     /**

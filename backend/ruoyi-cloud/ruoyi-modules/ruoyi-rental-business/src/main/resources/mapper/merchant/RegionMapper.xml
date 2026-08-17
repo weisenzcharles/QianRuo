@@ -1,11 +1,44 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ruoyi.rentalbusiness.mapper.RegionMapper">
-    <!-- 同时返回高德 citycode，供后续天气、物流等按城市编码调用的业务复用。 -->
+    <!-- 同时返回导入数据中的高德 citycode 快照，供级联展示和物流等城市编码业务复用。 -->
     <select id="selectChildren" resultType="map">
         select region_code as code, region_name as name, region_level as level, city_code as cityCode
-        from ry_business.ry_region
+        from ry_business.ry_rental_region
         where parent_code = #{parentCode} and region_level &lt;= 3 and is_delete = 0
         order by sort_no, region_code
+    </select>
+
+    <!-- 地址解析只需要省、市、区县三级，启动后缓存该小型字典避免每个订单重复访问数据库。 -->
+    <select id="selectActiveRegionNodes" resultType="com.ruoyi.rentalbusiness.model.RegionNode">
+        select region_code as code,
+               parent_code as parentCode,
+               region_level as level,
+               region_name as name,
+               city_code as amapCityCode
+        from ry_business.ry_rental_region
+        where region_level &lt;= 3
+          and is_delete = 0
+        order by region_level, sort_no, region_code
+    </select>
+
+    <!-- 天气任务只请求二级行政区；二级以下行政区读取天气时通过 parent_code 复用对应市级记录。 -->
+    <select id="selectWeatherRegions" resultType="com.ruoyi.rentalbusiness.model.RegionWeatherRegion">
+        select city.region_code as regionCode,
+               city.region_name as regionName,
+               city.region_code as cityCode,
+               city.region_name as cityName,
+               province.region_code as provinceCode,
+               province.region_name as provinceName,
+               city.region_code as weatherAdcode,
+               coalesce(nullif(city.city_code, ''),
+                   nullif(province.city_code, '')) as amapCityCode
+        from ry_business.ry_rental_region city
+        left join ry_business.ry_rental_region province
+            on province.region_code = city.parent_code
+           and province.is_delete = 0
+        where city.region_level = 2
+          and city.is_delete = 0
+        order by city.region_code
     </select>
 </mapper>

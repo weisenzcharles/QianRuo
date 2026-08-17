@@ -227,6 +227,32 @@
         on duplicate key update member_role = 'owner', status = '0', is_delete = 0,
             update_by = values(create_by), update_time = sysdate()
     </insert>
+    <insert id="insertMerchantRolesFromTemplates">
+        insert into `ry_rental`.`ry_rental_merchant_role`
+            (tenant_id, member_id, role_template_id, role_name, role_key, role_sort,
+             menu_check_strictly, status, is_delete, create_by, create_time, remark)
+        select #{tenantId}, #{merchantId}, t.role_template_id, t.role_name, t.role_key, t.role_sort,
+               t.menu_check_strictly, t.status, 0, #{operator}, sysdate(), '由平台全局角色模板初始化'
+        from `ry_rental`.`ry_rental_merchant_role_template` t
+        where t.status = '0' and t.is_delete = 0
+          and not exists (
+              select 1
+              from `ry_rental`.`ry_rental_merchant_role` r
+              where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
+                and r.is_delete = 0
+                and (r.role_template_id = t.role_template_id or r.role_key = t.role_key)
+          )
+    </insert>
+    <insert id="insertMerchantRoleMenusFromTemplates">
+        insert into `ry_rental`.`ry_rental_merchant_role_menu`
+            (tenant_id, member_id, role_id, menu_id, is_delete)
+        select r.tenant_id, r.member_id, r.role_id, tm.menu_id, 0
+        from `ry_rental`.`ry_rental_merchant_role` r
+        inner join `ry_rental`.`ry_rental_merchant_role_template_menu` tm
+            on tm.role_template_id = r.role_template_id and tm.is_delete = 0
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId} and r.is_delete = 0
+        on duplicate key update is_delete = 0
+    </insert>
     <select id="selectAdminRoleId" resultType="Long">
         select role_id from `ry_rental`.`ry_rental_merchant_role`
         where tenant_id = #{tenantId} and member_id = #{merchantId}
@@ -243,9 +269,12 @@
     </insert>
     <insert id="insertAdminRoleMenus">
         insert into `ry_rental`.`ry_rental_merchant_role_menu` (tenant_id, member_id, role_id, menu_id, is_delete)
-        select #{tenantId}, #{merchantId}, #{roleId}, m.menu_id, 0
-        from `ry_rental`.`ry_rental_merchant_menu` m
-        where m.tenant_id = 0 and m.member_id = 0 and m.status = '0' and m.is_delete = '0'
+        select #{tenantId}, #{merchantId}, #{roleId}, tm.menu_id, 0
+        from `ry_rental`.`ry_rental_merchant_role` r
+        inner join `ry_rental`.`ry_rental_merchant_role_template_menu` tm
+            on tm.role_template_id = r.role_template_id and tm.is_delete = 0
+        where r.tenant_id = #{tenantId} and r.member_id = #{merchantId}
+          and r.role_id = #{roleId} and r.is_delete = 0
         on duplicate key update is_delete = 0
     </insert>
     <insert id="insertAdminUserRole">

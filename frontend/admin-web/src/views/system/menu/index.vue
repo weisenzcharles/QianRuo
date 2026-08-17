@@ -284,13 +284,7 @@
                            菜单状态
                         </span>
                      </template>
-                     <el-radio-group v-model="form.status">
-                        <el-radio
-                           v-for="dict in sys_normal_disable"
-                           :key="dict.value"
-                           :value="dict.value"
-                        >{{ dict.label }}</el-radio>
-                     </el-radio-group>
+                     <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="启用" inactive-text="停用" inline-prompt />
                   </el-form-item>
                </el-col>
             </el-row>

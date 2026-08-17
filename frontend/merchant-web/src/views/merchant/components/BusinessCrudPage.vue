@@ -66,6 +66,8 @@
               <el-select v-else-if="field.key === 'district'" v-model="form.district" clearable placeholder="请选择区/县" class="field-control">
                 <el-option v-for="item in districtOptions" :key="item.code" :label="item.name" :value="item.name" />
               </el-select>
+              <el-switch v-else-if="field.key === 'status'" v-model="form[field.key]" :active-value="0" :inactive-value="1" active-text="启用" inactive-text="停用" inline-prompt />
+              <el-switch v-else-if="field.key === 'enabled'" v-model="form[field.key]" :active-value="1" :inactive-value="0" active-text="启用" inactive-text="停用" inline-prompt />
               <el-select v-else-if="field.type === 'select'" v-model="form[field.key]" clearable :placeholder="field.placeholder || `请选择${field.label}`" class="field-control">
                 <el-option v-for="option in field.options" :key="String(option.value)" :label="option.label" :value="option.value" />
               </el-select>
@@ -232,7 +234,12 @@ function resetQuery() {
 function openCreate() {
   editing.value = false
   Object.keys(form).forEach(key => delete form[key])
-  config.value.fields.forEach(field => { form[field.key] = field.key === 'components' ? '[]' : undefined })
+  config.value.fields.forEach(field => {
+    if (field.key === 'components') form[field.key] = '[]'
+    else if (field.key === 'status') form[field.key] = 0
+    else if (field.key === 'enabled') form[field.key] = 1
+    else form[field.key] = undefined
+  })
   if (props.resource === 'pool') form.substitutableFlag = 1
   if (props.resource === 'sn' || props.resource === 'accessory') form.assetStatus = 'available'
   if (props.resource === 'warehouse') { provinceOptions.value = []; cityOptions.value = []; districtOptions.value = []; loadRegions('0', provinceOptions) }
@@ -248,7 +255,14 @@ async function openEdit(row) {
     ? await getMerchantWarehouse(row.id).then(response => response.data || response)
     : row
   form.id = detail.id
-  config.value.fields.forEach(field => { form[field.key] = detail[field.key] })
+  config.value.fields.forEach(field => {
+    const value = detail[field.key]
+    form[field.key] = field.key === 'status'
+      ? Number(value ?? 0)
+      : field.key === 'enabled'
+        ? Number(value ?? 1)
+        : value
+  })
   if (props.resource === 'package') form.components = JSON.stringify(detail.components || [], null, 2)
   if (props.resource === 'warehouse') { cityOptions.value = []; districtOptions.value = []; loadWarehouseRegions(detail.province, detail.city) }
   dialogVisible.value = true

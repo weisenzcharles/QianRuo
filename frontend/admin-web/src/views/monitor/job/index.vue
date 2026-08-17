@@ -193,13 +193,7 @@
                </el-col>
                <el-col :span="24" v-if="form.jobId !== undefined">
                   <el-form-item label="状态">
-                     <el-radio-group v-model="form.status">
-                        <el-radio
-                           v-for="dict in sys_job_status"
-                           :key="dict.value"
-                           :value="dict.value"
-                        >{{ dict.label }}</el-radio>
-                     </el-radio-group>
+                     <el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="正常" inactive-text="暂停" inline-prompt />
                   </el-form-item>
                </el-col>
                <el-col :span="12">

@@ -16,6 +16,13 @@
         <result property="customerNote" column="customer_note" />
         <result property="warehouseName" column="warehouse_name" />
         <result property="warehouseCity" column="warehouse_city" />
+        <result property="recipientProvinceCode" column="recipient_province_code" />
+        <result property="recipientCityCode" column="recipient_city_code" />
+        <result property="recipientDistrictCode" column="recipient_district_code" />
+        <result property="recipientAmapCityCode" column="recipient_amap_city_code" />
+        <result property="recipientProvinceName" column="recipient_province_name" />
+        <result property="recipientCityName" column="recipient_city_name" />
+        <result property="recipientDistrictName" column="recipient_district_name" />
         <result property="warehouseId" column="warehouse_id" />
         <result property="returnWarehouseId" column="return_warehouse_id" />
         <result property="productId" column="product_id" />
@@ -68,6 +75,13 @@
             coalesce(c.remark, '') as customer_note,
             w.warehouse_name,
             w.city as warehouse_city,
+            recipient_history.province_code as recipient_province_code,
+            recipient_history.city_code as recipient_city_code,
+            recipient_history.district_code as recipient_district_code,
+            recipient_history.amap_city_code as recipient_amap_city_code,
+            recipient_history.province_name as recipient_province_name,
+            recipient_history.city_name as recipient_city_name,
+            recipient_history.district_name as recipient_district_name,
             o.lease_start_date,
             o.lease_end_date,
             o.ship_due_time,
@@ -224,6 +238,28 @@
            and w.tenant_id = o.tenant_id
            and w.member_id = o.member_id
            and w.is_delete = 0
+        left join (
+            select h.tenant_id, h.member_id, h.order_no,
+                   h.province_code, h.city_code, h.district_code, h.amap_city_code,
+                   h.province_name, h.city_name, h.district_name
+            from ry_business.ry_rental_order_recipient_history h
+            inner join (
+                select tenant_id, member_id, order_no, max(recipient_history_id) as recipient_history_id
+                from ry_business.ry_rental_order_recipient_history
+                where is_delete = 0
+                  and used = 1
+                group by tenant_id, member_id, order_no
+            ) latest_history
+                on latest_history.recipient_history_id = h.recipient_history_id
+               and latest_history.tenant_id = h.tenant_id
+               and latest_history.member_id = h.member_id
+               and latest_history.order_no = h.order_no
+            where h.is_delete = 0
+              and h.used = 1
+        ) recipient_history
+            on recipient_history.tenant_id = o.tenant_id
+           and recipient_history.member_id = o.member_id
+           and recipient_history.order_no = o.order_no
         left join ry_business.ry_rental_order_channel cch
             on cch.channel_id = o.channel_id
            and cch.is_delete = 0
@@ -299,7 +335,14 @@
                o.order_status, o.pay_status, o.time_effect_status, o.weather_risk_flag, o.priority_flag,
                o.source_text_snapshot, o.share_snapshot_json, o.source_order_id, o.version, o.remark,
                oi.product_id, oi.package_id, oi.sn_id, oi.accessory_item_ids, oi.quantity,
-               c.customer_nickname, c.remark as customer_note, w.warehouse_name, w.city as warehouse_city
+               c.customer_nickname, c.remark as customer_note, w.warehouse_name, w.city as warehouse_city,
+               recipient_history.province_code as recipient_province_code,
+               recipient_history.city_code as recipient_city_code,
+               recipient_history.district_code as recipient_district_code,
+               recipient_history.amap_city_code as recipient_amap_city_code,
+               recipient_history.province_name as recipient_province_name,
+               recipient_history.city_name as recipient_city_name,
+               recipient_history.district_name as recipient_district_name
         from ry_business.ry_rental_order o
         left join ry_business.ry_rental_customer c on c.customer_id = o.customer_id
             and c.tenant_id = o.tenant_id and c.member_id = o.member_id and c.is_delete = 0
@@ -307,6 +350,26 @@
             and cch.is_delete = 0
         left join ry_business.ry_rental_warehouse w on w.warehouse_id = o.warehouse_id
             and w.tenant_id = o.tenant_id and w.member_id = o.member_id and w.is_delete = 0
+        left join (
+            select h.tenant_id, h.member_id, h.order_no,
+                   h.province_code, h.city_code, h.district_code, h.amap_city_code,
+                   h.province_name, h.city_name, h.district_name
+            from ry_business.ry_rental_order_recipient_history h
+            inner join (
+                select tenant_id, member_id, order_no, max(recipient_history_id) as recipient_history_id
+                from ry_business.ry_rental_order_recipient_history
+                where is_delete = 0
+                  and used = 1
+                group by tenant_id, member_id, order_no
+            ) latest_history
+                on latest_history.recipient_history_id = h.recipient_history_id
+               and latest_history.tenant_id = h.tenant_id
+               and latest_history.member_id = h.member_id
+               and latest_history.order_no = h.order_no
+            where h.is_delete = 0
+              and h.used = 1
+        ) recipient_history on recipient_history.tenant_id = o.tenant_id
+            and recipient_history.member_id = o.member_id and recipient_history.order_no = o.order_no
         left join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
             and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
         where o.order_id = #{orderId} and o.tenant_id = #{tenantId} and o.member_id = #{merchantId} and o.is_delete = 0

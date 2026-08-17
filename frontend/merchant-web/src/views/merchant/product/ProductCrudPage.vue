@@ -214,9 +214,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="状态" prop="status">
-              <el-select v-model="form.status" placeholder="请选择状态" class="field-control">
-                <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <el-switch v-model="form.status" :active-value="0" :inactive-value="1" active-text="启用" inactive-text="停用" inline-prompt />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -385,6 +383,7 @@ async function openEdit(row) {
   editing.value = true
   const response = await getMerchantProduct(row.id)
   Object.assign(form, createEmptyForm(), responseData(response) || row)
+  form.status = Number(form.status ?? 0)
   formVisible.value = true
 }
 

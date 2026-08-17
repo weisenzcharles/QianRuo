@@ -70,7 +70,7 @@
           <el-col :span="12"><el-form-item label="型号" prop="modelName"><el-input v-model="form.modelName" maxlength="128" show-word-limit placeholder="请输入型号" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="内存/规格" prop="memorySpec"><el-input v-model="form.memorySpec" maxlength="64" show-word-limit placeholder="可选" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="官方标准" prop="officialFlag"><el-radio-group v-model="form.officialFlag"><el-radio value="1">是</el-radio><el-radio value="0">否</el-radio></el-radio-group></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="状态" prop="status"><el-radio-group v-model="form.status"><el-radio value="0">正常</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="状态" prop="status"><el-switch v-model="form.status" active-value="0" inactive-value="1" active-text="正常" inactive-text="停用" inline-prompt /></el-form-item></el-col>
         </el-row>
         <el-form-item label="备注" prop="remark"><el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="请输入维护备注" /></el-form-item>
       </el-form>

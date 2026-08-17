@@ -20,7 +20,7 @@
       <el-form :model="form" label-width="100px">
         <el-form-item label="渠道编码"><el-input v-model="form.channelCode" disabled placeholder="保存后由系统生成" /></el-form-item>
         <el-form-item label="渠道名称" required><el-input v-model="form.channelName" maxlength="128" /></el-form-item>
-        <el-form-item label="状态"><el-radio-group v-model="form.status"><el-radio :value="0">启用</el-radio><el-radio :value="1">停用</el-radio></el-radio-group></el-form-item>
+        <el-form-item label="状态"><el-switch v-model="form.status" :active-value="0" :inactive-value="1" active-text="启用" inactive-text="停用" inline-prompt /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sortNo" :min="0" :max="9999" /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.reason" type="textarea" :rows="3" /></el-form-item>
       </el-form>
