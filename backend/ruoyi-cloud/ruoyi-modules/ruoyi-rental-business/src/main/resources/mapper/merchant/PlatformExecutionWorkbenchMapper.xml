@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformExecutionWorkbenchMapper">
+
+    <sql id="merchantName">
+        coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code, '未知商户')
+    </sql>
+
+    <select id="countOpenFulfillmentTasks" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_order o
+        where o.is_delete = 0
+          and o.order_status in (10, 15, 45, 60, 65)
+    </select>
+
+    <select id="countOpenAfterSalesTasks" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_after_sales_case c
+        where c.is_delete = 0 and c.case_status = 0
+    </select>
+
+    <select id="countOpenLogisticsTasks" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_logistics_order l
+        where l.is_delete = 0
+          and l.abnormal_flag = 1
+          and l.route_status not in (2, 4)
+    </select>
+
+    <select id="countOpenInventoryAlertTasks" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_inventory_alert_event e
+        where e.is_delete = 0 and e.alert_status = 0
+    </select>
+
+    <select id="selectFulfillmentTasks" resultType="com.ruoyi.system.api.model.PlatformExecutionWorkbenchTaskView">
+        select o.order_id as task_id,
+               6 as task_type,
+               case when o.order_status in (60, 65) then 3 else 2 end as priority,
+               o.order_status as task_status,
+               concat('订单履约：', o.order_no) as subject,
+               case o.order_status
+                   when 10 then '订单等待发货'
+                   when 15 then '订单已备货，等待发出'
+                   when 45 then '订单归还中，等待验机完成'
+                   when 60 then '订单归还已逾期'
+                   when 65 then '订单已逾期，需要平台关注'
+                   else '订单需要跟进'
+               end as detail,
+               o.order_no as business_no,
+               <include refid="merchantName" /> as merchant_name,
+               date_format(o.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(coalesce(o.update_time, o.create_time), '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_business.ry_rental_order o
+        left join ry_rental.ry_rental_member m
+          on m.tenant_id = o.tenant_id and m.member_id = o.member_id and m.is_delete = 0
+        where o.is_delete = 0
+          and o.order_status in (10, 15, 45, 60, 65)
+        order by priority desc, o.update_time asc, o.order_id asc
+        limit #{limit}
+    </select>
+
+    <select id="selectAfterSalesTasks" resultType="com.ruoyi.system.api.model.PlatformExecutionWorkbenchTaskView">
+        select c.case_id as task_id,
+               7 as task_type,
+               3 as priority,
+               c.case_status as task_status,
+               concat('售后处理：', c.case_no) as subject,
+               coalesce(nullif(c.problem_desc, ''), '售后案件等待平台处理') as detail,
+               c.case_no as business_no,
+               <include refid="merchantName" /> as merchant_name,
+               date_format(c.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(coalesce(c.update_time, c.create_time), '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_business.ry_rental_after_sales_case c
+        left join ry_rental.ry_rental_member m
+          on m.tenant_id = c.tenant_id and m.member_id = c.member_id and m.is_delete = 0
+        where c.is_delete = 0 and c.case_status = 0
+        order by c.create_time asc, c.case_id asc
+        limit #{limit}
+    </select>
+
+    <select id="selectLogisticsTasks" resultType="com.ruoyi.system.api.model.PlatformExecutionWorkbenchTaskView">
+        select l.logistics_id as task_id,
+               8 as task_type,
+               3 as priority,
+               l.route_status as task_status,
+               concat('物流异常：', coalesce(nullif(l.tracking_no, ''), '未填写单号')) as subject,
+               coalesce(nullif(l.route_message, ''), concat(coalesce(l.carrier, '未知承运商'), ' 运单需要处理')) as detail,
+               l.tracking_no as business_no,
+               <include refid="merchantName" /> as merchant_name,
+               date_format(l.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(coalesce(l.update_time, l.create_time), '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_business.ry_rental_logistics_order l
+        left join ry_rental.ry_rental_member m
+          on m.tenant_id = l.tenant_id and m.member_id = l.member_id and m.is_delete = 0
+        where l.is_delete = 0
+          and l.abnormal_flag = 1
+          and l.route_status not in (2, 4)
+        order by l.update_time asc, l.logistics_id asc
+        limit #{limit}
+    </select>
+
+    <select id="selectInventoryAlertTasks" resultType="com.ruoyi.system.api.model.PlatformExecutionWorkbenchTaskView">
+        select e.alert_id as task_id,
+               9 as task_type,
+               2 as priority,
+               e.alert_status as task_status,
+               concat('库存告警：', coalesce(nullif(p.product_name, ''), p.product_code, '未知商品')) as subject,
+               e.alert_message as detail,
+               p.product_code as business_no,
+               m.member_code as merchant_code,
+               <include refid="merchantName" /> as merchant_name,
+               date_format(e.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(coalesce(e.update_time, e.create_time), '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_business.ry_rental_inventory_alert_event e
+        left join ry_business.ry_rental_product p
+          on p.tenant_id = e.tenant_id and p.member_id = e.member_id
+         and p.product_id = e.product_id and p.is_delete = 0
+        left join ry_rental.ry_rental_member m
+          on m.tenant_id = e.tenant_id and m.member_id = e.member_id and m.is_delete = 0
+        where e.is_delete = 0 and e.alert_status = 0
+        order by e.last_triggered_time asc, e.alert_id asc
+        limit #{limit}
+    </select>
+</mapper>

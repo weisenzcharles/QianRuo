@@ -1,0 +1,54 @@
+package com.ruoyi.merchant.controller;
+
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.security.utils.MerchantContextUtils;
+import com.ruoyi.merchant.application.RentalBusinessWarehouseGateway;
+import com.ruoyi.merchant.domain.MerchantWarehouse;
+
+/** 当前商户可信工作上下文。 */
+@RestController
+@RequestMapping("/merchant/context")
+public class MerchantContextController
+{
+    @Autowired
+    private RentalBusinessWarehouseGateway rentalBusinessWarehouseGateway;
+
+    @GetMapping
+    public AjaxResult context()
+    {
+        AjaxResult result = AjaxResult.success();
+        result.put("memberId", MerchantContextUtils.getMemberId());
+        result.put("merchantAuthStatus", MerchantContextUtils.getMerchantAuthStatus());
+        result.put("featureEnabled", MerchantContextUtils.isMerchantApproved());
+        result.put("memberRole", MerchantContextUtils.getMemberRole());
+        result.put("warehouseScopeType", MerchantContextUtils.getWarehouseScopeType());
+        result.put("warehouseIds", MerchantContextUtils.getWarehouseIds());
+        return result;
+    }
+
+    /**
+     * 查询当前商户启用仓库并按当前用户仓库范围过滤。未审核商户允许查看仓库页面数据，但不能修改业务数据。
+     *
+     * @return 当前用户可查看的仓库列表
+     */
+    @GetMapping("/warehouses")
+    public AjaxResult warehouses()
+    {
+        List<MerchantWarehouse> warehouses = rentalBusinessWarehouseGateway.listEnabledWarehouses();
+        if (!MerchantContextUtils.hasAllWarehouseAccess())
+        {
+            Set<Long> allowed = MerchantContextUtils.getWarehouseIds();
+            warehouses = warehouses.stream()
+                    .filter(warehouse -> allowed.contains(warehouse.getWarehouseId()))
+                    .collect(Collectors.toList());
+        }
+        return AjaxResult.success(warehouses);
+    }
+}

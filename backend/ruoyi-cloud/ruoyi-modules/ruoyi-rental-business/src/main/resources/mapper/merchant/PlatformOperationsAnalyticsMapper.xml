@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformOperationsAnalyticsMapper">
+    <sql id="memberScope">
+        o.is_delete = 0
+        and o.member_id in
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </sql>
+
+    <sql id="latestRecipientHistory">
+        select history.tenant_id, history.member_id, history.order_no, history.city_name
+        from ry_business.ry_rental_order_recipient_history history
+        inner join (
+            select tenant_id, member_id, order_no, max(recipient_history_id) as recipient_history_id
+            from ry_business.ry_rental_order_recipient_history
+            where is_delete = 0
+            group by tenant_id, member_id, order_no
+        ) latest on latest.recipient_history_id = history.recipient_history_id
+        where history.is_delete = 0
+    </sql>
+
+    <select id="selectOrderTrend" resultType="com.ruoyi.system.api.model.PlatformOperationsTrendView">
+        select date_format(o.create_time, '%Y-%m-%d') as stat_date,
+               count(1) as order_count,
+               coalesce(sum(o.rent_amount), 0) as rent_amount,
+               sum(case when o.order_status = 50 then 1 else 0 end) as completed_order_count,
+               sum(case when o.order_status in (60, 65)
+                              or cast(o.time_effect_status as char) in ('1', 'overdue')
+                        then 1 else 0 end) as overdue_order_count
+        from ry_business.ry_rental_order o
+        where <include refid="memberScope" />
+          and o.create_time &gt;= #{beginTime}
+          and o.create_time &lt; #{endTime}
+        group by date(o.create_time)
+        order by date(o.create_time)
+    </select>
+
+    <select id="selectMerchantStats" resultType="com.ruoyi.system.api.model.PlatformOperationsMerchantStat">
+        select requested.member_id as member_id,
+               coalesce(order_stat.order_count, 0) as order_count,
+               coalesce(order_stat.rent_amount, 0) as rent_amount,
+               coalesce(order_stat.active_order_count, 0) as active_order_count,
+               coalesce(order_stat.completed_order_count, 0) as completed_order_count,
+               coalesce(order_stat.overdue_order_count, 0) as overdue_order_count,
+               coalesce(inventory_stat.total_inventory_quantity, 0) as total_inventory_quantity,
+               coalesce(inventory_stat.available_inventory_quantity, 0) as available_inventory_quantity
+        from (
+            <foreach collection="memberIds" item="memberId" separator=" union all ">
+                select #{memberId} as member_id
+            </foreach>
+        ) requested
+        left join (
+            select o.member_id,
+                   count(1) as order_count,
+                   coalesce(sum(o.rent_amount), 0) as rent_amount,
+                   sum(case when o.order_status in (20, 25, 30, 40, 45, 70) then 1 else 0 end) as active_order_count,
+                   sum(case when o.order_status = 50 then 1 else 0 end) as completed_order_count,
+                   sum(case when o.order_status in (60, 65)
+                                  or cast(o.time_effect_status as char) in ('1', 'overdue')
+                            then 1 else 0 end) as overdue_order_count
+            from ry_business.ry_rental_order o
+            where o.is_delete = 0
+              and o.member_id in
+              <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+                  #{memberId}
+              </foreach>
+              and o.create_time &gt;= #{beginTime}
+              and o.create_time &lt; #{endTime}
+            group by o.member_id
+        ) order_stat on order_stat.member_id = requested.member_id
+        left join (
+            select i.member_id,
+                   coalesce(sum(i.total_quantity), 0) as total_inventory_quantity,
+                   coalesce(sum(i.available_quantity), 0) as available_inventory_quantity
+            from ry_business.ry_rental_merchant_inventory i
+            where i.is_delete = 0 and i.status = 0
+              and i.member_id in
+              <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+                  #{memberId}
+              </foreach>
+            group by i.member_id
+        ) inventory_stat on inventory_stat.member_id = requested.member_id
+        order by coalesce(order_stat.order_count, 0) desc, requested.member_id
+    </select>
+
+    <select id="selectCityStats" resultType="com.ruoyi.system.api.model.PlatformOperationsCityStat">
+        select coalesce(nullif(trim(recipient.city_name), ''), '未解析城市') as city_name,
+               count(distinct o.order_id) as order_count,
+               coalesce(sum(o.rent_amount), 0) as rent_amount,
+               count(distinct case when o.order_status = 50 then o.order_id end) as completed_order_count,
+               count(distinct case when o.order_status in (60, 65)
+                                          or cast(o.time_effect_status as char) in ('1', 'overdue')
+                                    then o.order_id end) as overdue_order_count
+        from ry_business.ry_rental_order o
+        left join (
+            <include refid="latestRecipientHistory" />
+        ) recipient on recipient.tenant_id = o.tenant_id
+                   and recipient.member_id = o.member_id
+                   and recipient.order_no = o.order_no
+        where <include refid="memberScope" />
+          and o.create_time &gt;= #{beginTime}
+          and o.create_time &lt; #{endTime}
+        group by coalesce(nullif(trim(recipient.city_name), ''), '未解析城市')
+        order by order_count desc, city_name
+        limit 100
+    </select>
+
+    <select id="selectModelStats" resultType="com.ruoyi.system.api.model.PlatformOperationsModelStat">
+        select coalesce(nullif(trim(product.model_name), ''),
+                        nullif(trim(json_unquote(json_extract(o.package_details_json, '$.modelName'))), ''),
+                        '未指定型号') as model_name,
+               count(distinct o.order_id) as order_count,
+               coalesce(sum(coalesce(oi.quantity, 1)), 0) as quantity,
+               count(distinct case when o.order_status = 50 then o.order_id end) as completed_order_count,
+               count(distinct case when o.order_status in (60, 65)
+                                          or cast(o.time_effect_status as char) in ('1', 'overdue')
+                                    then o.order_id end) as overdue_order_count
+        from ry_business.ry_rental_order o
+        inner join ry_business.ry_rental_order_item oi
+                on oi.tenant_id = o.tenant_id
+               and oi.member_id = o.member_id
+               and oi.order_id = o.order_id
+               and oi.is_delete = 0
+        left join ry_business.ry_rental_product product
+               on product.tenant_id = oi.tenant_id
+              and product.member_id = oi.member_id
+              and product.product_id = oi.product_id
+              and product.is_delete = 0
+        where <include refid="memberScope" />
+          and o.create_time &gt;= #{beginTime}
+          and o.create_time &lt; #{endTime}
+        group by coalesce(nullif(trim(product.model_name), ''),
+                          nullif(trim(json_unquote(json_extract(o.package_details_json, '$.modelName'))), ''),
+                          '未指定型号')
+        order by order_count desc, model_name
+        limit 100
+    </select>
+</mapper>

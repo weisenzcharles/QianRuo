@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalPackageMapper">
+    <resultMap id="packageResult" type="com.ruoyi.system.domain.rental.RentalPackage">
+        <id property="packageId" column="package_id" />
+        <result property="packageCode" column="package_code" /><result property="packageName" column="package_name" />
+        <result property="classId" column="class_id" /><result property="modelId" column="model_id" />
+        <result property="className" column="class_name" /><result property="modelName" column="model_name" />
+        <result property="status" column="status" /><result property="sortNo" column="sort_no" />
+        <result property="packageVersionId" column="package_version_id" /><result property="versionNo" column="version_no" />
+        <result property="versionStatus" column="version_status" /><result property="isDelete" column="is_delete" />
+        <result property="createBy" column="create_by" /><result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" /><result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+    <resultMap id="itemResult" type="com.ruoyi.system.domain.rental.RentalPackageItem">
+        <id property="packageItemId" column="package_item_id" /><result property="packageVersionId" column="package_version_id" />
+        <result property="itemRole" column="item_role" /><result property="modelId" column="model_id" />
+        <result property="accessoryId" column="accessory_id" /><result property="modelName" column="model_name" />
+        <result property="accessoryName" column="accessory_name" /><result property="quantity" column="quantity" />
+        <result property="requiredFlag" column="required_flag" /><result property="sortNo" column="sort_no" />
+    </resultMap>
+    <sql id="columns">
+        p.package_id, p.package_code, p.package_name, p.class_id, p.model_id,
+        concat_ws(' / ', parent_class.class_name, pc.class_name) class_name, m.model_name,
+        p.status, p.sort_no, v.package_version_id, v.version_no, v.version_status, p.is_delete,
+        p.create_by, p.create_time, p.update_by, p.update_time, p.remark
+    </sql>
+    <select id="selectList" resultMap="packageResult">
+        select <include refid="columns" /> from `ry_rental`.`ry_rental_package` p
+        inner join `ry_rental`.`ry_rental_product_class` pc on pc.class_id = p.class_id and pc.is_delete = 0
+        inner join `ry_rental`.`ry_rental_product_class` parent_class on parent_class.class_id = pc.parent_id and parent_class.is_delete = 0
+        inner join `ry_rental`.`ry_rental_model` m on m.model_id = p.model_id and m.is_delete = 0
+        left join `ry_rental`.`ry_rental_package_version` v on v.package_id = p.package_id and v.is_delete = 0
+          and v.version_no = (select max(v2.version_no) from `ry_rental`.`ry_rental_package_version` v2 where v2.package_id = p.package_id and v2.is_delete = 0)
+        where p.is_delete = 0
+        <if test="keyword != null and keyword != ''">and (p.package_code like concat('%', #{keyword}, '%') or p.package_name like concat('%', #{keyword}, '%'))</if>
+        <if test="status != null">and p.status = #{status}</if><if test="classId != null">and p.class_id = #{classId}</if><if test="modelId != null">and p.model_id = #{modelId}</if>
+        order by p.create_time desc, p.package_id desc
+    </select>
+    <select id="selectById" resultMap="packageResult">
+        select <include refid="columns" /> from `ry_rental`.`ry_rental_package` p
+        inner join `ry_rental`.`ry_rental_product_class` pc on pc.class_id = p.class_id and pc.is_delete = 0
+        inner join `ry_rental`.`ry_rental_product_class` parent_class on parent_class.class_id = pc.parent_id and parent_class.is_delete = 0
+        inner join `ry_rental`.`ry_rental_model` m on m.model_id = p.model_id and m.is_delete = 0
+        left join `ry_rental`.`ry_rental_package_version` v on v.package_id = p.package_id and v.is_delete = 0
+          and v.version_no = (select max(v2.version_no) from `ry_rental`.`ry_rental_package_version` v2 where v2.package_id = p.package_id and v2.is_delete = 0)
+        where p.package_id = #{packageId} and p.is_delete = 0
+    </select>
+    <select id="selectItems" resultMap="itemResult">
+        select i.package_item_id, i.package_version_id, i.item_role, i.model_id, i.accessory_id,
+          m.model_name, a.accessory_name, i.quantity, i.required_flag, i.sort_no
+        from `ry_rental`.`ry_rental_package_item` i
+        left join `ry_rental`.`ry_rental_model` m on m.model_id = i.model_id and m.is_delete = 0
+        left join `ry_rental`.`ry_rental_accessory` a on a.accessory_id = i.accessory_id and a.is_delete = 0
+        where i.package_version_id = #{packageVersionId} and i.is_delete = 0 order by i.sort_no, i.package_item_id
+    </select>
+    <select id="countByCode" resultType="int">select count(1) from `ry_rental`.`ry_rental_package` where package_code = #{packageCode} and is_delete = 0 <if test="excludePackageId != null">and package_id != #{excludePackageId}</if></select>
+    <select id="selectNextVersionNo" resultType="int">select coalesce(max(version_no), 0) + 1 from `ry_rental`.`ry_rental_package_version` where package_id = #{packageId} and is_delete = 0</select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="packageId">insert into `ry_rental`.`ry_rental_package` (package_code, package_name, class_id, model_id, status, sort_no, create_by, create_time, remark, is_delete) values (#{packageCode}, #{packageName}, #{classId}, #{modelId}, #{status}, #{sortNo}, #{createBy}, sysdate(), #{remark}, 0)</insert>
+    <update id="update">update `ry_rental`.`ry_rental_package` set package_code=#{packageCode}, package_name=#{packageName}, class_id=#{classId}, model_id=#{modelId}, status=#{status}, sort_no=#{sortNo}, update_by=#{updateBy}, update_time=sysdate(), remark=#{remark} where package_id=#{packageId} and is_delete=0</update>
+    <insert id="insertVersion" useGeneratedKeys="true" keyProperty="packageVersionId">insert into `ry_rental`.`ry_rental_package_version` (package_id, version_no, version_status, bom_hash, create_by, create_time, is_delete) values (#{packageId}, #{versionNo}, #{versionStatus}, #{bomHash}, #{createBy}, sysdate(), 0)</insert>
+    <insert id="insertItem" useGeneratedKeys="true" keyProperty="packageItemId">insert into `ry_rental`.`ry_rental_package_item` (package_version_id, item_role, model_id, accessory_id, quantity, required_flag, sort_no, create_by, create_time, is_delete) values (#{packageVersionId}, #{itemRole}, #{modelId}, #{accessoryId}, #{quantity}, coalesce(#{requiredFlag}, 1), coalesce(#{sortNo}, 0), #{createBy}, sysdate(), 0)</insert>
+    <update id="retireVersions">update `ry_rental`.`ry_rental_package_version` set version_status=2, update_by=#{operator}, update_time=sysdate() where package_id=#{packageId} and is_delete=0</update>
+    <update id="activateLatest">update `ry_rental`.`ry_rental_package_version` set version_status=1, effective_time=sysdate(), update_by=#{operator}, update_time=sysdate() where package_version_id = (select package_version_id from (select package_version_id from `ry_rental`.`ry_rental_package_version` where package_id=#{packageId} and is_delete=0 order by version_no desc limit 1) latest)</update>
+    <update id="softDeleteItems">update `ry_rental`.`ry_rental_package_item` i inner join `ry_rental`.`ry_rental_package_version` v on v.package_version_id=i.package_version_id set i.is_delete=1, i.remove_by=#{operator}, i.remove_time=sysdate() where v.package_id=#{packageId} and i.is_delete=0</update>
+    <update id="softDeleteVersions">update `ry_rental`.`ry_rental_package_version` set is_delete=1, remove_by=#{operator}, remove_time=sysdate() where package_id=#{packageId} and is_delete=0</update>
+    <update id="softDelete">update `ry_rental`.`ry_rental_package` set is_delete=1, update_by=#{operator}, remove_by=#{operator}, remove_time=sysdate() where package_id=#{packageId} and is_delete=0</update>
+    <resultMap id="internalPackageResult" type="com.ruoyi.system.api.model.PlatformPackage">
+        <id property="packageId" column="package_id" /><result property="packageCode" column="package_code" />
+        <result property="packageName" column="package_name" /><result property="classId" column="class_id" />
+        <result property="modelId" column="model_id" /><result property="className" column="class_name" />
+        <result property="modelName" column="model_name" /><result property="versionNo" column="version_no" />
+        <result property="bomHash" column="bom_hash" />
+        <collection property="items" ofType="com.ruoyi.system.api.model.PlatformPackageItem">
+            <result property="itemRole" column="item_role" /><result property="modelId" column="item_model_id" />
+            <result property="accessoryId" column="accessory_id" /><result property="quantity" column="quantity" />
+            <result property="requiredFlag" column="required_flag" /><result property="sortNo" column="item_sort_no" />
+        </collection>
+    </resultMap>
+    <select id="selectActiveForInternal" resultMap="internalPackageResult">
+        select p.package_id, p.package_code, p.package_name, p.class_id, p.model_id,
+          concat_ws(' / ', parent_class.class_name, pc.class_name) class_name, m.model_name,
+          v.version_no, v.bom_hash, i.item_role, i.model_id item_model_id, i.accessory_id,
+          i.quantity, i.required_flag, i.sort_no item_sort_no
+        from `ry_rental`.`ry_rental_package` p
+        inner join `ry_rental`.`ry_rental_product_class` pc on pc.class_id=p.class_id and pc.is_delete=0
+        inner join `ry_rental`.`ry_rental_product_class` parent_class on parent_class.class_id=pc.parent_id and parent_class.is_delete=0
+        inner join `ry_rental`.`ry_rental_model` m on m.model_id=p.model_id and m.is_delete=0
+        inner join `ry_rental`.`ry_rental_package_version` v on v.package_id=p.package_id and v.version_status=1 and v.is_delete=0
+        left join `ry_rental`.`ry_rental_package_item` i on i.package_version_id=v.package_version_id and i.is_delete=0
+        where p.status=0 and p.is_delete=0 order by p.sort_no, p.package_id, i.sort_no, i.package_item_id
+    </select>
+</mapper>

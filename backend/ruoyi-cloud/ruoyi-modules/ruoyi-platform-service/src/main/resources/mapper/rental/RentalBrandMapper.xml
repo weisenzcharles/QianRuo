@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalBrandMapper">
+    <resultMap id="brandResult" type="com.ruoyi.system.domain.rental.RentalBrand">
+        <id property="brandId" column="brand_id" />
+        <result property="brandName" column="brand_name" />
+        <result property="className" column="class_name" />
+        <result property="sortNo" column="sort_no" />
+        <result property="status" column="status" />
+        <result property="modelCount" column="model_count" />
+        <result property="isDelete" column="is_delete" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="columns">
+        b.brand_id, b.brand_name, b.sort_no, b.status, b.is_delete,
+        b.create_by, b.create_time, b.update_by, b.update_time, b.remark,
+        (select count(1) from `ry_rental`.`ry_rental_model` bm
+          where bm.brand_id = b.brand_id and bm.is_delete = 0) as model_count,
+        relation.class_name
+    </sql>
+
+    <select id="selectList" resultMap="brandResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_brand` b
+        inner join (
+            select relation.brand_id,
+                   group_concat(
+                       concat_ws(' / ', parent_class.class_name, pc.class_name)
+                       order by relation.class_id separator '，'
+                   ) as class_name
+            from `ry_rental`.`ry_rental_brand_class` relation
+            inner join `ry_rental`.`ry_rental_product_class` pc
+                on pc.class_id = relation.class_id and pc.class_level = 2 and pc.is_delete = 0
+            inner join `ry_rental`.`ry_rental_product_class` parent_class
+                on parent_class.class_id = pc.parent_id and parent_class.class_level = 1
+               and parent_class.is_delete = 0
+            where relation.is_delete = 0
+            group by relation.brand_id
+        ) relation on relation.brand_id = b.brand_id
+        where b.is_delete = 0
+        <if test="brandName != null and brandName != ''">and b.brand_name like concat('%', #{brandName}, '%')</if>
+        <if test="status != null">and b.status = #{status}</if>
+        <if test="classId != null">
+            and exists (
+                select 1 from `ry_rental`.`ry_rental_brand_class` filter_relation
+                where filter_relation.brand_id = b.brand_id
+                  and filter_relation.class_id = #{classId}
+                  and filter_relation.is_delete = 0
+            )
+        </if>
+        order by b.create_time desc, b.brand_id desc
+    </select>
+
+    <select id="selectById" resultMap="brandResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_brand` b
+        inner join (
+            select relation.brand_id,
+                   group_concat(
+                       concat_ws(' / ', parent_class.class_name, pc.class_name)
+                       order by relation.class_id separator '，'
+                   ) as class_name
+            from `ry_rental`.`ry_rental_brand_class` relation
+            inner join `ry_rental`.`ry_rental_product_class` pc
+                on pc.class_id = relation.class_id and pc.class_level = 2 and pc.is_delete = 0
+            inner join `ry_rental`.`ry_rental_product_class` parent_class
+                on parent_class.class_id = pc.parent_id and parent_class.class_level = 1
+               and parent_class.is_delete = 0
+            where relation.is_delete = 0 and relation.brand_id = #{brandId}
+            group by relation.brand_id
+        ) relation on relation.brand_id = b.brand_id
+        where b.brand_id = #{brandId} and b.is_delete = 0
+    </select>
+
+    <select id="selectClassIds" resultType="long">
+        select relation.class_id
+        from `ry_rental`.`ry_rental_brand_class` relation
+        inner join `ry_rental`.`ry_rental_product_class` pc
+            on pc.class_id = relation.class_id and pc.class_level = 2 and pc.is_delete = 0
+        inner join `ry_rental`.`ry_rental_product_class` parent_class
+            on parent_class.class_id = pc.parent_id and parent_class.class_level = 1
+           and parent_class.is_delete = 0
+        where relation.brand_id = #{brandId} and relation.is_delete = 0
+        order by relation.class_id
+    </select>
+
+    <select id="countByName" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_brand`
+        where brand_name = #{brandName} and is_delete = 0
+        <if test="excludeBrandId != null">and brand_id != #{excludeBrandId}</if>
+    </select>
+
+    <select id="countModelReferences" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_model`
+        where brand_id = #{brandId} and is_delete = 0
+    </select>
+
+    <select id="countModelReferencesByClass" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_model`
+        where brand_id = #{brandId} and class_id = #{classId} and is_delete = 0
+    </select>
+
+    <select id="countClassRelation" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_brand_class`
+        where brand_id = #{brandId} and class_id = #{classId} and is_delete = 0
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="brandId">
+        insert into `ry_rental`.`ry_rental_brand`(
+            brand_name, sort_no, status, is_delete, create_by, create_time, remark
+        ) values (
+            #{brandName}, coalesce(#{sortNo}, 0), #{status}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertClassRelation">
+        insert into `ry_rental`.`ry_rental_brand_class`(
+            brand_id, class_id, is_delete, create_by, create_time, update_by, update_time
+        ) values (
+            #{brandId}, #{classId}, 0, #{operator}, sysdate(), #{operator}, sysdate()
+        )
+        on duplicate key update
+            is_delete = 0, update_by = #{operator}, update_time = sysdate()
+    </insert>
+
+    <update id="softDeleteClassRelation">
+        update `ry_rental`.`ry_rental_brand_class`
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where brand_id = #{brandId} and class_id = #{classId} and is_delete = 0
+    </update>
+
+    <update id="softDeleteRelations">
+        update `ry_rental`.`ry_rental_brand_class`
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where brand_id = #{brandId} and is_delete = 0
+    </update>
+
+    <update id="update">
+        update `ry_rental`.`ry_rental_brand`
+        set brand_name = #{brandName}, sort_no = coalesce(#{sortNo}, 0), status = #{status},
+            update_by = #{updateBy}, update_time = sysdate(), remark = #{remark}
+        where brand_id = #{brandId} and is_delete = 0
+    </update>
+
+    <update id="softDelete">
+        update `ry_rental`.`ry_rental_brand`
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where brand_id = #{brandId} and is_delete = 0
+    </update>
+</mapper>

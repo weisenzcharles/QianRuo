@@ -1,0 +1,48 @@
+# Tomcat
+server:
+  port: 9300
+
+# Spring
+spring: 
+  application:
+    # 应用名称
+    name: ruoyi-file
+  servlet:
+    multipart:
+      max-file-size: ${FILE_MAX_FILE_SIZE:200MB}
+      max-request-size: ${FILE_MAX_REQUEST_SIZE:220MB}
+  profiles:
+    # 环境配置
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: 127.0.0.1:8848
+      config:
+        # 配置中心地址
+        server-addr: 127.0.0.1:8848
+  config:
+    # 配置文件格式
+    file-extension: yml
+    import:
+      - nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+# Keep the file service bootable while Nacos is recovering. Environment or
+# Nacos values still override these container-safe defaults.
+file:
+  storage-provider: ${FILE_STORAGE_PROVIDER:aliyun-oss}
+  domain: ${FILE_DOMAIN:http://127.0.0.1:9300}
+  path: ${FILE_PATH:/home/ruoyi/uploadPath}
+  prefix: ${FILE_PREFIX:/statics}
+
+minio:
+  url: ${MINIO_URL:http://127.0.0.1:9000}
+  accessKey: ${MINIO_ACCESS_KEY:}
+  secretKey: ${MINIO_SECRET_KEY:}
+  bucketName: ${MINIO_BUCKET_NAME:test}
+
+referer:
+  enabled: ${REFERER_ENABLED:false}
+  allowed-domains: ${REFERER_ALLOWED_DOMAINS:localhost,127.0.0.1}

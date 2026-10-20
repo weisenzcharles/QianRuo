@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformMarketMapper">
+    <sql id="postColumns">
+        p.post_id, p.post_no, p.board_type,
+        coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code, '未知商户') as merchant_name,
+        m.member_code, p.category, p.brand, p.model_name, p.memory_spec, p.condition_level,
+        p.quantity, p.price_range_code, p.city, p.service_tags, p.recent_30d_turnover,
+        p.idle_qty, p.rented_qty, p.long_idle_qty, p.post_status, p.down_rank_flag,
+        (select count(1) from ry_rental.ry_rental_market_report pending_report
+          where pending_report.post_id = p.post_id and pending_report.report_status = 0
+            and pending_report.is_delete = 0) as pending_report_count,
+        date_format(p.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+        date_format(p.update_time, '%Y-%m-%d %H:%i:%s') as update_time, p.remark
+    </sql>
+
+    <select id="selectPosts" resultType="com.ruoyi.system.model.rental.PlatformMarketPostVO">
+        select <include refid="postColumns" />
+        from ry_rental.ry_rental_market_post p
+        left join ry_rental.ry_rental_member m on m.member_id = p.member_id and m.is_delete = 0
+        <where>
+            p.is_delete = 0
+            <if test="query.keyword != null and query.keyword != ''">
+                and (p.post_no like concat('%', #{query.keyword}, '%')
+                  or p.brand like concat('%', #{query.keyword}, '%')
+                  or p.model_name like concat('%', #{query.keyword}, '%')
+                  or m.member_code like concat('%', #{query.keyword}, '%')
+                  or m.nickname like concat('%', #{query.keyword}, '%')
+                  or m.legal_subject_name like concat('%', #{query.keyword}, '%'))
+            </if>
+            <if test="query.boardType != null">and p.board_type = #{query.boardType}</if>
+            <if test="query.postStatus != null">and p.post_status = #{query.postStatus}</if>
+            <if test="query.city != null and query.city != ''">and p.city like concat('%', #{query.city}, '%')</if>
+        </where>
+        order by pending_report_count desc, p.create_time desc, p.post_id desc
+    </select>
+
+    <select id="selectPost" resultType="com.ruoyi.system.model.rental.PlatformMarketPostVO">
+        select <include refid="postColumns" />
+        from ry_rental.ry_rental_market_post p
+        left join ry_rental.ry_rental_member m on m.member_id = p.member_id and m.is_delete = 0
+        where p.post_id = #{postId} and p.is_delete = 0
+    </select>
+
+    <select id="selectReports" resultType="com.ruoyi.system.model.rental.PlatformMarketReportVO">
+        select r.report_id, r.post_id, p.post_no,
+               coalesce(nullif(reporter.nickname, ''), nullif(reporter.legal_subject_name, ''), reporter.member_code, '未知商户') as reporter_name,
+               coalesce(nullif(reported.nickname, ''), nullif(reported.legal_subject_name, ''), reported.member_code, '未知商户') as reported_merchant_name,
+               r.report_type, cast(r.evidence_json as char) as evidence, r.report_status, r.review_result,
+               reviewer.nick_name as reviewer_name,
+               date_format(r.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(r.review_time, '%Y-%m-%d %H:%i:%s') as review_time
+        from ry_rental.ry_rental_market_report r
+        left join ry_rental.ry_rental_market_post p on p.post_id = r.post_id and p.is_delete = 0
+        left join ry_rental.ry_rental_member reporter on reporter.member_id = r.reporter_member_id and reporter.is_delete = 0
+        left join ry_rental.ry_rental_member reported on reported.member_id = r.reported_member_id and reported.is_delete = 0
+        left join `ry-cloud`.sys_user reviewer on reviewer.user_id = r.reviewer_id and reviewer.is_delete = 0
+        <where>
+            r.is_delete = 0
+            <if test="query.keyword != null and query.keyword != ''">
+                and (p.post_no like concat('%', #{query.keyword}, '%')
+                  or r.report_type like concat('%', #{query.keyword}, '%')
+                  or reporter.nickname like concat('%', #{query.keyword}, '%')
+                  or reported.nickname like concat('%', #{query.keyword}, '%')
+                  or reporter.legal_subject_name like concat('%', #{query.keyword}, '%')
+                  or reported.legal_subject_name like concat('%', #{query.keyword}, '%'))
+            </if>
+            <if test="query.reportStatus != null">and r.report_status = #{query.reportStatus}</if>
+            <if test="query.city != null and query.city != ''">and p.city like concat('%', #{query.city}, '%')</if>
+        </where>
+        order by field(r.report_status, 0, 1, 2), r.create_time desc, r.report_id desc
+    </select>
+
+    <select id="selectReport" resultType="com.ruoyi.system.model.rental.PlatformMarketReportVO">
+        select r.report_id, r.post_id, p.post_no,
+               coalesce(nullif(reporter.nickname, ''), nullif(reporter.legal_subject_name, ''), reporter.member_code, '未知商户') as reporter_name,
+               coalesce(nullif(reported.nickname, ''), nullif(reported.legal_subject_name, ''), reported.member_code, '未知商户') as reported_merchant_name,
+               r.report_type, cast(r.evidence_json as char) as evidence, r.report_status, r.review_result,
+               reviewer.nick_name as reviewer_name,
+               date_format(r.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(r.review_time, '%Y-%m-%d %H:%i:%s') as review_time
+        from ry_rental.ry_rental_market_report r
+        left join ry_rental.ry_rental_market_post p on p.post_id = r.post_id and p.is_delete = 0
+        left join ry_rental.ry_rental_member reporter on reporter.member_id = r.reporter_member_id and reporter.is_delete = 0
+        left join ry_rental.ry_rental_member reported on reported.member_id = r.reported_member_id and reported.is_delete = 0
+        left join `ry-cloud`.sys_user reviewer on reviewer.user_id = r.reviewer_id and reviewer.is_delete = 0
+        where r.report_id = #{reportId} and r.is_delete = 0
+    </select>
+
+    <update id="reviewReport">
+        update ry_rental.ry_rental_market_report
+        set report_status = #{reportStatus}, review_result = #{reviewResult}, reviewer_id = #{reviewerId},
+            review_time = now()
+        where report_id = #{reportId} and report_status = 0 and is_delete = 0
+    </update>
+
+    <update id="updatePostStatus">
+        update ry_rental.ry_rental_market_post
+        set post_status = #{postStatus}, update_by = #{operatorId}, update_time = now()
+        where post_id = #{postId} and is_delete = 0
+    </update>
+
+    <update id="updatePostRank">
+        update ry_rental.ry_rental_market_post
+        set down_rank_flag = #{downRankFlag}, update_by = #{operatorId}, update_time = now()
+        where post_id = #{postId} and is_delete = 0
+    </update>
+</mapper>

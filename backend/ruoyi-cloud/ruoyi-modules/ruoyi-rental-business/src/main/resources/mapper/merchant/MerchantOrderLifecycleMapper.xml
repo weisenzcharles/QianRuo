@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantOrderLifecycleMapper">
+    <select id="selectCandidates"
+            resultType="com.ruoyi.rentalbusiness.domain.MerchantOrderLifecycleCandidate">
+        select tenant_id as tenantId, member_id as memberId, order_id as orderId,
+               order_no as orderNo, order_status as orderStatus
+        from ry_business.ry_rental_order
+        where is_delete = 0
+          and (
+              (order_status in
+               <foreach collection="shippingStatuses" item="status" open="(" separator="," close=")">
+                   #{status}
+               </foreach>
+               and lease_start_date is not null
+               and lease_start_date &lt;= #{businessDate})
+              or (order_status in
+               <foreach collection="shipOverdueStatuses" item="status" open="(" separator="," close=")">
+                   #{status}
+               </foreach>
+               and ship_due_time is not null
+               and ship_due_time &lt; #{now})
+              or (order_status in
+               <foreach collection="rentingStatuses" item="status" open="(" separator="," close=")">
+                   #{status}
+               </foreach>
+               and ((return_due_time is not null and return_due_time &lt; #{now})
+                    or (lease_end_date is not null and lease_end_date &lt; #{businessDate})))
+          )
+        order by tenant_id, member_id, order_id
+    </select>
+
+    <update id="updateOrderStatus">
+        update ry_business.ry_rental_order
+        set order_status = #{toStatus}, time_effect_status = #{timeEffectStatus},
+            version = version + 1, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and order_id = #{orderId}
+          and order_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateOrderItemStatus">
+        update ry_business.ry_rental_order_item
+        set item_status = #{itemStatus}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and order_id = #{orderId}
+          and is_delete = 0
+    </update>
+
+    <select id="selectAllianceSourceOrderLink"
+            resultType="com.ruoyi.rentalbusiness.model.MerchantOrderAllianceLinkModel">
+        select a.alliance_order_id as allianceOrderId,
+               a.source_member_id as sourceMemberId,
+               a.target_member_id as targetMemberId,
+               a.source_order_id as sourceOrderId,
+               a.child_order_id as childOrderId
+        from ry_business.ry_rental_order_alliance a
+        where a.tenant_id = #{tenantId}
+          and a.target_member_id = #{targetMemberId}
+          and a.child_order_id = #{childOrderId}
+          and a.is_delete = 0
+        order by a.accepted_time desc, a.alliance_order_id desc
+        limit 1
+    </select>
+
+    <update id="updateAllianceSourceOrderStatus">
+        update ry_business.ry_rental_order
+        set order_status = #{orderStatus}, time_effect_status = #{timeEffectStatus},
+            version = version + 1, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{sourceMemberId} and order_id = #{sourceOrderId}
+          and is_delete = 0
+          and (order_status &lt;&gt; #{orderStatus}
+               or coalesce(time_effect_status, -1) &lt;&gt; coalesce(#{timeEffectStatus}, -1))
+    </update>
+
+    <insert id="insertOrderEditLog">
+        insert into ry_business.ry_rental_order_edit_log
+            (tenant_id, member_id, order_id, field_name, before_value, after_value,
+             before_display_value, after_display_value, change_reason,
+             operator_id, operator_name, operator_ip, create_time, is_delete)
+        values
+            (#{tenantId}, #{memberId}, #{orderId}, #{fieldName}, #{beforeValue}, #{afterValue},
+             #{beforeDisplayValue}, #{afterDisplayValue}, #{changeReason},
+             #{operatorId}, #{operatorName}, null, now(), 0)
+    </insert>
+</mapper>

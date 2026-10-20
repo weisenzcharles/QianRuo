@@ -1,0 +1,1255 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantOrderMapper">
+    <resultMap id="merchantOrderRow" type="com.ruoyi.rentalbusiness.domain.MerchantOrderRow">
+        <id property="orderId" column="order_id" />
+        <result property="sourceOrderId" column="source_order_id" />
+        <result property="allianceSourceLocked" column="alliance_source_locked" />
+        <result property="orderNo" column="order_no" />
+        <result property="externalOrderNo" column="external_order_no" />
+        <result property="channelId" column="channel_id" />
+        <result property="channelCode" column="channel_code" />
+        <result property="channelName" column="channel_name" />
+        <result property="shopName" column="shop_name" />
+        <result property="customerName" column="customer_name" />
+        <result property="customerNickname" column="customer_nickname" />
+        <result property="customerPhone" column="customer_phone" />
+        <result property="recipientName" column="recipient_name" />
+        <result property="recipientPhone" column="recipient_phone" />
+        <result property="recipientAddress" column="recipient_address" />
+        <result property="customerNote" column="customer_note" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="returnWarehouseName" column="return_warehouse_name" />
+        <result property="warehouseCity" column="warehouse_city" />
+        <result property="recipientProvinceCode" column="recipient_province_code" />
+        <result property="recipientCityCode" column="recipient_city_code" />
+        <result property="recipientDistrictCode" column="recipient_district_code" />
+        <result property="recipientAmapCityCode" column="recipient_amap_city_code" />
+        <result property="recipientProvinceName" column="recipient_province_name" />
+        <result property="recipientCityName" column="recipient_city_name" />
+        <result property="recipientDistrictName" column="recipient_district_name" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="returnWarehouseId" column="return_warehouse_id" />
+        <result property="productId" column="product_id" />
+        <result property="packageId" column="package_id" />
+        <result property="snId" column="sn_id" />
+        <result property="accessoryItemIds" column="accessory_item_ids" />
+        <result property="quantity" column="quantity" />
+        <result property="leaseStartDate" column="lease_start_date" />
+        <result property="leaseEndDate" column="lease_end_date" />
+        <result property="shipDueTime" column="ship_due_time" />
+        <result property="shipTimeSlot" column="ship_time_slot" />
+        <result property="returnDueTime" column="return_due_time" />
+        <result property="deliveryMethod" column="delivery_method" />
+        <result property="returnDeliveryMethod" column="return_delivery_method" />
+        <result property="deliveryAmount" column="delivery_amount" />
+        <result property="insuranceAmount" column="insurance_amount" />
+        <result property="leaseDays" column="lease_days" />
+        <result property="arrivalDate" column="arrival_date" />
+        <result property="createTime" column="create_time" />
+        <result property="rentAmount" column="rent_amount" />
+        <result property="depositAmount" column="deposit_amount" />
+        <result property="orderStatus" column="order_status" />
+        <result property="payStatus" column="pay_status" />
+        <result property="timeEffectStatus" column="time_effect_status" />
+        <result property="priorityFlag" column="priority_flag" />
+        <result property="version" column="version" />
+        <result property="remark" column="remark" />
+        <result property="sourceTextSnapshot" column="source_text_snapshot" />
+        <result property="weatherRiskFlag" column="weather_risk_flag" />
+        <result property="productName" column="product_name" />
+        <result property="modelName" column="model_name" />
+        <result property="packageName" column="package_name" />
+        <result property="productCode" column="product_code" />
+        <result property="shippingCarrier" column="shipping_carrier" />
+        <result property="shippingTrackingNo" column="shipping_tracking_no" />
+        <result property="returnCarrier" column="return_carrier" />
+        <result property="returnTrackingNo" column="return_tracking_no" />
+        <result property="shippingFee" column="shipping_fee" />
+        <result property="attention" column="attention" />
+        <result property="addonNames" column="addon_names" />
+        <result property="packageDetailsJson" column="package_details_json" />
+        <result property="createBy" column="create_by" />
+        <result property="updateBy" column="update_by" />
+    </resultMap>
+
+    <resultMap id="merchantOrderNote" type="com.ruoyi.rentalbusiness.model.MerchantOrderNoteVO">
+        <id property="noteId" column="note_id" />
+        <result property="noteContent" column="note_content" />
+        <result property="noteType" column="note_type" />
+        <result property="operatorId" column="operator_id" />
+        <result property="operatorName" column="operator_name" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <resultMap id="merchantOrderEditLog" type="com.ruoyi.rentalbusiness.model.MerchantOrderEditLogVO">
+        <id property="logId" column="log_id" />
+        <result property="fieldName" column="field_name" />
+        <result property="beforeValue" column="before_value" />
+        <result property="afterValue" column="after_value" />
+        <result property="beforeDisplayValue" column="before_display_value" />
+        <result property="afterDisplayValue" column="after_display_value" />
+        <result property="changeReason" column="change_reason" />
+        <result property="operatorId" column="operator_id" />
+        <result property="operatorName" column="operator_name" />
+        <result property="operatorIp" column="operator_ip" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <resultMap id="merchantOrderReturnInspection"
+            type="com.ruoyi.rentalbusiness.model.MerchantOrderReturnInspectionVO">
+        <result property="result" column="inspection_result" />
+        <result property="caseType" column="case_type" />
+        <result property="problemDesc" column="problem_desc" />
+        <result property="lostItemsJson" column="lost_items_json" />
+        <result property="compensationAmount" column="compensation_amount" />
+        <result property="customerContacted" column="customer_contacted" />
+        <result property="remark" column="remark" />
+        <result property="inspectedTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectMerchantOrderEditLogs" resultMap="merchantOrderEditLog">
+        select log_id, field_name, before_display_value, after_display_value, change_reason,
+               operator_id, operator_name, operator_ip, create_time
+        from ry_business.ry_rental_order_edit_log
+        where tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and order_id = #{orderId}
+          and is_delete = 0
+        order by create_time desc, log_id desc
+    </select>
+
+    <insert id="insertMerchantOrderEditLog">
+        insert into ry_business.ry_rental_order_edit_log
+            (tenant_id, member_id, order_id, field_name, before_value, after_value,
+             before_display_value, after_display_value,
+             change_reason, operator_id, operator_name, operator_ip, create_time, is_delete)
+        values
+            (#{tenantId}, #{merchantId}, #{orderId}, #{fieldName}, #{beforeValue}, #{afterValue},
+             #{beforeDisplayValue}, #{afterDisplayValue},
+             #{changeReason}, #{operatorId}, #{operatorName}, #{operatorIp}, now(), 0)
+    </insert>
+
+    <select id="selectWarehouseNames" resultType="com.ruoyi.rentalbusiness.model.MerchantAuditReferenceModel">
+        select warehouse_id as referenceId, warehouse_name as referenceName
+        from ry_business.ry_rental_warehouse
+        where tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and is_delete = 0
+          and warehouse_id in
+        <foreach collection="referenceIds" item="referenceId" open="(" separator="," close=")">
+            #{referenceId}
+        </foreach>
+    </select>
+
+    <select id="selectOrderChannelNames" resultType="com.ruoyi.rentalbusiness.model.MerchantAuditReferenceModel">
+        select channel_id as referenceId, channel_name as referenceName
+        from ry_business.ry_rental_order_channel
+        where is_delete = 0
+          and channel_id in
+        <foreach collection="referenceIds" item="referenceId" open="(" separator="," close=")">
+            #{referenceId}
+        </foreach>
+          and ((scope_type = 1 and channel_type = 1)
+               or (scope_type = 2 and tenant_id = #{tenantId} and member_id = #{merchantId}))
+    </select>
+
+    <!-- 列表和总数共享筛选条件；套餐名称和明细从订单 JSON 快照读取，不关联套餐目录。 -->
+    <sql id="merchantOrderFilters">
+        where o.tenant_id = #{tenantId}
+          and o.member_id = #{merchantId}
+          and o.is_delete = 0
+        <choose>
+            <when test="query.allWarehouseAccess">
+                <!-- 当前用户可访问商户全部仓库，不追加仓库条件。 -->
+            </when>
+            <when test="query.warehouseIds != null and query.warehouseIds.size() > 0">
+                and o.warehouse_id in
+                <foreach collection="query.warehouseIds" item="warehouseId" open="(" separator="," close=")">
+                    #{warehouseId}
+                </foreach>
+            </when>
+            <otherwise>
+                and 1 = 0
+            </otherwise>
+        </choose>
+        <if test="query.keyword != null and query.keyword != ''">
+            and (
+                o.order_no like concat('%', #{query.keyword}, '%')
+                or o.external_order_no like concat('%', #{query.keyword}, '%')
+                or cch.channel_code like concat('%', #{query.keyword}, '%')
+                or cch.channel_name like concat('%', #{query.keyword}, '%')
+                or o.shop_name like concat('%', #{query.keyword}, '%')
+                or o.customer_name like concat('%', #{query.keyword}, '%')
+                or o.customer_phone like concat('%', #{query.keyword}, '%')
+                or o.recipient_name like concat('%', #{query.keyword}, '%')
+                or o.recipient_phone like concat('%', #{query.keyword}, '%')
+                or c.customer_nickname like concat('%', #{query.keyword}, '%')
+                or json_unquote(json_extract(o.package_details_json, '$.packageName')) like concat('%', #{query.keyword}, '%')
+                or json_unquote(json_extract(o.package_details_json, '$.mainProduct.productName')) like concat('%', #{query.keyword}, '%')
+                or json_unquote(json_extract(o.package_details_json, '$.mainProduct.modelName')) like concat('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.status != null">
+            and o.order_status = #{query.status}
+        </if>
+        <if test="query.shippingOnly">
+            and o.order_status in (20, 25, 30)
+        </if>
+        <if test="query.channelId != null">
+            and o.channel_id = #{query.channelId}
+        </if>
+        <if test="query.warehouseId != null">
+            and o.warehouse_id = #{query.warehouseId}
+        </if>
+        <if test="query.attentionOnly">
+            and (o.time_effect_status = 1
+                 or o.weather_risk_flag = 1
+                 or o.order_status in (60, 65, 70)
+                 )
+        </if>
+        <if test="query.dateStart != null and query.dateStart != ''">
+            <choose>
+                <when test="query.dateTypeCode == 'return'">
+                    and o.return_due_time &gt;= #{query.dateStart}
+                </when>
+                <when test="query.dateTypeCode == 'arrival'">
+                    and o.arrival_date &gt;= #{query.dateStart}
+                </when>
+                <when test="query.dateTypeCode == 'lease_start'">
+                    and o.lease_start_date &gt;= #{query.dateStart}
+                </when>
+                <when test="query.dateTypeCode == 'order'">
+                    and o.create_time &gt;= #{query.dateStart}
+                </when>
+                <when test="query.dateTypeCode == 'create'">
+                    and o.create_time &gt;= #{query.dateStart}
+                </when>
+                <otherwise>
+                    and o.ship_due_time &gt;= #{query.dateStart}
+                </otherwise>
+            </choose>
+        </if>
+        <if test="query.dateEnd != null and query.dateEnd != ''">
+            <choose>
+                <when test="query.dateTypeCode == 'return'">
+                    and o.return_due_time &lt; date_add(#{query.dateEnd}, interval 1 day)
+                </when>
+                <when test="query.dateTypeCode == 'arrival'">
+                    and o.arrival_date &lt; date_add(#{query.dateEnd}, interval 1 day)
+                </when>
+                <when test="query.dateTypeCode == 'lease_start'">
+                    and o.lease_start_date &lt; date_add(#{query.dateEnd}, interval 1 day)
+                </when>
+                <when test="query.dateTypeCode == 'order'">
+                    and o.create_time &lt; date_add(#{query.dateEnd}, interval 1 day)
+                </when>
+                <when test="query.dateTypeCode == 'create'">
+                    and o.create_time &lt; date_add(#{query.dateEnd}, interval 1 day)
+                </when>
+                <otherwise>
+                    and o.ship_due_time &lt; date_add(#{query.dateEnd}, interval 1 day)
+                </otherwise>
+            </choose>
+        </if>
+        <choose>
+            <when test="query.orderScope == 'today-shipping'">
+                and o.ship_due_time &gt;= current_date()
+                and o.ship_due_time &lt; date_add(current_date(), interval 1 day)
+                and o.order_status &lt;&gt; 80
+            </when>
+            <when test="query.orderScope == 'today-return'">
+                and o.return_due_time &gt;= current_date()
+                and o.return_due_time &lt; date_add(current_date(), interval 1 day)
+                and o.order_status &lt;&gt; 80
+            </when>
+            <when test="query.orderScope == 'today-arrival'">
+                and o.arrival_date = current_date()
+                and o.order_status not in (50, 80)
+            </when>
+            <when test="query.orderScope == 'tomorrow-arrival'">
+                and o.arrival_date = date_add(current_date(), interval 1 day)
+                and o.order_status not in (50, 80)
+            </when>
+            <when test="query.orderScope == 'today-created'">
+                and o.create_time &gt;= current_date()
+                and o.create_time &lt; date_add(current_date(), interval 1 day)
+            </when>
+            <when test="query.orderScope == 'today-completed'">
+                and o.order_status = 50
+                and o.update_time &gt;= current_date()
+                and o.update_time &lt; date_add(current_date(), interval 1 day)
+            </when>
+        </choose>
+    </sql>
+
+    <!-- 只统计订单主表；套餐筛选使用订单 JSON，不展开明细或关联套餐目录。 -->
+    <select id="selectMerchantOrderCount" resultType="long">
+        select count(distinct o.order_id)
+        from ry_business.ry_rental_order o
+        left join ry_business.ry_rental_customer c
+            on c.customer_id = o.customer_id
+           and c.tenant_id = o.tenant_id
+           and c.member_id = o.member_id
+           and c.is_delete = 0
+        left join ry_business.ry_rental_order_channel cch
+            on cch.channel_id = o.channel_id
+           and cch.is_delete = 0
+        <include refid="merchantOrderFilters" />
+    </select>
+
+    <select id="selectWeatherRiskCandidates"
+            resultType="com.ruoyi.rentalbusiness.domain.WeatherRiskOrderCandidate">
+        select o.tenant_id, o.member_id, o.order_id, o.order_no,
+               w.city as warehouse_city,
+               recipient_history.city_code as recipient_city_code,
+               recipient_history.district_code as recipient_district_code
+        from ry_business.ry_rental_order o
+        inner join ry_business.ry_rental_warehouse w
+            on w.warehouse_id = o.warehouse_id
+           and w.tenant_id = o.tenant_id
+           and w.member_id = o.member_id
+           and w.is_delete = 0
+        left join (
+            select h.tenant_id, h.member_id, h.order_no, h.city_code, h.district_code
+            from ry_business.ry_rental_order_recipient_history h
+            inner join (
+                select tenant_id, member_id, order_no, max(recipient_history_id) as recipient_history_id
+                from ry_business.ry_rental_order_recipient_history
+                where is_delete = 0 and used = 1
+                group by tenant_id, member_id, order_no
+            ) latest_history
+                on latest_history.recipient_history_id = h.recipient_history_id
+               and latest_history.tenant_id = h.tenant_id
+               and latest_history.member_id = h.member_id
+               and latest_history.order_no = h.order_no
+            where h.is_delete = 0 and h.used = 1
+        ) recipient_history
+            on recipient_history.tenant_id = o.tenant_id
+           and recipient_history.member_id = o.member_id
+           and recipient_history.order_no = o.order_no
+        where o.is_delete = 0
+          and o.ship_due_time &gt;= #{shipDate}
+          and o.ship_due_time &lt; date_add(#{shipDate}, interval 1 day)
+          and o.order_status in
+          <foreach collection="orderStatuses" item="orderStatus" open="(" separator="," close=")">
+              #{orderStatus}
+          </foreach>
+        order by o.tenant_id, o.member_id, o.order_id
+    </select>
+
+    <update id="updateWeatherRiskFlag">
+        update ry_business.ry_rental_order
+        set weather_risk_flag = #{weatherRiskFlag}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and order_id = #{orderId}
+          and is_delete = 0
+          and ship_due_time &gt;= #{shipDate}
+          and ship_due_time &lt; date_add(#{shipDate}, interval 1 day)
+          and order_status in
+          <foreach collection="orderStatuses" item="orderStatus" open="(" separator="," close=")">
+              #{orderStatus}
+          </foreach>
+    </update>
+
+    <select id="selectMerchantOrderList" resultMap="merchantOrderRow">
+        select
+            o.order_id,
+            coalesce(o.source_order_id, (
+                select alliance_child.source_order_id
+                from ry_business.ry_rental_order_alliance alliance_child
+                where alliance_child.tenant_id = o.tenant_id
+                  and alliance_child.target_member_id = o.member_id
+                  and alliance_child.child_order_id = o.order_id
+                  and alliance_child.is_delete = 0
+                order by alliance_child.accepted_time desc, alliance_child.alliance_order_id desc
+                limit 1
+            )) as source_order_id,
+            exists (
+                select 1
+                from ry_business.ry_rental_order_alliance a_lock
+                where a_lock.tenant_id = o.tenant_id
+                  and a_lock.source_member_id = o.member_id
+                  and a_lock.source_order_id = o.order_id
+                  and a_lock.child_order_id is not null
+                  and a_lock.is_delete = 0
+            ) as alliance_source_locked,
+            o.order_no,
+            o.external_order_no,
+            o.channel_id,
+            cch.channel_code,
+            cch.channel_name,
+            o.shop_name,
+            o.customer_name,
+            o.customer_nickname,
+            o.customer_phone,
+            o.recipient_name,
+            o.recipient_phone,
+            o.recipient_address,
+            o.warehouse_id,
+            o.return_warehouse_id,
+            coalesce(o.remark, '') as customer_note,
+            w.warehouse_name,
+            return_warehouse.warehouse_name as return_warehouse_name,
+            w.city as warehouse_city,
+            recipient_history.province_code as recipient_province_code,
+            recipient_history.city_code as recipient_city_code,
+            recipient_history.district_code as recipient_district_code,
+            recipient_history.amap_city_code as recipient_amap_city_code,
+            recipient_history.province_name as recipient_province_name,
+            recipient_history.city_name as recipient_city_name,
+            recipient_history.district_name as recipient_district_name,
+            o.lease_start_date,
+            o.lease_end_date,
+            o.ship_due_time,
+            o.ship_time_slot,
+            o.return_due_time,
+            o.delivery_method,
+            o.return_delivery_method,
+            o.delivery_amount,
+            o.insurance_amount,
+            o.lease_days,
+            o.arrival_date,
+            o.create_time,
+            o.rent_amount,
+            o.order_status,
+            o.weather_risk_flag,
+            (
+                select oi.product_id
+                from ry_business.ry_rental_order_item oi
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                  and oi.product_id is not null
+                order by oi.order_item_id
+                limit 1
+            ) as product_id,
+            (
+                select p.product_name
+                from ry_business.ry_rental_order_item oi
+                left join ry_business.ry_rental_product p
+                    on p.product_id = oi.product_id
+                   and p.tenant_id = o.tenant_id
+                   and p.member_id = o.member_id
+                   and p.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                order by oi.order_item_id
+                limit 1
+            ) as product_name,
+            (
+                select p.model_name
+                from ry_business.ry_rental_order_item oi
+                left join ry_business.ry_rental_product p
+                    on p.product_id = oi.product_id
+                   and p.tenant_id = o.tenant_id
+                   and p.member_id = o.member_id
+                   and p.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                order by oi.order_item_id
+                limit 1
+            ) as model_name,
+            (
+                select oi.package_id
+                from ry_business.ry_rental_order_item oi
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                  and oi.package_id is not null
+                order by oi.order_item_id
+                limit 1
+            ) as package_id,
+            (
+                select p.product_code
+                from ry_business.ry_rental_order_item oi
+                left join ry_business.ry_rental_product p
+                    on p.product_id = oi.product_id
+                   and p.tenant_id = o.tenant_id
+                   and p.member_id = o.member_id
+                   and p.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                order by oi.order_item_id
+                limit 1
+            ) as product_code,
+            coalesce(
+                (
+                    select alliance_logistics.carrier
+                    from ry_business.ry_rental_logistics_order alliance_logistics
+                    inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                    where alliance_logistics.tenant_id = o.tenant_id
+                      and alliance_logistics.direction = 1
+                      and alliance_logistics.is_delete = 0
+                    order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                    limit 1
+                ),
+                (
+                    select l.carrier
+                    from ry_business.ry_rental_logistics_order l
+                    where l.order_id = o.order_id
+                      and l.tenant_id = o.tenant_id
+                      and l.member_id = o.member_id
+                      and l.direction = 1
+                      and l.is_delete = 0
+                    order by l.create_time desc, l.logistics_id desc
+                    limit 1
+                )
+            ) as shipping_carrier,
+            coalesce(
+                (
+                    select alliance_logistics.tracking_no
+                    from ry_business.ry_rental_logistics_order alliance_logistics
+                    inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                    where alliance_logistics.tenant_id = o.tenant_id
+                      and alliance_logistics.direction = 1
+                      and alliance_logistics.is_delete = 0
+                    order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                    limit 1
+                ),
+                (
+                    select l.tracking_no
+                    from ry_business.ry_rental_logistics_order l
+                    where l.order_id = o.order_id
+                      and l.tenant_id = o.tenant_id
+                      and l.member_id = o.member_id
+                      and l.direction = 1
+                      and l.is_delete = 0
+                    order by l.create_time desc, l.logistics_id desc
+                    limit 1
+                )
+            ) as shipping_tracking_no,
+            coalesce(
+                (
+                    select alliance_logistics.carrier
+                    from ry_business.ry_rental_logistics_order alliance_logistics
+                    inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                    where alliance_logistics.tenant_id = o.tenant_id
+                      and alliance_logistics.direction = 2
+                      and alliance_logistics.is_delete = 0
+                    order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                    limit 1
+                ),
+                (
+                    select l.carrier
+                    from ry_business.ry_rental_logistics_order l
+                    where l.order_id = o.order_id
+                      and l.tenant_id = o.tenant_id
+                      and l.member_id = o.member_id
+                      and l.direction = 2
+                      and l.is_delete = 0
+                    order by l.create_time desc, l.logistics_id desc
+                    limit 1
+                )
+            ) as return_carrier,
+            coalesce(
+                (
+                    select alliance_logistics.tracking_no
+                    from ry_business.ry_rental_logistics_order alliance_logistics
+                    inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                    where alliance_logistics.tenant_id = o.tenant_id
+                      and alliance_logistics.direction = 2
+                      and alliance_logistics.is_delete = 0
+                    order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                    limit 1
+                ),
+                (
+                    select l.tracking_no
+                    from ry_business.ry_rental_logistics_order l
+                    where l.order_id = o.order_id
+                      and l.tenant_id = o.tenant_id
+                      and l.member_id = o.member_id
+                      and l.direction = 2
+                      and l.is_delete = 0
+                    order by l.create_time desc, l.logistics_id desc
+                    limit 1
+                )
+            ) as return_tracking_no,
+            coalesce(
+                (
+                    select alliance_logistics.fee_amount
+                    from ry_business.ry_rental_logistics_order alliance_logistics
+                    inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                    where alliance_logistics.tenant_id = o.tenant_id
+                      and alliance_logistics.direction = 1
+                      and alliance_logistics.is_delete = 0
+                    order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                    limit 1
+                ),
+                (
+                    select l.fee_amount
+                    from ry_business.ry_rental_logistics_order l
+                    where l.order_id = o.order_id
+                      and l.tenant_id = o.tenant_id
+                      and l.member_id = o.member_id
+                      and l.direction = 1
+                      and l.is_delete = 0
+                    order by l.create_time desc, l.logistics_id desc
+                    limit 1
+                )
+            ) as shipping_fee,
+            (
+                select n.note_content
+                from ry_business.ry_rental_order_note n
+                where n.order_id = o.order_id
+                  and n.tenant_id = o.tenant_id
+                  and n.member_id = o.member_id
+                  and n.is_delete = 0
+                order by n.pinned_flag desc, n.create_time desc, n.note_id desc
+                limit 1
+            ) as attention,
+            (
+                select group_concat(distinct p.product_name order by p.product_name separator '、')
+                from ry_business.ry_rental_order_item oi
+                inner join ry_business.ry_rental_product p
+                    on p.product_id = oi.product_id
+                   and p.tenant_id = o.tenant_id
+                   and p.member_id = o.member_id
+                   and p.is_delete = 0
+                where oi.order_id = o.order_id
+                  and oi.tenant_id = o.tenant_id
+                  and oi.member_id = o.member_id
+                  and oi.is_delete = 0
+                  and p.product_type = 2
+            ) as addon_names,
+            o.package_details_json,
+            o.create_by as create_by,
+            o.update_by as update_by
+        from ry_business.ry_rental_order o
+        left join ry_business.ry_rental_customer c
+            on c.customer_id = o.customer_id
+           and c.tenant_id = o.tenant_id
+           and c.member_id = o.member_id
+           and c.is_delete = 0
+        left join ry_business.ry_rental_warehouse w
+            on w.warehouse_id = o.warehouse_id
+           and w.tenant_id = o.tenant_id
+           and w.member_id = o.member_id
+           and w.is_delete = 0
+        left join ry_business.ry_rental_warehouse return_warehouse
+            on return_warehouse.warehouse_id = o.return_warehouse_id
+           and return_warehouse.tenant_id = o.tenant_id
+           and return_warehouse.member_id = o.member_id
+           and return_warehouse.is_delete = 0
+        left join (
+            select h.tenant_id, h.member_id, h.order_no,
+                   h.province_code, h.city_code, h.district_code, h.amap_city_code,
+                   h.province_name, h.city_name, h.district_name
+            from ry_business.ry_rental_order_recipient_history h
+            inner join (
+                select tenant_id, member_id, order_no, max(recipient_history_id) as recipient_history_id
+                from ry_business.ry_rental_order_recipient_history
+                where tenant_id = #{tenantId}
+                  and member_id = #{merchantId}
+                  and is_delete = 0
+                  and used = 1
+                group by tenant_id, member_id, order_no
+            ) latest_history
+                on latest_history.recipient_history_id = h.recipient_history_id
+               and latest_history.tenant_id = h.tenant_id
+               and latest_history.member_id = h.member_id
+               and latest_history.order_no = h.order_no
+            where h.tenant_id = #{tenantId}
+              and h.member_id = #{merchantId}
+              and h.is_delete = 0
+              and h.used = 1
+        ) recipient_history
+            on recipient_history.tenant_id = o.tenant_id
+           and recipient_history.member_id = o.member_id
+           and recipient_history.order_no = o.order_no
+        left join ry_business.ry_rental_order_channel cch
+            on cch.channel_id = o.channel_id
+           and cch.is_delete = 0
+        <include refid="merchantOrderFilters" />
+        order by
+        <choose>
+            <when test="query.sortTypeCode == 'status'">o.order_status</when>
+            <when test="query.sortTypeCode == 'ship'">o.ship_due_time</when>
+            <when test="query.sortTypeCode == 'return'">o.return_due_time</when>
+            <when test="query.sortTypeCode == 'arrival'">o.arrival_date</when>
+            <when test="query.sortTypeCode == 'lease_start'">o.lease_start_date</when>
+            <when test="query.sortTypeCode == 'order'">o.create_time</when>
+            <when test="query.sortTypeCode == 'create'">o.create_time</when>
+            <otherwise>o.create_time</otherwise>
+        </choose>
+        <choose>
+            <when test="query.sortDirectionCode == 'asc'">asc</when>
+            <otherwise>desc</otherwise>
+        </choose>, o.order_id desc
+    </select>
+
+    <select id="countAcceptedAllianceChildren" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_order_alliance
+        where tenant_id = #{tenantId}
+          and source_member_id = #{merchantId}
+          and source_order_id = #{orderId}
+          and child_order_id is not null
+          and is_delete = 0
+    </select>
+
+    <select id="selectAllianceSourceOrderLink"
+            resultType="com.ruoyi.rentalbusiness.model.MerchantOrderAllianceLinkModel">
+        select a.alliance_order_id as allianceOrderId,
+               a.source_member_id as sourceMemberId,
+               a.target_member_id as targetMemberId,
+               a.source_order_id as sourceOrderId,
+               a.child_order_id as childOrderId
+        from ry_business.ry_rental_order_alliance a
+        where a.tenant_id = #{tenantId}
+          and a.target_member_id = #{targetMemberId}
+          and a.child_order_id = #{childOrderId}
+          and a.is_delete = 0
+        order by a.accepted_time desc, a.alliance_order_id desc
+        limit 1
+    </select>
+
+    <select id="selectMerchantOrderSummary" resultType="com.ruoyi.rentalbusiness.model.MerchantOrderSummaryVO">
+        select
+            count(1) as total,
+            coalesce(sum(case when o.order_status = 10 then 1 else 0 end), 0) as pendingShip,
+            coalesce(sum(case when o.order_status in (20, 25, 30) then 1 else 0 end), 0) as shipping,
+            coalesce(sum(case when o.time_effect_status = 1
+                          or o.weather_risk_flag = 1
+                          or o.order_status in (60, 65, 70)
+                     then 1 else 0 end), 0) as attention
+        from ry_business.ry_rental_order o
+        <choose>
+            <when test="query.allWarehouseAccess">
+                where o.tenant_id = #{tenantId}
+                  and o.member_id = #{merchantId}
+                  and o.is_delete = 0
+            </when>
+            <when test="query.warehouseIds != null and query.warehouseIds.size() > 0">
+                where o.tenant_id = #{tenantId}
+                  and o.member_id = #{merchantId}
+                  and o.is_delete = 0
+                  and o.warehouse_id in
+                  <foreach collection="query.warehouseIds" item="warehouseId" open="(" separator="," close=")">
+                      #{warehouseId}
+                  </foreach>
+            </when>
+            <otherwise>
+                where 1 = 0
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectMerchantOrderById" resultMap="merchantOrderRow">
+        select o.order_id, o.order_no, o.external_order_no, o.channel_id,
+               cch.channel_code, cch.channel_name, o.shop_name,
+               o.customer_name, o.customer_nickname, o.customer_phone, o.recipient_name, o.recipient_phone,
+               o.recipient_address, o.lease_start_date, o.lease_end_date,
+               o.warehouse_id, o.return_warehouse_id, o.ship_due_time, o.ship_time_slot, o.return_due_time,
+               o.delivery_method, o.return_delivery_method, o.delivery_amount, o.insurance_amount, o.lease_days, o.arrival_date,
+               o.create_time, o.rent_amount, o.deposit_amount,
+               o.order_status, o.pay_status, o.time_effect_status, o.weather_risk_flag, o.priority_flag,
+               o.source_text_snapshot, o.share_snapshot_json, o.package_details_json,
+               coalesce(o.source_order_id, (
+                   select alliance_child.source_order_id
+                   from ry_business.ry_rental_order_alliance alliance_child
+                   where alliance_child.tenant_id = o.tenant_id
+                     and alliance_child.target_member_id = o.member_id
+                     and alliance_child.child_order_id = o.order_id
+                     and alliance_child.is_delete = 0
+                   order by alliance_child.accepted_time desc, alliance_child.alliance_order_id desc
+                   limit 1
+               )) as source_order_id, o.version, o.remark,
+               o.create_by, o.update_by,
+               oi.order_item_id, oi.product_id, oi.package_id, oi.sn_id, oi.accessory_item_ids, oi.quantity,
+               product.product_name, product.model_name, product.product_code,
+               coalesce(o.remark, '') as customer_note, w.warehouse_name,
+               return_warehouse.warehouse_name as return_warehouse_name, w.city as warehouse_city,
+               recipient_history.province_code as recipient_province_code,
+               recipient_history.city_code as recipient_city_code,
+               recipient_history.district_code as recipient_district_code,
+               recipient_history.amap_city_code as recipient_amap_city_code,
+               recipient_history.province_name as recipient_province_name,
+               recipient_history.city_name as recipient_city_name,
+               recipient_history.district_name as recipient_district_name,
+               coalesce(
+                   (select alliance_logistics.carrier
+                      from ry_business.ry_rental_logistics_order alliance_logistics
+                      inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                     where alliance_logistics.tenant_id = o.tenant_id
+                       and alliance_logistics.direction = 1
+                       and alliance_logistics.is_delete = 0
+                     order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                     limit 1),
+                   (select l.carrier
+                      from ry_business.ry_rental_logistics_order l
+                     where l.order_id = o.order_id
+                       and l.tenant_id = o.tenant_id
+                       and l.member_id = o.member_id
+                       and l.direction = 1
+                       and l.is_delete = 0
+                     order by l.create_time desc, l.logistics_id desc
+                     limit 1)) as shipping_carrier,
+               coalesce(
+                   (select alliance_logistics.tracking_no
+                      from ry_business.ry_rental_logistics_order alliance_logistics
+                      inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                     where alliance_logistics.tenant_id = o.tenant_id
+                       and alliance_logistics.direction = 1
+                       and alliance_logistics.is_delete = 0
+                     order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                     limit 1),
+                   (select l.tracking_no
+                      from ry_business.ry_rental_logistics_order l
+                     where l.order_id = o.order_id
+                       and l.tenant_id = o.tenant_id
+                       and l.member_id = o.member_id
+                       and l.direction = 1
+                       and l.is_delete = 0
+                     order by l.create_time desc, l.logistics_id desc
+                     limit 1)) as shipping_tracking_no,
+               coalesce(
+                   (select alliance_logistics.carrier
+                      from ry_business.ry_rental_logistics_order alliance_logistics
+                      inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                     where alliance_logistics.tenant_id = o.tenant_id
+                       and alliance_logistics.direction = 2
+                       and alliance_logistics.is_delete = 0
+                     order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                     limit 1),
+                   (select l.carrier
+                      from ry_business.ry_rental_logistics_order l
+                     where l.order_id = o.order_id
+                       and l.tenant_id = o.tenant_id
+                       and l.member_id = o.member_id
+                       and l.direction = 2
+                       and l.is_delete = 0
+                     order by l.create_time desc, l.logistics_id desc
+                     limit 1)) as return_carrier,
+               coalesce(
+                   (select alliance_logistics.tracking_no
+                      from ry_business.ry_rental_logistics_order alliance_logistics
+                      inner join ry_business.ry_rental_order_alliance alliance_link
+                        on alliance_link.tenant_id = o.tenant_id
+                       and alliance_link.source_member_id = o.member_id
+                       and alliance_link.source_order_id = o.order_id
+                       and alliance_link.child_order_id = alliance_logistics.order_id
+                       and alliance_link.target_member_id = alliance_logistics.member_id
+                       and alliance_link.is_delete = 0
+                     where alliance_logistics.tenant_id = o.tenant_id
+                       and alliance_logistics.direction = 2
+                       and alliance_logistics.is_delete = 0
+                     order by alliance_logistics.create_time desc, alliance_logistics.logistics_id desc
+                     limit 1),
+                   (select l.tracking_no
+                      from ry_business.ry_rental_logistics_order l
+                     where l.order_id = o.order_id
+                       and l.tenant_id = o.tenant_id
+                       and l.member_id = o.member_id
+                       and l.direction = 2
+                       and l.is_delete = 0
+                     order by l.create_time desc, l.logistics_id desc
+                     limit 1)) as return_tracking_no
+        from ry_business.ry_rental_order o
+        left join ry_business.ry_rental_customer c on c.customer_id = o.customer_id
+            and c.tenant_id = o.tenant_id and c.member_id = o.member_id and c.is_delete = 0
+        left join ry_business.ry_rental_order_channel cch on cch.channel_id = o.channel_id
+            and cch.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = o.warehouse_id
+            and w.tenant_id = o.tenant_id and w.member_id = o.member_id and w.is_delete = 0
+        left join ry_business.ry_rental_warehouse return_warehouse
+            on return_warehouse.warehouse_id = o.return_warehouse_id
+            and return_warehouse.tenant_id = o.tenant_id
+            and return_warehouse.member_id = o.member_id
+            and return_warehouse.is_delete = 0
+        left join (
+            select h.tenant_id, h.member_id, h.order_no,
+                   h.province_code, h.city_code, h.district_code, h.amap_city_code,
+                   h.province_name, h.city_name, h.district_name
+            from ry_business.ry_rental_order_recipient_history h
+            inner join (
+                select tenant_id, member_id, order_no, max(recipient_history_id) as recipient_history_id
+                from ry_business.ry_rental_order_recipient_history
+                where tenant_id = #{tenantId}
+                  and member_id = #{merchantId}
+                  and is_delete = 0
+                  and used = 1
+                group by tenant_id, member_id, order_no
+            ) latest_history
+                on latest_history.recipient_history_id = h.recipient_history_id
+               and latest_history.tenant_id = h.tenant_id
+               and latest_history.member_id = h.member_id
+               and latest_history.order_no = h.order_no
+            where h.tenant_id = #{tenantId}
+              and h.member_id = #{merchantId}
+              and h.is_delete = 0
+              and h.used = 1
+        ) recipient_history on recipient_history.tenant_id = o.tenant_id
+            and recipient_history.member_id = o.member_id and recipient_history.order_no = o.order_no
+        left join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+        left join ry_business.ry_rental_product product on product.product_id = oi.product_id
+            and product.tenant_id = o.tenant_id and product.member_id = o.member_id and product.is_delete = 0
+        where o.order_id = #{orderId} and o.tenant_id = #{tenantId} and o.member_id = #{merchantId} and o.is_delete = 0
+          and (
+              oi.order_item_id is null
+              or oi.order_item_id = (
+                  select min(first_item.order_item_id)
+                  from ry_business.ry_rental_order_item first_item
+                  where first_item.order_id = o.order_id
+                    and first_item.tenant_id = o.tenant_id
+                    and first_item.member_id = o.member_id
+                    and first_item.is_delete = 0
+              )
+          )
+        order by oi.order_item_id
+    </select>
+
+    <select id="selectMerchantOrderNotes" resultMap="merchantOrderNote">
+        select n.note_id,
+               n.note_content,
+               n.note_type,
+               n.create_by as operator_id,
+               date_format(n.create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from ry_business.ry_rental_order_note n
+        where n.tenant_id = #{tenantId}
+          and n.member_id = #{merchantId}
+          and n.order_id = #{orderId}
+          and n.is_delete = 0
+        order by n.create_time desc, n.note_id desc
+    </select>
+
+    <select id="selectLatestReturnInspection" resultMap="merchantOrderReturnInspection">
+        select inspection_result, case_type, problem_desc, lost_items_json, compensation_amount,
+               customer_contacted, remark, create_time
+        from ry_business.ry_rental_order_return_inspection
+        where tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and order_id = #{orderId}
+          and is_delete = 0
+        order by create_time desc, inspection_id desc
+        limit 1
+    </select>
+
+    <select id="selectOrderReturnReadiness"
+            resultType="com.ruoyi.rentalbusiness.model.MerchantOrderReturnReadinessVO">
+        select count(package_unit.unit_id) as bound_unit_count,
+               coalesce(sum(case when inventory_unit.unit_status = 1 then 1 else 0 end), 0)
+                   as returned_unit_count
+        from ry_business.ry_rental_order o
+        join json_table(
+            coalesce(json_extract(o.package_details_json, '$.items'), json_array()),
+            '$[*]' columns (
+                nested path '$.unitIds[*]' columns (
+                    unit_id bigint path '$'
+                )
+            )
+        ) package_unit
+        left join ry_business.ry_rental_merchant_inventory_unit inventory_unit
+          on inventory_unit.tenant_id = o.tenant_id
+         and inventory_unit.member_id = o.member_id
+         and inventory_unit.unit_id = package_unit.unit_id
+         and inventory_unit.is_delete = 0
+        where o.tenant_id = #{tenantId}
+          and o.member_id = #{merchantId}
+          and o.order_id = #{orderId}
+          and o.is_delete = 0
+          and package_unit.unit_id is not null
+    </select>
+
+    <insert id="insertReturnInspection">
+        insert into ry_business.ry_rental_order_return_inspection
+            (tenant_id, member_id, order_id, inspection_result, case_type, problem_desc,
+             lost_items_json, compensation_amount, customer_contacted, remark,
+             create_by, create_time, update_by, update_time, is_delete)
+        values
+            (#{tenantId}, #{merchantId}, #{orderId}, #{command.result}, #{command.caseType},
+             #{command.problemDesc}, #{command.lostItemsJson}, #{command.compensationAmount},
+             coalesce(#{command.customerContacted}, 0), #{command.remark},
+             #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <insert id="insertMerchantOrderNote">
+        insert into ry_business.ry_rental_order_note
+        (tenant_id, member_id, order_id, note_content, note_type, pinned_flag, create_by, create_time,
+         update_by, update_time, is_delete)
+        select #{tenantId}, #{merchantId}, #{orderId}, #{noteContent}, #{noteType}, 0, #{operatorId}, now(),
+               #{operatorId}, now(), 0
+        from ry_business.ry_rental_order
+        where order_id = #{orderId}
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and is_delete = 0
+    </insert>
+
+    <select id="countUsableOrderChannel" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_order_channel
+        where channel_id = #{channelId}
+          and status = 0
+          and is_delete = 0
+          and ((scope_type = 1 and channel_type = 1)
+               or (scope_type = 2 and tenant_id = #{tenantId} and member_id = #{merchantId}))
+    </select>
+
+    <insert id="insertMerchantOrder" useGeneratedKeys="true" keyProperty="command.orderId">
+        insert into ry_business.ry_rental_order
+        (tenant_id, member_id, order_no, external_order_no, channel_id, shop_name,
+         customer_name, customer_nickname, customer_phone, recipient_name, recipient_phone, recipient_address,
+         warehouse_id, return_warehouse_id,
+         lease_start_date, lease_end_date, ship_due_time, ship_time_slot, return_due_time, delivery_method, return_delivery_method, delivery_amount, insurance_amount, lease_days, arrival_date, rent_amount, deposit_amount,
+         order_status, pay_status, time_effect_status, weather_risk_flag, priority_flag,
+         source_text_snapshot, share_snapshot_json, package_details_json, source_order_id, version, create_by, create_time, update_by, update_time, remark, is_delete)
+        values
+        (#{tenantId}, #{merchantId}, #{command.orderNo}, #{command.externalOrderNo}, #{command.channelId}, #{command.shopName},
+         #{command.customerName}, #{command.customerNickname}, #{command.customerPhone}, #{command.recipientName}, #{command.recipientPhone},
+         #{command.recipientAddress}, #{command.warehouseId}, #{command.returnWarehouseId},
+         #{command.leaseStartDate}, #{command.leaseEndDate}, nullif(#{command.shipDueTime}, ''), nullif(#{command.shipTimeSlot}, ''), nullif(#{command.returnDueTime}, ''), #{command.deliveryMethod}, #{command.returnDeliveryMethod}, #{command.deliveryAmount}, #{command.insuranceAmount}, #{command.leaseDays}, nullif(#{command.arrivalDate}, ''), #{command.rentAmount}, #{command.depositAmount},
+         coalesce(#{command.orderStatus}, 10), coalesce(#{command.payStatus}, 0), #{command.timeEffectStatus},
+         coalesce(#{command.weatherRiskFlag}, 0), coalesce(#{command.priorityFlag}, 0), #{command.sourceTextSnapshot},
+         nullif(trim(#{command.shareSnapshotJson}), ''), NULL, #{command.sourceOrderId}, coalesce(#{command.version}, 0), #{operatorId}, now(), #{operatorId}, now(), #{command.remark}, 0)
+    </insert>
+
+    <update id="updateMerchantOrder">
+        update ry_business.ry_rental_order
+        set channel_id = case when source_order_id is null then #{command.channelId} else channel_id end,
+            external_order_no = #{command.externalOrderNo},
+            customer_name = #{command.customerName}, customer_nickname = #{command.customerNickname}, customer_phone = #{command.customerPhone},
+            recipient_name = #{command.recipientName}, recipient_phone = #{command.recipientPhone},
+            recipient_address = #{command.recipientAddress}, warehouse_id = #{command.warehouseId}, return_warehouse_id = #{command.returnWarehouseId},
+            lease_start_date = #{command.leaseStartDate}, lease_end_date = #{command.leaseEndDate}, ship_due_time = nullif(#{command.shipDueTime}, ''), ship_time_slot = nullif(#{command.shipTimeSlot}, ''), return_due_time = nullif(#{command.returnDueTime}, ''),
+            delivery_method = #{command.deliveryMethod}, return_delivery_method = #{command.returnDeliveryMethod}, delivery_amount = #{command.deliveryAmount}, insurance_amount = #{command.insuranceAmount}, lease_days = #{command.leaseDays}, arrival_date = nullif(#{command.arrivalDate}, ''),
+            rent_amount = #{command.rentAmount}, deposit_amount = #{command.depositAmount}, order_status = #{command.orderStatus}, pay_status = #{command.payStatus},
+            time_effect_status = #{command.timeEffectStatus}, weather_risk_flag = coalesce(#{command.weatherRiskFlag}, 0), priority_flag = coalesce(#{command.priorityFlag}, 0),
+            source_text_snapshot = #{command.sourceTextSnapshot}, share_snapshot_json = nullif(trim(#{command.shareSnapshotJson}), ''), source_order_id = #{command.sourceOrderId}, version = version + 1,
+            remark = #{command.remark}, update_by = #{operatorId}, update_time = now()
+        where order_id = #{command.orderId} and tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
+    </update>
+
+    <select id="selectMerchantOrderPaymentTarget" resultType="map">
+        select o.order_id as orderId,
+               o.order_no as orderNo,
+               coalesce(o.rent_amount, 0) + coalesce(o.deposit_amount, 0) as amount,
+               o.pay_status as payStatus,
+               o.order_status as orderStatus
+        from ry_business.ry_rental_order o
+        where o.order_id = #{orderId}
+          and o.tenant_id = #{tenantId}
+          and o.member_id = #{merchantId}
+          and o.is_delete = 0
+        limit 1
+    </select>
+
+    <update id="updateMerchantOrderPayStatus">
+        update ry_business.ry_rental_order
+        set pay_status = #{toStatus},
+            version = version + 1,
+            update_time = now()
+        where order_id = #{orderId}
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and pay_status = #{fromStatus}
+          and order_status &lt;&gt; #{cancelledStatus}
+          and is_delete = 0
+    </update>
+
+    <update id="updateMerchantOrderStatus">
+        update ry_business.ry_rental_order
+        set order_status = #{toStatus},
+            version = version + 1,
+            update_by = #{operatorId},
+            update_time = now()
+        where order_id = #{orderId}
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and order_status = #{fromStatus}
+          and is_delete = 0
+    </update>
+
+    <update id="updateAllianceSourceOrderStatus">
+        update ry_business.ry_rental_order
+        set order_status = #{orderStatus},
+            version = version + 1,
+            update_by = #{operatorId},
+            update_time = now()
+        where tenant_id = #{tenantId}
+          and member_id = #{sourceMemberId}
+          and order_id = #{sourceOrderId}
+          and is_delete = 0
+          and order_status &lt;&gt; #{orderStatus}
+    </update>
+
+    <update id="updateMerchantOrderItemPackage">
+        update ry_business.ry_rental_order_item
+        set product_id = coalesce((
+                select package_item.product_id
+                from ry_business.ry_rental_merchant_package_version package_version
+                inner join ry_business.ry_rental_merchant_package_item package_item
+                    on package_item.package_version_id = package_version.package_version_id
+                   and package_item.item_role = 1
+                   and package_item.is_delete = 0
+                where package_version.tenant_id = #{tenantId}
+                  and package_version.member_id = #{merchantId}
+                  and package_version.package_id = #{command.packageId}
+                  and package_version.version_status = 1
+                  and package_version.is_delete = 0
+                order by package_version.version_no desc, package_item.package_item_id
+                limit 1
+            ), #{command.productId}),
+            package_id = #{command.packageId},
+            sn_id = #{command.snId},
+            accessory_item_ids = #{command.accessoryItemIds},
+            quantity = coalesce(#{command.quantity}, quantity),
+            update_by = #{operatorId}, update_time = now()
+        where order_id = #{command.orderId}
+          <if test="command.orderItemId != null">
+          and order_item_id = #{command.orderItemId}
+          </if>
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and is_delete = 0
+    </update>
+
+    <select id="selectLatestMerchantOrderLogisticsId" resultType="java.lang.Long">
+        select logistics_id
+        from ry_business.ry_rental_logistics_order
+        where tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and order_id = #{orderId}
+          and direction = #{direction}
+          and is_delete = 0
+        order by create_time desc, logistics_id desc
+        limit 1
+    </select>
+
+    <update id="updateMerchantOrderLogistics">
+        update ry_business.ry_rental_logistics_order
+        set warehouse_id = #{warehouseId}, carrier = #{carrier}, tracking_no = #{trackingNo},
+            update_by = #{operatorId}, update_time = now()
+        where logistics_id = #{logisticsId}
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and is_delete = 0
+    </update>
+
+    <update id="updateMerchantOrderLogisticsInfo">
+        update ry_business.ry_rental_logistics_order
+        set carrier = #{carrier}, tracking_no = #{trackingNo},
+            update_by = #{operatorId}, update_time = now()
+        where logistics_id = #{logisticsId}
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and is_delete = 0
+    </update>
+
+    <insert id="insertMerchantOrderLogistics">
+        insert into ry_business.ry_rental_logistics_order
+            (tenant_id, member_id, order_id, warehouse_id, direction, carrier, tracking_no,
+             source_type, route_status, create_by, create_time, update_by, update_time, is_delete)
+        values
+            (#{tenantId}, #{merchantId}, #{orderId}, #{warehouseId}, #{direction}, #{carrier}, #{trackingNo},
+             2, 0, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <update id="updateMerchantOrderRecipient">
+        update ry_business.ry_rental_order
+        set customer_name = #{command.customerName},
+            customer_phone = #{command.customerPhone},
+            customer_nickname = #{command.customerNickname},
+            recipient_name = #{command.recipientName},
+            recipient_phone = #{command.recipientPhone},
+            recipient_address = #{command.recipientAddress},
+            remark = #{command.remark},
+            update_by = #{operatorId},
+            update_time = now(),
+            version = version + 1
+        where order_id = #{command.orderId}
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and is_delete = 0
+    </update>
+
+    <insert id="insertOrderForwardRecord">
+        insert into ry_business.ry_rental_order_forward_record
+            (tenant_id, member_id, order_id, old_recipient_name, old_recipient_phone,
+             old_recipient_address, new_recipient_name, new_recipient_phone, new_recipient_address,
+             remark, create_by, create_time, update_by, update_time, is_delete)
+        values
+            (#{tenantId}, #{merchantId}, #{orderId}, #{oldRecipientName}, #{oldRecipientPhone},
+             #{oldRecipientAddress}, #{newRecipientName}, #{newRecipientPhone}, #{newRecipientAddress},
+             #{remark}, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <insert id="insertMerchantOrderItem" useGeneratedKeys="true" keyProperty="command.orderItemId">
+        insert into ry_business.ry_rental_order_item
+        (tenant_id, member_id, order_id, product_id, package_id, sn_id, accessory_item_ids, quantity,
+         item_status, create_by, create_time, update_by, update_time, remark, is_delete)
+        values
+        (#{tenantId}, #{merchantId}, #{command.orderId}, #{command.productId}, #{command.packageId}, #{command.snId},
+         #{command.accessoryItemIds}, coalesce(#{command.quantity}, 1), #{itemStatus}, #{operatorId}, now(), #{operatorId}, now(), #{command.remark}, 0)
+    </insert>
+
+    <update id="updateOrderPackageDetails">
+        update ry_business.ry_rental_order
+        set package_details_json = #{packageDetailsJson},
+            version = version + 1,
+            update_by = #{operatorId},
+            update_time = now()
+        where order_id = #{orderId}
+          and tenant_id = #{tenantId}
+          and member_id = #{merchantId}
+          and is_delete = 0
+    </update>
+</mapper>

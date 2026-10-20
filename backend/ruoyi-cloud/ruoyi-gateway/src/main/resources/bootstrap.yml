@@ -1,0 +1,46 @@
+# Tomcat
+server:
+  port: 8080
+
+# Spring
+spring: 
+  application:
+    # 应用名称
+    name: ruoyi-gateway
+  profiles:
+    # 环境配置
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: 127.0.0.1:8848
+      config:
+        # 配置中心地址
+        server-addr: 127.0.0.1:8848
+    sentinel:
+      # 未配置控制台时不主动建立连接
+      eager: ${SENTINEL_EAGER:false}
+      transport:
+        # 可选控制台地址，例如 ruoyi-sentinel:8718
+        dashboard: ${SENTINEL_DASHBOARD:}
+      # nacos配置持久化
+      datasource:
+        ds1:
+          nacos:
+            server-addr: ${spring.cloud.nacos.config.server-addr}
+            dataId: sentinel-ruoyi-gateway
+            groupId: DEFAULT_GROUP
+            data-type: json
+            rule-type: gw-flow
+  config:
+    # 配置文件格式
+    file-extension: yml
+    import:
+      - nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+management:
+  health:
+    sentinel:
+      enabled: ${SENTINEL_HEALTH_ENABLED:false}

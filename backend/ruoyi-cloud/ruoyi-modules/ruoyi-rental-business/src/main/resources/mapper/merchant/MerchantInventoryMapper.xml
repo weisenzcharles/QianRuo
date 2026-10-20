@@ -1,0 +1,1553 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantInventoryMapper">
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <select id="selectInventory" resultType="map">
+        select i.inventory_id as inventoryId, i.warehouse_id as warehouseId, i.product_id as productId,
+               i.model_id as modelId, i.total_quantity as totalQuantity, i.available_quantity as availableQuantity,
+               i.reserved_quantity as reservedQuantity, i.rented_quantity as rentedQuantity,
+               i.repairing_quantity as repairingQuantity, i.damaged_quantity as damagedQuantity,
+               i.stock_protection_qty as stockProtectionQty, i.calculation_mode as calculationMode,
+               i.calculation_percent as calculationPercent,
+               case when i.calculation_mode = 2
+                    then least(i.available_quantity, floor(i.total_quantity * i.calculation_percent / 100))
+                    else greatest(i.available_quantity - i.stock_protection_qty, 0) end as orderableQuantity,
+               i.status, p.product_code as productCode, p.product_name as productName,
+               p.class_id as classId, p.product_type as productType, p.stock_mode as stockMode, p.brand,
+               p.model_name as modelName, w.warehouse_code as warehouseCode,
+               w.warehouse_name as warehouseName, w.city as warehouseCity,
+               w.address as warehouseAddress
+        from ry_business.ry_rental_merchant_inventory i
+        left join ry_business.ry_rental_product p on p.product_id = i.product_id
+          and p.tenant_id = i.tenant_id and p.member_id = i.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = i.warehouse_id
+          and w.tenant_id = i.tenant_id and w.member_id = i.member_id and w.is_delete = 0
+        where i.tenant_id = #{tenantId} and i.member_id = #{memberId} and i.is_delete = 0
+        <if test="keyword != null and keyword != ''">and (p.product_code like concat('%', #{keyword}, '%') or p.product_name like concat('%', #{keyword}, '%'))</if>
+        <if test="warehouseId != null">and i.warehouse_id = #{warehouseId}</if>
+        <if test="excludeWarehouseId != null">and i.warehouse_id &lt;&gt; #{excludeWarehouseId}</if>
+        <if test="unitStatus != null">and exists (select 1 from ry_business.ry_rental_merchant_inventory_unit u where u.inventory_id = i.inventory_id and u.unit_status = #{unitStatus} and u.is_delete = 0)</if>
+        <if test="classId != null">and p.class_id = #{classId}</if>
+        <if test="productType != null">and p.product_type = #{productType}</if>
+        <if test="brand != null and brand != ''">and p.brand = #{brand}</if>
+        <if test="!allWarehouseAccess">
+            <choose>
+                <when test="warehouseIds != null and warehouseIds.size() > 0">
+                    and i.warehouse_id in
+                    <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">#{allowedWarehouseId}</foreach>
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+            </choose>
+        </if>
+        order by i.create_time desc, i.inventory_id desc
+    </select>
+
+    <select id="selectSharedInventory" resultType="map">
+        select p.product_id as productId, p.member_id as ownerMemberId, p.product_code as productCode,
+               p.product_name as productName, p.product_type as productType, p.stock_mode as stockMode,
+               p.brand, p.model_name as modelName, p.model_id as modelId,
+               w.warehouse_id as warehouseId, w.warehouse_name as warehouseName, w.city as warehouseCity,
+               least(floor(i.available_quantity * coalesce(ps.share_quantity_ratio, 1)),
+                     coalesce(ps.share_quantity_limit, i.available_quantity)) as onHandQty,
+               i.reserved_quantity as reservedQty,
+               ps.share_quantity_ratio as shareQuantityRatio,
+               ps.share_quantity_limit as shareQuantityLimit
+        from ry_business.ry_rental_merchant_inventory i
+        inner join ry_business.ry_rental_product p on p.product_id = i.product_id
+            and p.tenant_id = i.tenant_id and p.member_id = i.member_id and p.is_delete = 0
+        inner join ry_business.ry_rental_warehouse w on w.warehouse_id = i.warehouse_id
+            and w.tenant_id = i.tenant_id and w.member_id = i.member_id and w.is_delete = 0
+        left join ry_business.ry_rental_alliance_warehouse_scope ws
+            on ws.tenant_id = i.tenant_id and ws.alliance_id = #{allianceId}
+            and ws.owner_member_id = i.member_id and ws.warehouse_id = i.warehouse_id
+            and ws.share_status = 1 and ws.accept_order_enabled = 1 and ws.is_delete = 0
+            and (ws.effective_time is null or ws.effective_time &lt;= now())
+            and (ws.expire_time is null or ws.expire_time &gt; now())
+        left join ry_business.ry_rental_alliance_product_scope ps
+            on ps.tenant_id = i.tenant_id and ps.alliance_id = #{allianceId}
+            and ps.owner_member_id = i.member_id and ps.product_id = i.product_id
+            and ps.share_status = 1 and ps.accept_order_enabled = 1 and ps.is_delete = 0
+            and (ps.effective_time is null or ps.effective_time &lt;= now())
+            and (ps.expire_time is null or ps.expire_time &gt; now())
+        where p.tenant_id = #{tenantId} and p.member_id in
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">#{memberId}</foreach>
+          and i.is_delete = 0
+          and (ws.scope_id is not null or (w.alliance_share_enabled = 1 and p.alliance_share_enabled = 1))
+        <if test="keyword != null and keyword != ''">
+          and (p.product_code like concat('%', #{keyword}, '%') or p.product_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="warehouseId != null">and w.warehouse_id = #{warehouseId}</if>
+        <if test="productType != null">and p.product_type = #{productType}</if>
+        order by p.member_id, w.sort_no asc, w.warehouse_id, p.product_id
+    </select>
+
+    <select id="selectProductOptions" resultType="map">
+        select p.product_id as productId, p.product_code as productCode, p.product_name as productName,
+               p.class_id as classId, p.product_type as productType, p.stock_mode as stockMode,
+               p.brand, p.model_name as modelName
+        from ry_business.ry_rental_product p
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.is_delete = 0
+          and p.status = 0
+        <if test="classId != null">and p.class_id = #{classId}</if>
+        <if test="productType != null">and p.product_type = #{productType}</if>
+        <if test="brand != null and brand != ''">and p.brand = #{brand}</if>
+        <if test="keyword != null and keyword != ''">
+            and (p.product_code like concat('%', #{keyword}, '%')
+              or p.product_name like concat('%', #{keyword}, '%')
+              or p.model_name like concat('%', #{keyword}, '%'))
+        </if>
+        order by p.product_type, p.product_name, p.product_id desc
+    </select>
+
+    <select id="selectModelOverview" resultType="map">
+        with recursive days as (
+          select current_date as forecastDate, 1 as dayNo
+          union all select date_add(forecastDate, interval 1 day), dayNo + 1 from days where dayNo &lt; #{days}
+        ), models as (
+          select coalesce(p.model_id, p.product_id) as modelId, coalesce(nullif(p.model_name, ''), p.product_name) as itemName,
+                 max(p.brand) as brand, sum(i.total_quantity) as totalQuantity,
+                 sum(i.available_quantity) as currentAvailable,
+                 sum(case when coalesce(i.calculation_mode, 1) = 1 then i.available_quantity else 0 end) as fixedAvailable,
+                 sum(case when coalesce(i.calculation_mode, 1) = 1 then coalesce(i.stock_protection_qty, 0) else 0 end) as fixedProtection,
+                 sum(case when coalesce(i.calculation_mode, 1) = 2
+                          then floor(i.total_quantity * coalesce(i.calculation_percent, 0) / 100)
+                          else 0 end) as percentCapacity,
+                 sum(case when coalesce(i.calculation_mode, 1) = 1 then 1 else 0 end) as fixedPolicyCount,
+                 sum(case when coalesce(i.calculation_mode, 1) = 2 then 1 else 0 end) as percentPolicyCount
+          from ry_business.ry_rental_merchant_inventory i
+          inner join ry_business.ry_rental_product p on p.product_id = i.product_id
+            and p.tenant_id = i.tenant_id and p.member_id = i.member_id and p.is_delete = 0
+          where i.tenant_id = #{tenantId} and i.member_id = #{memberId} and i.is_delete = 0
+          <if test="warehouseId != null">and i.warehouse_id = #{warehouseId}</if>
+          <if test="brand != null and brand != ''">and p.brand = #{brand}</if>
+          <if test="modelId != null">and p.model_id = #{modelId}</if>
+          group by coalesce(p.model_id, p.product_id), coalesce(nullif(p.model_name, ''), p.product_name)
+        ), demand as (
+          select d.forecastDate, coalesce(op.model_id, op.product_id) as modelId, sum(oi.quantity) as quantity
+          from days d
+          inner join ry_business.ry_rental_order o
+            on d.forecastDate between o.lease_start_date and o.lease_end_date
+           and o.tenant_id = #{tenantId} and o.member_id = #{memberId} and o.is_delete = 0
+           and o.order_status not in
+           <foreach collection="excludedOrderStatuses" item="status" open="(" separator="," close=")">#{status}</foreach>
+          inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+          inner join ry_business.ry_rental_product op on op.product_id = oi.product_id
+            and op.tenant_id = oi.tenant_id and op.member_id = oi.member_id and op.is_delete = 0
+          group by d.forecastDate, coalesce(op.model_id, op.product_id)
+        )
+        , projected as (
+          select d.forecastDate, m.modelId, m.itemName, m.brand, m.totalQuantity,
+                 m.fixedAvailable, m.fixedProtection, m.percentCapacity,
+                 m.fixedPolicyCount, m.percentPolicyCount,
+                 greatest(m.currentAvailable - coalesce(dm.quantity, 0), 0) as availableQuantity
+          from days d
+          cross join models m
+          left join demand dm on dm.forecastDate = d.forecastDate and dm.modelId = m.modelId
+        )
+        select 'model' as overviewType, forecastDate, modelId, itemName, brand, totalQuantity,
+               availableQuantity,
+               case
+                 when percentPolicyCount = 0 then greatest(availableQuantity - fixedProtection, 0)
+                 when fixedPolicyCount = 0 then least(availableQuantity, percentCapacity)
+                 else least(availableQuantity, greatest(fixedAvailable - fixedProtection, 0) + percentCapacity)
+               end as orderableQuantity
+        from projected order by forecastDate, itemName
+    </select>
+
+    <select id="selectPackageOverview" resultType="map">
+        with recursive days as (
+          select current_date as forecastDate, 1 as dayNo
+          union all select date_add(forecastDate, interval 1 day), dayNo + 1 from days where dayNo &lt; #{days}
+        ), package_items as (
+          select p.package_id as packageId, p.package_name as itemName, p.package_code as itemCode,
+                 coalesce(pi.product_id, pi.accessory_item_product_id) as componentProductId,
+                 pi.quantity
+          from ry_business.ry_rental_merchant_package p
+          inner join ry_business.ry_rental_merchant_package_version v
+            on v.package_id = p.package_id and v.version_status = 1 and v.is_delete = 0
+          inner join ry_business.ry_rental_merchant_package_item pi
+            on pi.package_version_id = v.package_version_id and pi.required_flag = 1 and pi.is_delete = 0
+          where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.status = 0 and p.is_delete = 0
+        ), package_demand as (
+          select d.forecastDate, oi.package_id as packageId, sum(oi.quantity) as quantity
+          from days d
+          inner join ry_business.ry_rental_order o
+            on d.forecastDate between o.lease_start_date and o.lease_end_date
+           and o.tenant_id = #{tenantId} and o.member_id = #{memberId} and o.is_delete = 0
+           and o.order_status not in
+           <foreach collection="excludedOrderStatuses" item="status" open="(" separator="," close=")">#{status}</foreach>
+          inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+            and oi.package_id is not null
+          group by d.forecastDate, oi.package_id
+        ), component_base as (
+          select d.forecastDate, pi.packageId, pi.itemName, pi.itemCode, pi.quantity,
+                 coalesce(sum(inv.total_quantity), 0) as totalQuantity,
+                 coalesce(sum(inv.available_quantity), 0) as currentAvailable,
+                 coalesce(sum(case when inv.inventory_id is not null and coalesce(inv.calculation_mode, 1) = 1
+                                   then inv.available_quantity else 0 end), 0) as fixedAvailable,
+                 coalesce(sum(case when inv.inventory_id is not null and coalesce(inv.calculation_mode, 1) = 1
+                                   then coalesce(inv.stock_protection_qty, 0) else 0 end), 0) as fixedProtection,
+                 coalesce(sum(case when inv.inventory_id is not null and coalesce(inv.calculation_mode, 1) = 2
+                                   then floor(inv.total_quantity * coalesce(inv.calculation_percent, 0) / 100)
+                                   else 0 end), 0) as percentCapacity,
+                 coalesce(sum(case when inv.inventory_id is not null and coalesce(inv.calculation_mode, 1) = 1
+                                   then 1 else 0 end), 0) as fixedPolicyCount,
+                 coalesce(sum(case when inv.inventory_id is not null and coalesce(inv.calculation_mode, 1) = 2
+                                   then 1 else 0 end), 0) as percentPolicyCount,
+                 coalesce(max(pd.quantity), 0) as packageDemand
+          from days d
+          cross join package_items pi
+          left join ry_business.ry_rental_merchant_inventory inv
+            on inv.tenant_id = #{tenantId} and inv.member_id = #{memberId}
+           and inv.product_id = pi.componentProductId and inv.is_delete = 0
+           <if test="warehouseId != null">and inv.warehouse_id = #{warehouseId}</if>
+          left join package_demand pd on pd.forecastDate = d.forecastDate and pd.packageId = pi.packageId
+          group by d.forecastDate, pi.packageId, pi.itemName, pi.itemCode, pi.quantity
+        ), component_projection as (
+          select forecastDate, packageId, itemName, itemCode,
+                 floor(totalQuantity / nullif(quantity, 0)) as totalQuantity,
+                 greatest(currentAvailable - packageDemand * quantity, 0) as availableQuantity,
+                 case
+                   when percentPolicyCount = 0
+                     then greatest(currentAvailable - packageDemand * quantity - fixedProtection, 0)
+                   when fixedPolicyCount = 0
+                     then least(greatest(currentAvailable - packageDemand * quantity, 0), percentCapacity)
+                   else least(greatest(currentAvailable - packageDemand * quantity, 0),
+                              greatest(fixedAvailable - fixedProtection, 0) + percentCapacity)
+                 end as orderableQuantity
+          from component_base
+        ), packages as (
+          select forecastDate, packageId, max(itemName) as itemName, max(itemCode) as itemCode,
+                 min(totalQuantity) as totalQuantity, min(availableQuantity) as availableQuantity,
+                 min(orderableQuantity) as orderableQuantity
+          from component_projection
+          group by forecastDate, packageId
+        )
+        select 'package' as overviewType, forecastDate, packageId, itemName, itemCode,
+               totalQuantity, availableQuantity, orderableQuantity
+        from packages order by forecastDate, itemName
+    </select>
+
+    <select id="selectForecastMemberScopes" resultType="map">
+        select distinct tenant_id as tenantId, member_id as memberId
+        from ry_business.ry_rental_merchant_inventory
+        where is_delete = 0 and status = 0
+        order by member_id
+    </select>
+
+    <select id="selectForecastWarehouseIds" resultType="long">
+        select distinct warehouse_id
+        from ry_business.ry_rental_merchant_inventory
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0 and status = 0
+        order by warehouse_id
+    </select>
+
+    <select id="selectForecastSnapshots" resultType="com.ruoyi.rentalbusiness.model.MerchantInventoryForecastRowVO">
+        select forecast_id as forecastId, warehouse_id as warehouseId, forecast_type as forecastType,
+               item_id as itemId, item_code as itemCode, item_name as itemName, brand,
+               snapshot_date as snapshotDate, total_quantity as totalQuantity,
+               occupied_quantity as occupiedQuantity, available_quantity as availableQuantity,
+               orderable_quantity as orderableQuantity, risk_level as riskLevel,
+               risk_message as riskMessage, generated_time as generatedTime
+        from ry_business.ry_rental_inventory_forecast_snapshot
+        where tenant_id = #{tenantId} and member_id = #{memberId} and warehouse_id = #{warehouseId}
+          and forecast_type = #{forecastType} and snapshot_date &gt;= current_date
+          and snapshot_date &lt; date_add(current_date, interval #{days} day) and is_delete = 0
+        <if test="brand != null and brand != ''">and brand = #{brand}</if>
+        <if test="modelId != null and forecastType == 1">and item_id = #{modelId}</if>
+        order by snapshot_date, item_name, item_id
+    </select>
+
+    <update id="removeForecastSnapshots">
+        update ry_business.ry_rental_inventory_forecast_snapshot
+        set is_delete = 1, remove_by = #{operator}, remove_time = now(), update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and snapshot_date &gt;= #{fromDate} and snapshot_date &lt;= #{toDate} and is_delete = 0
+    </update>
+
+    <insert id="insertForecastSnapshots">
+        insert into ry_business.ry_rental_inventory_forecast_snapshot
+        (tenant_id, member_id, warehouse_id, forecast_type, item_id, item_code, item_name, brand,
+         snapshot_date, total_quantity, occupied_quantity, available_quantity, orderable_quantity,
+         risk_level, risk_message, generated_time, create_by, update_by)
+        values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.tenantId}, #{row.memberId}, #{row.warehouseId}, #{row.forecastType}, #{row.itemId},
+             #{row.itemCode}, #{row.itemName}, #{row.brand}, #{row.snapshotDate}, #{row.totalQuantity},
+             #{row.occupiedQuantity}, #{row.availableQuantity}, #{row.orderableQuantity}, #{row.riskLevel},
+             #{row.riskMessage}, #{row.generatedTime}, #{row.createBy}, #{row.updateBy})
+        </foreach>
+    </insert>
+
+    <select id="selectInboundOutboundTrend" resultType="com.ruoyi.rentalbusiness.model.MerchantInboundOutboundTrendRowVO">
+        with shipment_rows as (
+          select date(coalesce(o.ship_due_time, o.lease_start_date)) as trendDate,
+            case when #{mode} = 'package' then oi.package_id else coalesce(p.model_id, package_row.model_id) end as itemId,
+            case when #{mode} = 'package' then package_row.package_name
+                 else coalesce(nullif(p.model_name, ''), model_option.model_name, '未命名型号') end as itemName,
+            case when #{mode} = 'package' then null else coalesce(nullif(p.brand, ''), model_option.brand) end as itemBrand,
+            case when #{mode} = 'package' then package_row.package_code else null end as itemCode,
+            sum(coalesce(oi.quantity, 1)) as shipQuantity, cast(0 as signed) as returnQuantity,
+            cast(0 as signed) as estimatedShipQuantity, cast(0 as signed) as estimatedReturnQuantity
+          from ry_business.ry_rental_order o
+          inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+          left join ry_business.ry_rental_product p on p.product_id = oi.product_id
+            and p.tenant_id = oi.tenant_id and p.member_id = oi.member_id and p.is_delete = 0
+          left join ry_business.ry_rental_merchant_package package_row on package_row.package_id = oi.package_id
+            and package_row.tenant_id = oi.tenant_id and package_row.member_id = oi.member_id
+            and package_row.is_delete = 0
+          left join (
+            select tenant_id, member_id, model_id, max(nullif(model_name, '')) as model_name,
+                   max(nullif(brand, '')) as brand
+            from ry_business.ry_rental_product
+            where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0 and model_id is not null
+            group by tenant_id, member_id, model_id
+          ) model_option on model_option.tenant_id = o.tenant_id and model_option.member_id = o.member_id
+            and model_option.model_id = coalesce(p.model_id, package_row.model_id)
+          where o.tenant_id = #{tenantId} and o.member_id = #{memberId} and o.is_delete = 0
+            and o.order_status in
+            <foreach collection="shipmentStatusValues" item="status" open="(" separator="," close=")">#{status}</foreach>
+            and ((o.ship_due_time &gt;= current_date and o.ship_due_time &lt; date_add(current_date, interval #{days} day))
+              or (o.ship_due_time is null and o.lease_start_date &gt;= current_date
+                and o.lease_start_date &lt; date_add(current_date, interval #{days} day)))
+            <if test="warehouseId != null">and o.warehouse_id = #{warehouseId}</if>
+            <if test="!allWarehouseAccess">
+              <choose>
+                <when test="warehouseIds != null and warehouseIds.size() > 0">
+                  and o.warehouse_id in
+                  <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">#{allowedWarehouseId}</foreach>
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+              </choose>
+            </if>
+            <choose>
+              <when test="mode == 'package'">and oi.package_id is not null</when>
+              <otherwise>and coalesce(p.model_id, package_row.model_id) is not null</otherwise>
+            </choose>
+            <if test="mode == 'model' and modelId != null">and coalesce(p.model_id, package_row.model_id) = #{modelId}</if>
+            <if test="mode == 'model' and brand != null and brand != ''">and coalesce(nullif(p.brand, ''), model_option.brand) = #{brand}</if>
+          group by trendDate, itemId, itemName, itemBrand, itemCode
+        ), return_rows as (
+          select date(coalesce(o.return_due_time, o.lease_end_date)) as trendDate,
+            case when #{mode} = 'package' then oi.package_id else coalesce(p.model_id, package_row.model_id) end as itemId,
+            case when #{mode} = 'package' then package_row.package_name
+                 else coalesce(nullif(p.model_name, ''), model_option.model_name, '未命名型号') end as itemName,
+            case when #{mode} = 'package' then null else coalesce(nullif(p.brand, ''), model_option.brand) end as itemBrand,
+            case when #{mode} = 'package' then package_row.package_code else null end as itemCode,
+            cast(0 as signed) as shipQuantity, sum(coalesce(oi.quantity, 1)) as returnQuantity,
+            cast(0 as signed) as estimatedShipQuantity, cast(0 as signed) as estimatedReturnQuantity
+          from ry_business.ry_rental_order o
+          inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+          left join ry_business.ry_rental_product p on p.product_id = oi.product_id
+            and p.tenant_id = oi.tenant_id and p.member_id = oi.member_id and p.is_delete = 0
+          left join ry_business.ry_rental_merchant_package package_row on package_row.package_id = oi.package_id
+            and package_row.tenant_id = oi.tenant_id and package_row.member_id = oi.member_id
+            and package_row.is_delete = 0
+          left join (
+            select tenant_id, member_id, model_id, max(nullif(model_name, '')) as model_name,
+                   max(nullif(brand, '')) as brand
+            from ry_business.ry_rental_product
+            where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0 and model_id is not null
+            group by tenant_id, member_id, model_id
+          ) model_option on model_option.tenant_id = o.tenant_id and model_option.member_id = o.member_id
+            and model_option.model_id = coalesce(p.model_id, package_row.model_id)
+          where o.tenant_id = #{tenantId} and o.member_id = #{memberId} and o.is_delete = 0
+            and o.order_status in
+            <foreach collection="returnStatusValues" item="status" open="(" separator="," close=")">#{status}</foreach>
+            and ((o.return_due_time &gt;= current_date and o.return_due_time &lt; date_add(current_date, interval #{days} day))
+              or (o.return_due_time is null and o.lease_end_date &gt;= current_date
+                and o.lease_end_date &lt; date_add(current_date, interval #{days} day)))
+            <if test="warehouseId != null">and o.return_warehouse_id = #{warehouseId}</if>
+            <if test="!allWarehouseAccess">
+              <choose>
+                <when test="warehouseIds != null and warehouseIds.size() > 0">
+                  and o.return_warehouse_id in
+                  <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">#{allowedWarehouseId}</foreach>
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+              </choose>
+            </if>
+            <choose>
+              <when test="mode == 'package'">and oi.package_id is not null</when>
+              <otherwise>and coalesce(p.model_id, package_row.model_id) is not null</otherwise>
+            </choose>
+            <if test="mode == 'model' and modelId != null">and coalesce(p.model_id, package_row.model_id) = #{modelId}</if>
+            <if test="mode == 'model' and brand != null and brand != ''">and coalesce(nullif(p.brand, ''), model_option.brand) = #{brand}</if>
+          group by trendDate, itemId, itemName, itemBrand, itemCode
+        ), route_rows as (
+          select l.*, row_number() over (
+            partition by l.tenant_id, l.member_id, l.order_id, l.direction
+            order by l.create_time desc, l.logistics_id desc
+          ) as routeRank
+          from ry_business.ry_rental_logistics_order l
+          where l.tenant_id = #{tenantId} and l.member_id = #{memberId} and l.is_delete = 0
+        ), route_ship_rows as (
+          select date(l.pickup_time) as trendDate,
+            case when #{mode} = 'package' then oi.package_id else coalesce(p.model_id, package_row.model_id) end as itemId,
+            case when #{mode} = 'package' then package_row.package_name
+                 else coalesce(nullif(p.model_name, ''), model_option.model_name, '未命名型号') end as itemName,
+            case when #{mode} = 'package' then null else coalesce(nullif(p.brand, ''), model_option.brand) end as itemBrand,
+            case when #{mode} = 'package' then package_row.package_code else null end as itemCode,
+            cast(0 as signed) as shipQuantity, cast(0 as signed) as returnQuantity,
+            sum(coalesce(oi.quantity, 1)) as estimatedShipQuantity,
+            cast(0 as signed) as estimatedReturnQuantity
+          from route_rows l
+          inner join ry_business.ry_rental_order o on o.order_id = l.order_id
+            and o.tenant_id = l.tenant_id and o.member_id = l.member_id and o.is_delete = 0
+          inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+          left join ry_business.ry_rental_product p on p.product_id = oi.product_id
+            and p.tenant_id = oi.tenant_id and p.member_id = oi.member_id and p.is_delete = 0
+          left join ry_business.ry_rental_merchant_package package_row on package_row.package_id = oi.package_id
+            and package_row.tenant_id = oi.tenant_id and package_row.member_id = oi.member_id
+            and package_row.is_delete = 0
+          left join (
+            select tenant_id, member_id, model_id, max(nullif(model_name, '')) as model_name,
+                   max(nullif(brand, '')) as brand
+            from ry_business.ry_rental_product
+            where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0 and model_id is not null
+            group by tenant_id, member_id, model_id
+          ) model_option on model_option.tenant_id = o.tenant_id and model_option.member_id = o.member_id
+            and model_option.model_id = coalesce(p.model_id, package_row.model_id)
+          where l.routeRank = 1
+            and l.direction = 1 and l.pickup_time &gt;= current_date
+            and l.pickup_time &lt; date_add(current_date, interval #{days} day)
+            and coalesce(l.route_status, 0) not in (2, 4)
+            <if test="warehouseId != null">and coalesce(l.warehouse_id, o.warehouse_id) = #{warehouseId}</if>
+            <if test="!allWarehouseAccess">
+              <choose>
+                <when test="warehouseIds != null and warehouseIds.size() > 0">
+                  and coalesce(l.warehouse_id, o.warehouse_id) in
+                  <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">#{allowedWarehouseId}</foreach>
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+              </choose>
+            </if>
+            <choose>
+              <when test="mode == 'package'">and oi.package_id is not null</when>
+              <otherwise>and coalesce(p.model_id, package_row.model_id) is not null</otherwise>
+            </choose>
+            <if test="mode == 'model' and modelId != null">and coalesce(p.model_id, package_row.model_id) = #{modelId}</if>
+            <if test="mode == 'model' and brand != null and brand != ''">and coalesce(nullif(p.brand, ''), model_option.brand) = #{brand}</if>
+          group by trendDate, itemId, itemName, itemBrand, itemCode
+        ), route_return_rows as (
+          select date(l.estimated_arrive_time) as trendDate,
+            case when #{mode} = 'package' then oi.package_id else coalesce(p.model_id, package_row.model_id) end as itemId,
+            case when #{mode} = 'package' then package_row.package_name
+                 else coalesce(nullif(p.model_name, ''), model_option.model_name, '未命名型号') end as itemName,
+            case when #{mode} = 'package' then null else coalesce(nullif(p.brand, ''), model_option.brand) end as itemBrand,
+            case when #{mode} = 'package' then package_row.package_code else null end as itemCode,
+            cast(0 as signed) as shipQuantity, cast(0 as signed) as returnQuantity,
+            cast(0 as signed) as estimatedShipQuantity,
+            sum(coalesce(oi.quantity, 1)) as estimatedReturnQuantity
+          from route_rows l
+          inner join ry_business.ry_rental_order o on o.order_id = l.order_id
+            and o.tenant_id = l.tenant_id and o.member_id = l.member_id and o.is_delete = 0
+          inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+            and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+          left join ry_business.ry_rental_product p on p.product_id = oi.product_id
+            and p.tenant_id = oi.tenant_id and p.member_id = oi.member_id and p.is_delete = 0
+          left join ry_business.ry_rental_merchant_package package_row on package_row.package_id = oi.package_id
+            and package_row.tenant_id = oi.tenant_id and package_row.member_id = oi.member_id
+            and package_row.is_delete = 0
+          left join (
+            select tenant_id, member_id, model_id, max(nullif(model_name, '')) as model_name,
+                   max(nullif(brand, '')) as brand
+            from ry_business.ry_rental_product
+            where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0 and model_id is not null
+            group by tenant_id, member_id, model_id
+          ) model_option on model_option.tenant_id = o.tenant_id and model_option.member_id = o.member_id
+            and model_option.model_id = coalesce(p.model_id, package_row.model_id)
+          where l.routeRank = 1
+            and l.direction = 2 and l.estimated_arrive_time &gt;= current_date
+            and l.estimated_arrive_time &lt; date_add(current_date, interval #{days} day)
+            and coalesce(l.route_status, 0) not in (2, 4)
+            <if test="warehouseId != null">and coalesce(l.warehouse_id, o.return_warehouse_id) = #{warehouseId}</if>
+            <if test="!allWarehouseAccess">
+              <choose>
+                <when test="warehouseIds != null and warehouseIds.size() > 0">
+                  and coalesce(l.warehouse_id, o.return_warehouse_id) in
+                  <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">#{allowedWarehouseId}</foreach>
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+              </choose>
+            </if>
+            <choose>
+              <when test="mode == 'package'">and oi.package_id is not null</when>
+              <otherwise>and coalesce(p.model_id, package_row.model_id) is not null</otherwise>
+            </choose>
+            <if test="mode == 'model' and modelId != null">and coalesce(p.model_id, package_row.model_id) = #{modelId}</if>
+            <if test="mode == 'model' and brand != null and brand != ''">and coalesce(nullif(p.brand, ''), model_option.brand) = #{brand}</if>
+          group by trendDate, itemId, itemName, itemBrand, itemCode
+        )
+        select trendDate, itemId, itemName, itemBrand, itemCode,
+               sum(shipQuantity) as shipQuantity, sum(returnQuantity) as returnQuantity,
+               sum(estimatedShipQuantity) as estimatedShipQuantity,
+               sum(estimatedReturnQuantity) as estimatedReturnQuantity
+        from (
+          select trendDate, itemId, itemName, itemBrand, itemCode, shipQuantity, returnQuantity,
+                 estimatedShipQuantity, estimatedReturnQuantity from shipment_rows
+          union all
+          select trendDate, itemId, itemName, itemBrand, itemCode, shipQuantity, returnQuantity,
+                 estimatedShipQuantity, estimatedReturnQuantity from return_rows
+          union all
+          select trendDate, itemId, itemName, itemBrand, itemCode, shipQuantity, returnQuantity,
+                 estimatedShipQuantity, estimatedReturnQuantity from route_ship_rows
+          union all
+          select trendDate, itemId, itemName, itemBrand, itemCode, shipQuantity, returnQuantity,
+                 estimatedShipQuantity, estimatedReturnQuantity from route_return_rows
+        ) movements
+        group by trendDate, itemId, itemName, itemBrand, itemCode
+        <if test="showAll">
+          union all
+          <choose>
+            <when test="mode == 'package'">
+              select cast(null as date) as trendDate, p.package_id as itemId, p.package_name as itemName,
+                     cast(null as char) as itemBrand, p.package_code as itemCode,
+                     cast(0 as signed) as shipQuantity, cast(0 as signed) as returnQuantity,
+                     cast(0 as signed) as estimatedShipQuantity, cast(0 as signed) as estimatedReturnQuantity
+              from ry_business.ry_rental_merchant_package p
+              where p.tenant_id = #{tenantId} and p.member_id = #{memberId}
+                and p.status = 0 and p.is_delete = 0
+            </when>
+            <otherwise>
+              select cast(null as date) as trendDate, p.model_id as itemId,
+                     coalesce(max(nullif(p.model_name, '')), max(nullif(p.product_name, '')), '未命名型号') as itemName,
+                     max(nullif(p.brand, '')) as itemBrand, cast(null as char) as itemCode,
+                     cast(0 as signed) as shipQuantity, cast(0 as signed) as returnQuantity,
+                     cast(0 as signed) as estimatedShipQuantity, cast(0 as signed) as estimatedReturnQuantity
+              from ry_business.ry_rental_product p
+              where p.tenant_id = #{tenantId} and p.member_id = #{memberId}
+                and p.status = 0 and p.is_delete = 0 and p.model_id is not null
+              <if test="modelId != null">and p.model_id = #{modelId}</if>
+              <if test="brand != null and brand != ''">and p.brand = #{brand}</if>
+              group by p.model_id
+            </otherwise>
+          </choose>
+        </if>
+        order by trendDate, itemName
+    </select>
+
+    <select id="selectInboundOutboundOrders"
+            resultType="com.ruoyi.rentalbusiness.model.MerchantInboundOutboundOrderVO">
+        select max(o.order_id) as orderId,
+               max(o.order_no) as orderNo,
+               max(coalesce(nullif(o.customer_nickname, ''), nullif(o.customer_name, ''), '未填写')) as customerName,
+               max(coalesce(nullif(o.recipient_name, ''), '未填写')) as recipientName,
+               max(coalesce(nullif(o.recipient_phone, ''), '未填写')) as recipientPhone,
+               max(case when #{mode} = 'package' then package_row.package_name
+                        else coalesce(nullif(p.model_name, ''), model_option.model_name,
+                            nullif(p.product_name, ''), '未命名型号') end) as itemName,
+               max(package_row.package_name) as packageName,
+               sum(coalesce(oi.quantity, 1)) as quantity,
+               max(case when #{source} = 'estimated' then trend_warehouse.warehouse_name
+                        when #{direction} = 'return' then return_warehouse.warehouse_name
+                        else w.warehouse_name end) as warehouseName,
+               max(case
+                       when #{source} = 'estimated' and #{direction} = 'ship'
+                           then date_format(route.pickup_time, '%Y-%m-%d %H:%i:%s')
+                       when #{source} = 'estimated' and #{direction} = 'return'
+                           then date_format(route.estimated_arrive_time, '%Y-%m-%d %H:%i:%s')
+                       when #{direction} = 'return'
+                           then date_format(coalesce(o.return_due_time, o.lease_end_date), '%Y-%m-%d %H:%i:%s')
+                       else date_format(coalesce(o.ship_due_time, o.lease_start_date), '%Y-%m-%d %H:%i:%s')
+                   end) as trendTime,
+               max(o.order_status) as orderStatus
+        from ry_business.ry_rental_order o
+        inner join ry_business.ry_rental_order_item oi
+          on oi.order_id = o.order_id and oi.tenant_id = o.tenant_id
+         and oi.member_id = o.member_id and oi.is_delete = 0
+        left join ry_business.ry_rental_product p
+          on p.product_id = oi.product_id and p.tenant_id = oi.tenant_id
+         and p.member_id = oi.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_merchant_package package_row
+          on package_row.package_id = oi.package_id and package_row.tenant_id = oi.tenant_id
+         and package_row.member_id = oi.member_id and package_row.is_delete = 0
+        left join (
+            select tenant_id, member_id, model_id, max(nullif(model_name, '')) as model_name
+            from ry_business.ry_rental_product
+            where tenant_id = #{tenantId} and member_id = #{memberId}
+              and is_delete = 0 and model_id is not null
+            group by tenant_id, member_id, model_id
+        ) model_option
+          on model_option.tenant_id = o.tenant_id and model_option.member_id = o.member_id
+         and model_option.model_id = coalesce(p.model_id, package_row.model_id)
+        left join ry_business.ry_rental_logistics_order route
+          on route.tenant_id = o.tenant_id and route.member_id = o.member_id
+         and route.order_id = o.order_id and route.is_delete = 0
+         and route.direction = case when #{direction} = 'ship' then 1 else 2 end
+         and route.logistics_id = (
+             select latest_route.logistics_id
+             from ry_business.ry_rental_logistics_order latest_route
+             where latest_route.tenant_id = o.tenant_id
+               and latest_route.member_id = o.member_id
+               and latest_route.order_id = o.order_id
+               and latest_route.direction = route.direction
+               and latest_route.is_delete = 0
+             order by latest_route.create_time desc, latest_route.logistics_id desc
+             limit 1
+         )
+        left join ry_business.ry_rental_warehouse w
+          on w.warehouse_id = o.warehouse_id and w.tenant_id = o.tenant_id
+         and w.member_id = o.member_id and w.is_delete = 0
+        left join ry_business.ry_rental_warehouse return_warehouse
+          on return_warehouse.warehouse_id = o.return_warehouse_id
+         and return_warehouse.tenant_id = o.tenant_id and return_warehouse.member_id = o.member_id
+         and return_warehouse.is_delete = 0
+        left join ry_business.ry_rental_warehouse trend_warehouse
+          on trend_warehouse.warehouse_id = coalesce(route.warehouse_id,
+              case when #{direction} = 'return' then o.return_warehouse_id else o.warehouse_id end)
+         and trend_warehouse.tenant_id = o.tenant_id and trend_warehouse.member_id = o.member_id
+         and trend_warehouse.is_delete = 0
+        where o.tenant_id = #{tenantId} and o.member_id = #{memberId} and o.is_delete = 0
+        <choose>
+            <when test="source == 'estimated' and direction == 'ship'">
+                and route.pickup_time &gt;= #{trendDate}
+                and route.pickup_time &lt; date_add(#{trendDate}, interval 1 day)
+                and coalesce(route.route_status, 0) not in (2, 4)
+            </when>
+            <when test="source == 'estimated' and direction == 'return'">
+                and route.estimated_arrive_time &gt;= #{trendDate}
+                and route.estimated_arrive_time &lt; date_add(#{trendDate}, interval 1 day)
+                and coalesce(route.route_status, 0) not in (2, 4)
+            </when>
+            <when test="direction == 'return'">
+                and coalesce(o.return_due_time, o.lease_end_date) &gt;= #{trendDate}
+                and coalesce(o.return_due_time, o.lease_end_date) &lt; date_add(#{trendDate}, interval 1 day)
+                and o.order_status in
+                <foreach collection="returnStatusValues" item="status" open="(" separator="," close=")">
+                    #{status}
+                </foreach>
+            </when>
+            <otherwise>
+                and coalesce(o.ship_due_time, o.lease_start_date) &gt;= #{trendDate}
+                and coalesce(o.ship_due_time, o.lease_start_date) &lt; date_add(#{trendDate}, interval 1 day)
+                and o.order_status in
+                <foreach collection="shipmentStatusValues" item="status" open="(" separator="," close=")">
+                    #{status}
+                </foreach>
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="mode == 'package'">
+                and oi.package_id = #{itemId}
+            </when>
+            <otherwise>
+                and coalesce(p.model_id, package_row.model_id) = #{itemId}
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="direction == 'return' and source == 'estimated'">
+                <if test="warehouseId != null">and coalesce(route.warehouse_id, o.return_warehouse_id) = #{warehouseId}</if>
+                <if test="!allWarehouseAccess">
+                    <choose>
+                        <when test="warehouseIds != null and warehouseIds.size() > 0">
+                            and coalesce(route.warehouse_id, o.return_warehouse_id) in
+                            <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">
+                                #{allowedWarehouseId}
+                            </foreach>
+                        </when>
+                        <otherwise>and 1 = 0</otherwise>
+                    </choose>
+                </if>
+            </when>
+            <when test="direction == 'return'">
+                <if test="warehouseId != null">and o.return_warehouse_id = #{warehouseId}</if>
+                <if test="!allWarehouseAccess">
+                    <choose>
+                        <when test="warehouseIds != null and warehouseIds.size() > 0">
+                            and o.return_warehouse_id in
+                            <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">
+                                #{allowedWarehouseId}
+                            </foreach>
+                        </when>
+                        <otherwise>and 1 = 0</otherwise>
+                    </choose>
+                </if>
+            </when>
+            <when test="source == 'estimated'">
+                <if test="warehouseId != null">and coalesce(route.warehouse_id, o.warehouse_id) = #{warehouseId}</if>
+                <if test="!allWarehouseAccess">
+                    <choose>
+                        <when test="warehouseIds != null and warehouseIds.size() > 0">
+                            and coalesce(route.warehouse_id, o.warehouse_id) in
+                            <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">
+                                #{allowedWarehouseId}
+                            </foreach>
+                        </when>
+                        <otherwise>and 1 = 0</otherwise>
+                    </choose>
+                </if>
+            </when>
+            <otherwise>
+                <if test="warehouseId != null">and o.warehouse_id = #{warehouseId}</if>
+                <if test="!allWarehouseAccess">
+                    <choose>
+                        <when test="warehouseIds != null and warehouseIds.size() > 0">
+                            and o.warehouse_id in
+                            <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">
+                                #{allowedWarehouseId}
+                            </foreach>
+                        </when>
+                        <otherwise>and 1 = 0</otherwise>
+                    </choose>
+                </if>
+            </otherwise>
+        </choose>
+        group by o.order_id
+        order by trendTime asc, orderNo asc
+    </select>
+
+    <select id="countPendingShipOrders" resultType="long">
+        select count(distinct o.order_id)
+        from ry_business.ry_rental_order o
+        inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+          and oi.tenant_id = o.tenant_id and oi.member_id = o.member_id and oi.is_delete = 0
+        left join ry_business.ry_rental_product p on p.product_id = oi.product_id
+          and p.tenant_id = oi.tenant_id and p.member_id = oi.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_merchant_package package_row on package_row.package_id = oi.package_id
+          and package_row.tenant_id = oi.tenant_id and package_row.member_id = oi.member_id
+          and package_row.is_delete = 0
+        left join (
+          select tenant_id, member_id, model_id, max(nullif(model_name, '')) as model_name,
+                 max(nullif(brand, '')) as brand
+          from ry_business.ry_rental_product
+          where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0 and model_id is not null
+          group by tenant_id, member_id, model_id
+        ) model_option on model_option.tenant_id = o.tenant_id and model_option.member_id = o.member_id
+          and model_option.model_id = coalesce(p.model_id, package_row.model_id)
+        where o.tenant_id = #{tenantId} and o.member_id = #{memberId} and o.is_delete = 0
+          and o.order_status in
+          <foreach collection="shipmentStatusValues" item="status" open="(" separator="," close=")">#{status}</foreach>
+          <if test="warehouseId != null">and o.warehouse_id = #{warehouseId}</if>
+          <if test="!allWarehouseAccess">
+            <choose>
+              <when test="warehouseIds != null and warehouseIds.size() > 0">
+                and o.warehouse_id in
+                <foreach collection="warehouseIds" item="allowedWarehouseId" open="(" separator="," close=")">#{allowedWarehouseId}</foreach>
+              </when>
+              <otherwise>and 1 = 0</otherwise>
+            </choose>
+          </if>
+          <choose>
+            <when test="mode == 'package'">and oi.package_id is not null</when>
+            <otherwise>and coalesce(p.model_id, package_row.model_id) is not null</otherwise>
+          </choose>
+          <if test="mode == 'model' and modelId != null">and coalesce(p.model_id, package_row.model_id) = #{modelId}</if>
+          <if test="mode == 'model' and brand != null and brand != ''">and coalesce(nullif(p.brand, ''), model_option.brand) = #{brand}</if>
+    </select>
+
+    <select id="selectUnits" resultType="map">
+        select u.unit_id as unitId, u.inventory_id as inventoryId, u.product_id as productId,
+               u.warehouse_id as warehouseId, u.model_id as modelId, u.unit_code as unitCode,
+               u.serial_number as serialNumber,
+               u.unit_status as unitStatus, u.condition_level as conditionLevel,
+               u.memory_spec as memorySpec, u.purchase_cost as purchaseCost,
+               date_format(u.insurance_until, '%Y-%m-%d') as insuranceUntil,
+               u.insurance_amount as insuranceAmount, u.serial_photo_url as serialPhotoUrl,
+               u.market_verified_flag as marketVerifiedFlag,
+               date_format(u.market_verified_time, '%Y-%m-%d %H:%i:%s') as marketVerifiedTime, u.remark,
+               u.source_batch_id as sourceBatchId, p.product_name as productName, p.model_name as modelName,
+               w.warehouse_name as warehouseName,
+               case when exists (
+                   select 1
+                   from ry_business.ry_rental_merchant_inventory_reservation_unit ru
+                   inner join ry_business.ry_rental_merchant_inventory_reservation r
+                     on r.reservation_id = ru.reservation_id
+                    and r.tenant_id = u.tenant_id and r.member_id = u.member_id
+                    and r.order_id is not null
+                   where ru.unit_id = u.unit_id and ru.is_delete = 0 and r.is_delete = 0
+               ) or exists (
+                   select 1
+                   from ry_business.ry_rental_order_item oi
+                   where oi.tenant_id = u.tenant_id and oi.member_id = u.member_id
+                     and oi.sn_id = u.unit_id and oi.is_delete = 0
+               ) or exists (
+                   select 1
+                   from ry_business.ry_rental_order o
+                   where o.tenant_id = u.tenant_id and o.member_id = u.member_id
+                     and o.is_delete = 0
+                     and json_search(coalesce(o.package_details_json, json_object()),
+                         'one', cast(u.unit_id as char), null, '$.items[*].unitIds[*]') is not null
+               ) then 1 else 0 end as orderAssociated
+        from ry_business.ry_rental_merchant_inventory_unit u
+        left join ry_business.ry_rental_product p on p.product_id = u.product_id
+          and p.tenant_id = u.tenant_id and p.member_id = u.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = u.warehouse_id
+          and w.tenant_id = u.tenant_id and w.member_id = u.member_id and w.is_delete = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId} and u.is_delete = 0
+        <if test="inventoryId != null">and u.inventory_id = #{inventoryId}</if>
+        <if test="productId != null">and u.product_id = #{productId}</if>
+        <if test="warehouseId != null">and u.warehouse_id = #{warehouseId}</if>
+        <if test="keyword != null and keyword != ''">
+            and (u.unit_code like concat('%', #{keyword}, '%')
+                 or u.serial_number like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="unitStatus != null">and u.unit_status = #{unitStatus}</if>
+        <if test="transferableOnly">
+            and not (
+                exists (
+                    select 1
+                    from ry_business.ry_rental_merchant_inventory_reservation_unit ru
+                    inner join ry_business.ry_rental_merchant_inventory_reservation r
+                      on r.reservation_id = ru.reservation_id
+                     and r.tenant_id = u.tenant_id and r.member_id = u.member_id
+                     and r.order_id is not null
+                    where ru.unit_id = u.unit_id and ru.is_delete = 0 and r.is_delete = 0
+                ) or exists (
+                    select 1 from ry_business.ry_rental_order_item oi
+                    where oi.tenant_id = u.tenant_id and oi.member_id = u.member_id
+                      and oi.sn_id = u.unit_id and oi.is_delete = 0
+                ) or exists (
+                    select 1 from ry_business.ry_rental_order o
+                    where o.tenant_id = u.tenant_id and o.member_id = u.member_id
+                      and o.is_delete = 0
+                      and json_search(coalesce(o.package_details_json, json_object()),
+                          'one', cast(u.unit_id as char), null, '$.items[*].unitIds[*]') is not null
+                )
+            )
+        </if>
+        order by u.unit_id desc
+    </select>
+
+    <select id="selectQuantityReservationOrders" resultType="map">
+        select coalesce(nullif(o.order_no, ''), nullif(r.external_order_no, ''), r.reservation_no) as orderNo,
+               coalesce(nullif(o.customer_name, ''), '外部预占') as customerName,
+               coalesce(nullif(o.recipient_name, ''), nullif(o.customer_name, ''), '-') as recipientName,
+               q.quantity,
+               o.order_status as orderStatus,
+               date_format(r.create_time, '%Y-%m-%d %H:%i:%s') as reservedTime
+        from ry_business.ry_rental_merchant_inventory_reservation_quantity q
+        inner join ry_business.ry_rental_merchant_inventory_reservation r
+          on r.reservation_id = q.reservation_id
+         and r.tenant_id = #{tenantId} and r.member_id = #{memberId}
+         and r.reservation_status = 1 and r.is_delete = 0
+        left join ry_business.ry_rental_order o
+          on o.order_id = r.order_id
+         and o.tenant_id = r.tenant_id and o.member_id = r.member_id and o.is_delete = 0
+        where q.inventory_id = #{inventoryId} and q.quantity_status = 1 and q.is_delete = 0
+        order by r.create_time desc, r.reservation_id desc
+    </select>
+
+    <select id="selectMarketEligibleUnits" resultType="map">
+        select u.unit_id as unitId, u.unit_code as unitCode, u.serial_number as serialNumber,
+               p.brand, p.model_name as modelName, u.memory_spec as memorySpec,
+               u.condition_level as conditionLevel, w.warehouse_name as warehouseName
+        from ry_business.ry_rental_merchant_inventory_unit u
+        inner join ry_business.ry_rental_product p on p.product_id = u.product_id
+          and p.tenant_id = u.tenant_id and p.member_id = u.member_id and p.is_delete = 0
+          and p.status = 0
+        inner join ry_business.ry_rental_warehouse w on w.warehouse_id = u.warehouse_id
+          and w.tenant_id = u.tenant_id and w.member_id = u.member_id and w.is_delete = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+          and u.unit_status = 1 and u.market_verified_flag = 1
+          and u.serial_photo_url is not null and u.serial_photo_url &lt;&gt; ''
+          and u.is_delete = 0
+        <if test="brand != null and brand != ''">and p.brand = #{brand}</if>
+        <if test="modelName != null and modelName != ''">and p.model_name = #{modelName}</if>
+        <choose>
+            <when test="memorySpec != null and memorySpec != ''">and coalesce(u.memory_spec, '') = #{memorySpec}</when>
+            <otherwise>and coalesce(u.memory_spec, '') = ''</otherwise>
+        </choose>
+        <if test="unitIds != null and unitIds.size() > 0">
+            and u.unit_id in
+            <foreach collection="unitIds" item="unitId" open="(" separator="," close=")">#{unitId}</foreach>
+        </if>
+        order by u.unit_id desc
+    </select>
+
+    <select id="selectProduct" resultType="map">
+        select product_id as productId, model_id as modelId, stock_mode as stockMode,
+               product_code as productCode, product_name as productName,
+               product_type as productType, model_name as modelName
+        from ry_business.ry_rental_product
+        where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId} and is_delete = 0
+    </select>
+
+    <select id="selectWarehouse" resultType="map">
+        select warehouse_id as warehouseId, warehouse_name as warehouseName
+        from ry_business.ry_rental_warehouse
+        where tenant_id = #{tenantId} and member_id = #{memberId} and warehouse_id = #{warehouseId} and is_delete = 0
+    </select>
+
+    <select id="countSerialNumbers" resultType="int">
+        select count(1) from ry_business.ry_rental_merchant_inventory_unit
+        where member_id = #{memberId} and is_delete = 0
+          and (serial_number in
+        <foreach collection="serialNumbers" item="serialNumber" open="(" separator="," close=")">#{serialNumber}</foreach>
+          or (serial_number is null and unit_code in
+        <foreach collection="serialNumbers" item="serialNumber" open="(" separator="," close=")">#{serialNumber}</foreach>))
+    </select>
+
+    <select id="selectBatchByIdempotency" resultType="map">
+        select batch_id as batchId, batch_no as batchNo, total_quantity as totalQuantity,
+               success_quantity as successQuantity, failed_quantity as failedQuantity, batch_status as batchStatus,
+               idempotency_key as idempotencyKey, create_time as createTime
+        from ry_business.ry_rental_merchant_inventory_batch
+        where member_id = #{memberId} and idempotency_key = #{idempotencyKey} and is_delete = 0
+    </select>
+
+    <insert id="insertBatch">
+        insert into ry_business.ry_rental_merchant_inventory_batch
+        (tenant_id, member_id, warehouse_id, product_id, model_id, batch_no, total_quantity, idempotency_key, create_by, update_by, remark)
+        values (#{tenantId}, #{memberId}, #{warehouseId}, #{productId}, #{modelId}, #{batchNo}, #{totalQuantity}, #{idempotencyKey}, #{operator}, #{operator}, #{remark})
+    </insert>
+
+    <insert id="insertBatchItem">
+        insert into ry_business.ry_rental_merchant_inventory_batch_item
+        (batch_id, member_id, serial_number, unit_id, create_by)
+        values (#{batchId}, #{memberId}, #{serialNumber}, last_insert_id(), #{operator})
+    </insert>
+
+    <insert id="insertInventory">
+        insert into ry_business.ry_rental_merchant_inventory
+        (tenant_id, member_id, warehouse_id, product_id, model_id, inventory_type, stock_mode, create_by, update_by)
+        values (#{tenantId}, #{memberId}, #{warehouseId}, #{productId}, #{modelId}, 1, 1, #{operator}, #{operator})
+        on duplicate key update update_by = values(update_by), is_delete = 0
+    </insert>
+
+    <insert id="insertQuantityInventory">
+        insert into ry_business.ry_rental_merchant_inventory
+        (tenant_id, member_id, warehouse_id, product_id, model_id, inventory_type, stock_mode,
+         total_quantity, available_quantity, create_by, update_by)
+        values (#{tenantId}, #{memberId}, #{warehouseId}, #{productId}, #{modelId}, 1, 2,
+                #{quantity}, #{quantity}, #{operator}, #{operator})
+    </insert>
+
+    <select id="selectInventoryByScope" resultType="map">
+        select inventory_id as inventoryId from ry_business.ry_rental_merchant_inventory
+        where member_id = #{memberId} and warehouse_id = #{warehouseId} and product_id = #{productId} and is_delete = 0
+    </select>
+
+    <insert id="insertUnit">
+        insert into ry_business.ry_rental_merchant_inventory_unit
+        (inventory_id, tenant_id, member_id, warehouse_id, product_id, model_id, unit_code, serial_number,
+         unit_status, source_batch_id, create_by, update_by)
+        values (#{inventoryId}, #{tenantId}, #{memberId}, #{warehouseId}, #{productId}, #{modelId}, #{unitCode},
+                #{serialNumber}, 1, #{batchId}, #{operator}, #{operator})
+    </insert>
+
+    <update id="refreshInventoryCounts">
+        update ry_business.ry_rental_merchant_inventory i
+        set total_quantity = (select count(1) from ry_business.ry_rental_merchant_inventory_unit u where u.inventory_id = i.inventory_id and u.is_delete = 0),
+            available_quantity = (select count(1) from ry_business.ry_rental_merchant_inventory_unit u where u.inventory_id = i.inventory_id and u.unit_status = 1 and u.is_delete = 0),
+            reserved_quantity = (select count(1) from ry_business.ry_rental_merchant_inventory_unit u where u.inventory_id = i.inventory_id and u.unit_status = 2 and u.is_delete = 0),
+            rented_quantity = (select count(1) from ry_business.ry_rental_merchant_inventory_unit u where u.inventory_id = i.inventory_id and u.unit_status = 3 and u.is_delete = 0),
+            repairing_quantity = (select count(1) from ry_business.ry_rental_merchant_inventory_unit u where u.inventory_id = i.inventory_id and u.unit_status = 4 and u.is_delete = 0),
+            damaged_quantity = (select count(1) from ry_business.ry_rental_merchant_inventory_unit u where u.inventory_id = i.inventory_id and u.unit_status in (5, 6) and u.is_delete = 0),
+            update_by = #{operator}, version = version + 1, external_sync_version = external_sync_version + 1
+        where inventory_id = #{inventoryId} and is_delete = 0
+    </update>
+
+    <update id="updateInventoryPolicy">
+        update ry_business.ry_rental_merchant_inventory
+        set stock_protection_qty = #{stockProtectionQty}, calculation_mode = #{calculationMode},
+            calculation_percent = #{calculationPercent}, update_by = #{operator}, update_time = now(),
+            version = version + 1, external_sync_version = external_sync_version + 1
+        where tenant_id = #{tenantId} and member_id = #{memberId} and inventory_id = #{inventoryId} and is_delete = 0
+    </update>
+
+    <update id="updateBatch">
+        update ry_business.ry_rental_merchant_inventory_batch
+        set success_quantity = #{successQuantity}, failed_quantity = #{failedQuantity}, batch_status = #{status}, update_by = #{operator}
+        where batch_id = #{batchId} and is_delete = 0
+    </update>
+
+    <select id="selectReservationByKeyForUpdate" resultType="map">
+        select reservation_id as reservationId, order_id as orderId, package_id as packageId,
+               package_version_id as packageVersionId, warehouse_id as warehouseId,
+               reservation_no as reservationNo, reservation_status as reservationStatus,
+               reservation_source as reservationSource, external_token_id as externalTokenId,
+               external_order_no as externalOrderNo, external_product_id as externalProductId,
+               external_quantity as externalQuantity, external_payload_hash as externalPayloadHash,
+               expire_time as expireTime, idempotency_key as idempotencyKey, remark
+        from ry_business.ry_rental_merchant_inventory_reservation
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and idempotency_key = #{idempotencyKey} and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <select id="selectReservationForUpdate" resultType="map">
+        select reservation_id as reservationId, order_id as orderId, package_id as packageId,
+               package_version_id as packageVersionId, warehouse_id as warehouseId,
+               reservation_no as reservationNo, reservation_status as reservationStatus,
+               reservation_source as reservationSource, external_token_id as externalTokenId,
+               external_order_no as externalOrderNo, external_product_id as externalProductId,
+               external_quantity as externalQuantity, external_payload_hash as externalPayloadHash,
+               expire_time as expireTime, idempotency_key as idempotencyKey, remark
+        from ry_business.ry_rental_merchant_inventory_reservation
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and reservation_id = #{reservationId} and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <select id="selectReservationByNoForUpdate" resultType="map">
+        select reservation_id as reservationId, order_id as orderId, package_id as packageId,
+               package_version_id as packageVersionId, warehouse_id as warehouseId,
+               reservation_no as reservationNo, reservation_status as reservationStatus,
+               reservation_source as reservationSource, external_token_id as externalTokenId,
+               external_order_no as externalOrderNo, external_product_id as externalProductId,
+               external_quantity as externalQuantity, external_payload_hash as externalPayloadHash,
+               expire_time as expireTime, idempotency_key as idempotencyKey, remark
+        from ry_business.ry_rental_merchant_inventory_reservation
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and reservation_no = #{reservationNo} and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <update id="bindExternalReservationOrder">
+        update ry_business.ry_rental_merchant_inventory_reservation
+        set order_id = #{orderId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and reservation_id = #{reservationId} and reservation_source = 2
+          and external_token_id = #{tokenId} and external_order_no = #{externalOrderNo}
+          and reservation_status = 1 and order_id is null and is_delete = 0
+    </update>
+
+    <select id="selectActiveReservationsByOrderForUpdate" resultType="map">
+        select reservation_id as reservationId, order_id as orderId, package_id as packageId,
+               package_version_id as packageVersionId, warehouse_id as warehouseId,
+               reservation_no as reservationNo, reservation_status as reservationStatus,
+               reservation_source as reservationSource, external_token_id as externalTokenId,
+               external_order_no as externalOrderNo, external_product_id as externalProductId,
+               external_quantity as externalQuantity, external_payload_hash as externalPayloadHash,
+               expire_time as expireTime, idempotency_key as idempotencyKey, remark
+        from ry_business.ry_rental_merchant_inventory_reservation
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and order_id = #{orderId} and reservation_status = 1 and is_delete = 0
+        order by reservation_id
+        for update
+    </select>
+
+    <select id="selectExpiredExternalReservationsForUpdate" resultType="map">
+        select reservation_id as reservationId, tenant_id as tenantId, member_id as memberId,
+               order_id as orderId, package_id as packageId, package_version_id as packageVersionId,
+               warehouse_id as warehouseId, reservation_no as reservationNo,
+               reservation_status as reservationStatus, reservation_source as reservationSource,
+               external_token_id as externalTokenId, external_order_no as externalOrderNo,
+               external_product_id as externalProductId, external_quantity as externalQuantity,
+               external_payload_hash as externalPayloadHash, expire_time as expireTime,
+               idempotency_key as idempotencyKey, remark
+        from ry_business.ry_rental_merchant_inventory_reservation
+        where reservation_source = 2 and reservation_status = 1
+          and expire_time is not null and expire_time &lt;= now() and is_delete = 0
+        order by reservation_id
+        limit #{limit}
+        for update
+    </select>
+
+    <select id="selectReservationUnits" resultType="map">
+        select reservation_unit_id as reservationUnitId, inventory_id as inventoryId,
+               unit_id as unitId, quantity, unit_status as unitStatus
+        from ry_business.ry_rental_merchant_inventory_reservation_unit
+        where reservation_id = #{reservationId} and is_delete = 0
+        order by reservation_unit_id
+    </select>
+
+    <select id="selectReservationQuantities" resultType="map">
+        select reservation_quantity_id as reservationQuantityId,
+               inventory_id as inventoryId, product_id as productId,
+               quantity, quantity_status as unitStatus
+        from ry_business.ry_rental_merchant_inventory_reservation_quantity
+        where reservation_id = #{reservationId} and is_delete = 0
+        order by reservation_quantity_id
+    </select>
+
+    <select id="selectAvailableUnitsForUpdate" resultType="map">
+        select unit_id as unitId, inventory_id as inventoryId, product_id as productId,
+               warehouse_id as warehouseId, unit_code as unitCode, serial_number as serialNumber
+        from ry_business.ry_rental_merchant_inventory_unit
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and product_id = #{productId} and warehouse_id = #{warehouseId}
+          and unit_status = 1 and is_delete = 0
+        order by unit_id
+        limit #{quantity}
+        for update
+    </select>
+
+    <select id="selectOrderPackageDeviceOptions" resultType="map">
+        select u.unit_id as unitId, u.unit_code as unitCode, u.serial_number as serialNumber,
+               p.product_name as productName, p.model_name as modelName,
+               w.warehouse_name as warehouseName
+        from ry_business.ry_rental_merchant_inventory_unit u
+        inner join ry_business.ry_rental_product p
+          on p.tenant_id = u.tenant_id and p.member_id = u.member_id
+         and p.product_id = u.product_id and p.is_delete = 0 and p.status = 0
+        inner join ry_business.ry_rental_warehouse w
+          on w.tenant_id = u.tenant_id and w.member_id = u.member_id
+         and w.warehouse_id = u.warehouse_id and w.is_delete = 0 and w.status = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+          and u.product_id = #{productId} and u.warehouse_id = #{warehouseId}
+          and u.is_delete = 0
+          and (u.unit_status = 1 or exists (
+              select 1
+              from ry_business.ry_rental_merchant_inventory_reservation_unit own_ru
+              inner join ry_business.ry_rental_merchant_inventory_reservation own_r
+                on own_r.reservation_id = own_ru.reservation_id
+               and own_r.tenant_id = u.tenant_id and own_r.member_id = u.member_id
+               and own_r.order_id = #{orderId} and own_r.reservation_status = 1
+               and own_r.is_delete = 0
+              where own_ru.unit_id = u.unit_id and own_ru.is_delete = 0
+          ))
+          and not exists (
+              select 1
+              from ry_business.ry_rental_merchant_inventory_reservation_unit other_ru
+              inner join ry_business.ry_rental_merchant_inventory_reservation other_r
+                on other_r.reservation_id = other_ru.reservation_id
+               and other_r.tenant_id = u.tenant_id and other_r.member_id = u.member_id
+               and other_r.order_id is not null and other_r.order_id &lt;&gt; #{orderId}
+               and other_r.reservation_status = 1 and other_r.is_delete = 0
+              where other_ru.unit_id = u.unit_id and other_ru.is_delete = 0
+          )
+          and not exists (
+              select 1
+              from ry_business.ry_rental_order_item other_oi
+              where other_oi.tenant_id = u.tenant_id and other_oi.member_id = u.member_id
+                and other_oi.order_id &lt;&gt; #{orderId}
+                and other_oi.sn_id = u.unit_id and other_oi.is_delete = 0
+          )
+          and not exists (
+              select 1
+              from ry_business.ry_rental_order other_o
+              where other_o.tenant_id = u.tenant_id and other_o.member_id = u.member_id
+                and other_o.order_id &lt;&gt; #{orderId} and other_o.is_delete = 0
+                and json_search(coalesce(other_o.package_details_json, json_object()),
+                    'one', cast(u.unit_id as char), null, '$.items[*].unitIds[*]') is not null
+          )
+        order by u.unit_id
+    </select>
+
+    <select id="selectOrderPackageDeviceOptionsForUpdate" resultType="map">
+        select u.unit_id as unitId, u.unit_code as unitCode, u.serial_number as serialNumber,
+               p.product_name as productName, p.model_name as modelName,
+               w.warehouse_name as warehouseName
+        from ry_business.ry_rental_merchant_inventory_unit u
+        inner join ry_business.ry_rental_product p
+          on p.tenant_id = u.tenant_id and p.member_id = u.member_id
+         and p.product_id = u.product_id and p.is_delete = 0 and p.status = 0
+        inner join ry_business.ry_rental_warehouse w
+          on w.tenant_id = u.tenant_id and w.member_id = u.member_id
+         and w.warehouse_id = u.warehouse_id and w.is_delete = 0 and w.status = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+          and u.product_id = #{productId} and u.warehouse_id = #{warehouseId}
+          and u.is_delete = 0
+          and u.unit_id in
+        <foreach collection="unitIds" item="unitId" open="(" separator="," close=")">#{unitId}</foreach>
+          and (u.unit_status = 1 or exists (
+              select 1
+              from ry_business.ry_rental_merchant_inventory_reservation_unit own_ru
+              inner join ry_business.ry_rental_merchant_inventory_reservation own_r
+                on own_r.reservation_id = own_ru.reservation_id
+               and own_r.tenant_id = u.tenant_id and own_r.member_id = u.member_id
+               and own_r.order_id = #{orderId} and own_r.reservation_status = 1
+               and own_r.is_delete = 0
+              where own_ru.unit_id = u.unit_id and own_ru.is_delete = 0
+          ))
+          and not exists (
+              select 1
+              from ry_business.ry_rental_merchant_inventory_reservation_unit other_ru
+              inner join ry_business.ry_rental_merchant_inventory_reservation other_r
+                on other_r.reservation_id = other_ru.reservation_id
+               and other_r.tenant_id = u.tenant_id and other_r.member_id = u.member_id
+               and other_r.order_id is not null and other_r.order_id &lt;&gt; #{orderId}
+               and other_r.reservation_status = 1 and other_r.is_delete = 0
+              where other_ru.unit_id = u.unit_id and other_ru.is_delete = 0
+          )
+          and not exists (
+              select 1
+              from ry_business.ry_rental_order_item other_oi
+              where other_oi.tenant_id = u.tenant_id and other_oi.member_id = u.member_id
+                and other_oi.order_id &lt;&gt; #{orderId}
+                and other_oi.sn_id = u.unit_id and other_oi.is_delete = 0
+          )
+          and not exists (
+              select 1
+              from ry_business.ry_rental_order other_o
+              where other_o.tenant_id = u.tenant_id and other_o.member_id = u.member_id
+                and other_o.order_id &lt;&gt; #{orderId} and other_o.is_delete = 0
+                and json_search(coalesce(other_o.package_details_json, json_object()),
+                    'one', cast(u.unit_id as char), null, '$.items[*].unitIds[*]') is not null
+          )
+        order by u.unit_id
+        for update
+    </select>
+
+    <select id="selectInventoryForUpdate" resultType="map">
+        select inventory_id as inventoryId, product_id as productId, stock_mode as stockMode,
+               available_quantity as availableQuantity
+        from ry_business.ry_rental_merchant_inventory
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and product_id = #{productId} and warehouse_id = #{warehouseId}
+          and status = 0 and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <update id="reserveQuantity">
+        update ry_business.ry_rental_merchant_inventory
+        set available_quantity = available_quantity - #{quantity},
+            reserved_quantity = reserved_quantity + #{quantity},
+            update_by = #{operator}, update_time = now(), version = version + 1
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and inventory_id = #{inventoryId} and stock_mode = 2
+          and status = 0 and is_delete = 0 and available_quantity &gt;= #{quantity}
+    </update>
+
+    <update id="releaseQuantity">
+        update ry_business.ry_rental_merchant_inventory
+        set available_quantity = available_quantity + #{quantity},
+            reserved_quantity = reserved_quantity - #{quantity},
+            update_by = #{operator}, update_time = now(), version = version + 1
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and inventory_id = #{inventoryId} and stock_mode = 2
+          and status = 0 and is_delete = 0 and reserved_quantity &gt;= #{quantity}
+    </update>
+
+    <update id="consumeQuantity">
+        update ry_business.ry_rental_merchant_inventory
+        set reserved_quantity = reserved_quantity - #{quantity},
+            rented_quantity = rented_quantity + #{quantity},
+            update_by = #{operator}, update_time = now(), version = version + 1
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and inventory_id = #{inventoryId} and stock_mode = 2
+          and status = 0 and is_delete = 0 and reserved_quantity &gt;= #{quantity}
+    </update>
+
+    <select id="selectUnitForUpdate" resultType="map">
+        select unit_id as unitId, inventory_id as inventoryId, product_id as productId,
+               warehouse_id as warehouseId, model_id as modelId, unit_code as unitCode, serial_number as serialNumber,
+               unit_status as unitStatus, condition_level as conditionLevel, memory_spec as memorySpec,
+               purchase_cost as purchaseCost, date_format(insurance_until, '%Y-%m-%d') as insuranceUntil,
+               insurance_amount as insuranceAmount, remark
+        from ry_business.ry_rental_merchant_inventory_unit
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+        <choose>
+            <when test="unitId != null">and unit_id = #{unitId}</when>
+            <otherwise>and (unit_code = #{unitCode} or serial_number = #{unitCode})</otherwise>
+        </choose>
+        limit 1 for update
+    </select>
+
+    <update id="updateUnitWarehouse">
+        update ry_business.ry_rental_merchant_inventory_unit
+        set inventory_id = #{targetInventoryId}, warehouse_id = #{targetWarehouseId},
+            update_by = #{operator}, update_time = now(), version = version + 1
+        where tenant_id = #{tenantId} and member_id = #{memberId} and unit_id = #{unitId}
+          and inventory_id = #{sourceInventoryId} and warehouse_id = #{sourceWarehouseId}
+          and unit_status = 1 and is_delete = 0
+    </update>
+
+    <insert id="insertTransferOrder">
+        insert into ry_business.ry_rental_transfer_order
+            (tenant_id, member_id, transfer_no, from_warehouse_id, to_warehouse_id, ref_order_id,
+             carrier, tracking_no, sn_ids, transfer_status, create_by, create_time,
+             update_by, update_time, remark, is_delete)
+        values
+            (#{tenantId}, #{memberId}, #{transferNo}, #{fromWarehouseId}, #{toWarehouseId}, null,
+             null, null, json_array(#{unitId}), #{transferStatus}, #{operator}, now(),
+             #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <select id="selectVerificationUnit" resultType="map">
+        select u.unit_id as unitId, u.inventory_id as inventoryId, u.product_id as productId,
+               u.warehouse_id as warehouseId, u.unit_code as unitCode, u.serial_number as serialNumber,
+               u.unit_status as unitStatus, i.available_quantity as availableQuantity,
+               p.product_name as productName, p.model_name as modelName,
+               p.product_code as productCode, p.product_type as productType, p.stock_mode as stockMode,
+               w.warehouse_name as warehouseName,
+        <choose>
+            <when test="orderId != null">
+                case when exists (
+                    select 1
+                    from ry_business.ry_rental_merchant_inventory_reservation_unit own_ru
+                    inner join ry_business.ry_rental_merchant_inventory_reservation own_r
+                      on own_r.reservation_id = own_ru.reservation_id
+                     and own_r.tenant_id = u.tenant_id and own_r.member_id = u.member_id
+                     and own_r.order_id = #{orderId} and own_r.reservation_status = 1
+                     and own_r.is_delete = 0
+                    where own_ru.unit_id = u.unit_id and own_ru.is_delete = 0
+                ) then 1 else 0 end
+            </when>
+            <otherwise>0</otherwise>
+        </choose> as reservedByOrder,
+        <choose>
+            <when test="orderId != null">
+                case when exists (
+                    select 1
+                    from ry_business.ry_rental_merchant_inventory_reservation_unit other_ru
+                    inner join ry_business.ry_rental_merchant_inventory_reservation other_r
+                      on other_r.reservation_id = other_ru.reservation_id
+                     and other_r.tenant_id = u.tenant_id and other_r.member_id = u.member_id
+                     and other_r.order_id is not null and other_r.order_id &lt;&gt; #{orderId}
+                     and other_r.reservation_status = 1 and other_r.is_delete = 0
+                    where other_ru.unit_id = u.unit_id and other_ru.is_delete = 0
+                ) then 1 else 0 end
+            </when>
+            <otherwise>0</otherwise>
+        </choose> as reservedByOtherOrder,
+        <choose>
+            <when test="orderId != null">
+                case when exists (
+                    select 1
+                    from ry_business.ry_rental_order_item other_oi
+                    where other_oi.tenant_id = u.tenant_id and other_oi.member_id = u.member_id
+                      and other_oi.order_id &lt;&gt; #{orderId}
+                      and other_oi.sn_id = u.unit_id and other_oi.is_delete = 0
+                ) or exists (
+                    select 1
+                    from ry_business.ry_rental_order other_o
+                    where other_o.tenant_id = u.tenant_id and other_o.member_id = u.member_id
+                      and other_o.order_id &lt;&gt; #{orderId} and other_o.is_delete = 0
+                      and json_search(coalesce(other_o.package_details_json, json_object()),
+                          'one', cast(u.unit_id as char), null, '$.items[*].unitIds[*]') is not null
+                ) then 1 else 0 end
+            </when>
+            <otherwise>0</otherwise>
+        </choose> as boundByOtherOrder
+        from ry_business.ry_rental_merchant_inventory_unit u
+        inner join ry_business.ry_rental_merchant_inventory i
+          on i.inventory_id = u.inventory_id and i.tenant_id = u.tenant_id and i.member_id = u.member_id
+         and i.is_delete = 0 and i.status = 0
+        inner join ry_business.ry_rental_product p
+          on p.tenant_id = u.tenant_id and p.member_id = u.member_id
+         and p.product_id = u.product_id and p.is_delete = 0 and p.status = 0
+        inner join ry_business.ry_rental_warehouse w
+          on w.tenant_id = u.tenant_id and w.member_id = u.member_id
+         and w.warehouse_id = u.warehouse_id and w.is_delete = 0 and w.status = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+          and u.is_delete = 0
+        <if test="warehouseId != null">and u.warehouse_id = #{warehouseId}</if>
+          and (u.unit_code = #{unitCode} or u.serial_number = #{unitCode})
+        order by u.unit_id
+        limit 1
+    </select>
+
+    <select id="selectVerificationUnitForUpdate" resultType="map">
+        select u.unit_id as unitId, u.inventory_id as inventoryId, u.product_id as productId,
+               u.warehouse_id as warehouseId, u.unit_code as unitCode, u.serial_number as serialNumber,
+               u.unit_status as unitStatus, i.available_quantity as availableQuantity,
+               p.product_name as productName, p.model_name as modelName,
+               p.product_code as productCode, p.product_type as productType, p.stock_mode as stockMode,
+               w.warehouse_name as warehouseName,
+        <choose>
+            <when test="orderId != null">
+                case when exists (
+                    select 1
+                    from ry_business.ry_rental_merchant_inventory_reservation_unit own_ru
+                    inner join ry_business.ry_rental_merchant_inventory_reservation own_r
+                      on own_r.reservation_id = own_ru.reservation_id
+                     and own_r.tenant_id = u.tenant_id and own_r.member_id = u.member_id
+                     and own_r.order_id = #{orderId} and own_r.reservation_status = 1
+                     and own_r.is_delete = 0
+                    where own_ru.unit_id = u.unit_id and own_ru.is_delete = 0
+                ) then 1 else 0 end
+            </when>
+            <otherwise>0</otherwise>
+        </choose> as reservedByOrder,
+        <choose>
+            <when test="orderId != null">
+                case when exists (
+                    select 1
+                    from ry_business.ry_rental_merchant_inventory_reservation_unit other_ru
+                    inner join ry_business.ry_rental_merchant_inventory_reservation other_r
+                      on other_r.reservation_id = other_ru.reservation_id
+                     and other_r.tenant_id = u.tenant_id and other_r.member_id = u.member_id
+                     and other_r.order_id is not null and other_r.order_id &lt;&gt; #{orderId}
+                     and other_r.reservation_status = 1 and other_r.is_delete = 0
+                    where other_ru.unit_id = u.unit_id and other_ru.is_delete = 0
+                ) then 1 else 0 end
+            </when>
+            <otherwise>0</otherwise>
+        </choose> as reservedByOtherOrder,
+        <choose>
+            <when test="orderId != null">
+                case when exists (
+                    select 1
+                    from ry_business.ry_rental_order_item other_oi
+                    where other_oi.tenant_id = u.tenant_id and other_oi.member_id = u.member_id
+                      and other_oi.order_id &lt;&gt; #{orderId}
+                      and other_oi.sn_id = u.unit_id and other_oi.is_delete = 0
+                ) or exists (
+                    select 1
+                    from ry_business.ry_rental_order other_o
+                    where other_o.tenant_id = u.tenant_id and other_o.member_id = u.member_id
+                      and other_o.order_id &lt;&gt; #{orderId} and other_o.is_delete = 0
+                      and json_search(coalesce(other_o.package_details_json, json_object()),
+                          'one', cast(u.unit_id as char), null, '$.items[*].unitIds[*]') is not null
+                ) then 1 else 0 end
+            </when>
+            <otherwise>0</otherwise>
+        </choose> as boundByOtherOrder
+        from ry_business.ry_rental_merchant_inventory_unit u
+        inner join ry_business.ry_rental_merchant_inventory i
+          on i.inventory_id = u.inventory_id and i.tenant_id = u.tenant_id and i.member_id = u.member_id
+         and i.is_delete = 0 and i.status = 0
+        inner join ry_business.ry_rental_product p
+          on p.tenant_id = u.tenant_id and p.member_id = u.member_id
+         and p.product_id = u.product_id and p.is_delete = 0 and p.status = 0
+        inner join ry_business.ry_rental_warehouse w
+          on w.tenant_id = u.tenant_id and w.member_id = u.member_id
+         and w.warehouse_id = u.warehouse_id and w.is_delete = 0 and w.status = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+          and u.is_delete = 0
+        <if test="warehouseId != null">and u.warehouse_id = #{warehouseId}</if>
+          and (u.unit_code = #{unitCode} or u.serial_number = #{unitCode})
+        order by u.unit_id
+        limit 1
+        for update
+    </select>
+
+    <select id="countSerialNumber" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_merchant_inventory_unit
+        where member_id = #{memberId} and serial_number = #{serialNumber} and is_delete = 0
+          and unit_id != #{unitId}
+    </select>
+
+    <select id="selectInventoryTransactionByIdempotency" resultType="map">
+        select transaction_id as transactionId, inventory_id as inventoryId,
+               warehouse_id as warehouseId, product_id as productId,
+               source_order_id as sourceOrderId, idempotency_key as idempotencyKey
+        from ry_business.ry_rental_merchant_inventory_transaction
+        where member_id = #{memberId} and idempotency_key = #{idempotencyKey} and is_delete = 0
+        limit 1
+    </select>
+
+    <insert id="insertInventoryTransaction">
+        insert into ry_business.ry_rental_merchant_inventory_transaction
+            (tenant_id, member_id, inventory_id, warehouse_id, product_id, transaction_type,
+             change_quantity, before_quantity, after_quantity, source_order_id, idempotency_key,
+             reason, create_by, create_time, is_delete)
+        values
+            (#{tenantId}, #{memberId}, #{inventoryId}, #{warehouseId}, #{productId}, #{transactionType},
+             #{changeQuantity}, #{beforeQuantity}, #{afterQuantity}, #{sourceOrderId}, #{idempotencyKey},
+             #{reason}, #{operator}, now(), 0)
+    </insert>
+
+    <update id="updateUnitDetails">
+        update ry_business.ry_rental_merchant_inventory_unit
+        set serial_number = #{serialNumber}, unit_status = #{unitStatus, jdbcType=TINYINT},
+            memory_spec = #{memorySpec, jdbcType=VARCHAR},
+            purchase_cost = #{purchaseCost, jdbcType=DECIMAL},
+            condition_level = #{conditionLevel, jdbcType=TINYINT},
+            insurance_until = nullif(#{insuranceUntil, jdbcType=VARCHAR}, ''),
+            insurance_amount = #{insuranceAmount, jdbcType=DECIMAL},
+            serial_photo_url = #{serialPhotoUrl, jdbcType=VARCHAR},
+            market_verified_flag = case when #{serialPhotoUrl, jdbcType=VARCHAR} is null
+                                             or #{serialPhotoUrl, jdbcType=VARCHAR} = '' then 0 else 1 end,
+            market_verified_time = case when #{serialPhotoUrl, jdbcType=VARCHAR} is null
+                                             or #{serialPhotoUrl, jdbcType=VARCHAR} = '' then null else now() end,
+            market_verified_by = case when #{serialPhotoUrl, jdbcType=VARCHAR} is null
+                                             or #{serialPhotoUrl, jdbcType=VARCHAR} = '' then null else #{operator} end,
+            remark = #{remark, jdbcType=VARCHAR}, version = version + 1,
+            update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and unit_id = #{unitId} and is_delete = 0
+    </update>
+
+    <select id="countUnitOrderReferences" resultType="int">
+        select
+          (select count(1)
+             from ry_business.ry_rental_merchant_inventory_reservation_unit ru
+             inner join ry_business.ry_rental_merchant_inventory_reservation r
+               on r.reservation_id = ru.reservation_id
+              and r.tenant_id = #{tenantId} and r.member_id = #{memberId}
+              and r.order_id is not null
+            where ru.unit_id = #{unitId} and ru.is_delete = 0 and r.is_delete = 0)
+          + (select count(1)
+               from ry_business.ry_rental_order_item oi
+              where oi.tenant_id = #{tenantId} and oi.member_id = #{memberId}
+                and oi.sn_id = #{unitId} and oi.is_delete = 0)
+          + (select count(1)
+               from ry_business.ry_rental_order o
+              where o.tenant_id = #{tenantId} and o.member_id = #{memberId}
+                and o.is_delete = 0
+                and json_search(coalesce(o.package_details_json, json_object()),
+                    'one', cast(#{unitId} as char), null, '$.items[*].unitIds[*]') is not null)
+    </select>
+
+    <update id="softDeleteUnit">
+        update ry_business.ry_rental_merchant_inventory_unit
+        set is_delete = 1, unit_status = 6,
+            remove_by = #{operator}, remove_time = now(),
+            update_by = #{operator}, update_time = now(), version = version + 1
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and unit_id = #{unitId} and is_delete = 0
+    </update>
+
+    <insert id="insertReservation">
+        insert into ry_business.ry_rental_merchant_inventory_reservation
+          (tenant_id, member_id, order_id, package_id, package_version_id, warehouse_id,
+           reservation_no, reservation_status, idempotency_key, create_by, create_time,
+           update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{orderId}, #{packageId}, #{packageVersionId}, #{warehouseId},
+                #{reservationNo}, 1, #{idempotencyKey}, #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <insert id="insertExternalReservation">
+        insert into ry_business.ry_rental_merchant_inventory_reservation
+          (tenant_id, member_id, order_id, package_id, package_version_id, warehouse_id,
+           reservation_no, reservation_status, reservation_source, idempotency_key, expire_time,
+           external_token_id, external_order_no, external_product_id, external_quantity,
+           external_payload_hash, create_by, create_time,
+           update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, null, #{packageId}, #{packageVersionId}, #{warehouseId},
+                #{reservationNo}, 1, 2, #{idempotencyKey}, #{expireTime}, #{externalTokenId},
+                #{externalOrderNo}, #{externalProductId}, #{externalQuantity}, #{externalPayloadHash},
+                null, now(), null, now(), #{remark}, 0)
+    </insert>
+
+    <insert id="insertReservationUnit">
+        insert into ry_business.ry_rental_merchant_inventory_reservation_unit
+          (reservation_id, inventory_id, unit_id, quantity, unit_status,
+           create_by, create_time, update_by, update_time, is_delete)
+        values (#{reservationId}, #{inventoryId}, #{unitId}, 1, 1,
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <insert id="insertReservationQuantity">
+        insert into ry_business.ry_rental_merchant_inventory_reservation_quantity
+          (reservation_id, inventory_id, product_id, quantity, quantity_status,
+           create_by, create_time, update_by, update_time, is_delete)
+        values (#{reservationId}, #{inventoryId}, #{productId}, #{quantity}, 1,
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <update id="updateUnitStatus">
+        update ry_business.ry_rental_merchant_inventory_unit
+        set unit_status = #{toStatus}, version = version + 1,
+            update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and unit_id = #{unitId}
+          and unit_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateReservationUnitStatus">
+        update ry_business.ry_rental_merchant_inventory_reservation_unit
+        set unit_status = #{toStatus}, update_by = #{operator}, update_time = now()
+        where reservation_id = #{reservationId} and unit_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateReservationUnitStatusById">
+        update ry_business.ry_rental_merchant_inventory_reservation_unit
+        set unit_status = #{toStatus}, update_by = #{operator}, update_time = now()
+        where reservation_unit_id = #{reservationUnitId}
+          and unit_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateReservationQuantityStatus">
+        update ry_business.ry_rental_merchant_inventory_reservation_quantity
+        set quantity_status = #{toStatus}, update_by = #{operator}, update_time = now()
+        where reservation_id = #{reservationId} and quantity_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateReservationStatus">
+        update ry_business.ry_rental_merchant_inventory_reservation
+        set reservation_status = #{toStatus}, update_by = #{operator}, update_time = now(), remark = #{remark}
+        where tenant_id = #{tenantId} and member_id = #{memberId} and reservation_id = #{reservationId}
+          and reservation_status = #{fromStatus} and is_delete = 0
+    </update>
+</mapper>

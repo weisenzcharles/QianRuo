@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qianruo-web
+  namespace: ${K8S_NAMESPACE}
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: alb
+  tls:
+    - hosts:
+        - ${ADMIN_HOST}
+        - ${MERCHANT_HOST}
+        - qianruo.com.cn
+  rules:
+    - host: ${ADMIN_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rental-admin-web
+                port:
+                  number: 80
+    - host: ${MERCHANT_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rental-merchant-web
+                port:
+                  number: 80
+    # Keep the former merchant hostname during DNS and certificate cutover.
+    - host: qianruo.com.cn
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rental-merchant-web
+                port:
+                  number: 80

@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysMerchantNoticeMapper">
+
+    <resultMap id="merchantNoticeListResult" type="com.ruoyi.system.model.rental.MerchantNoticeListVO">
+        <id property="merchantNoticeId" column="merchant_notice_id" />
+        <result property="noticeTitle" column="notice_title" />
+        <result property="noticeType" column="notice_type" />
+        <result property="targetScope" column="target_scope" />
+        <result property="status" column="status" />
+        <result property="targetMemberNames" column="target_member_names" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <resultMap id="merchantNoticeEditResult" type="com.ruoyi.system.model.rental.MerchantNoticeEditVO">
+        <id property="merchantNoticeId" column="merchant_notice_id" />
+        <result property="noticeTitle" column="notice_title" />
+        <result property="noticeType" column="notice_type" />
+        <result property="noticeContent" column="notice_content" />
+        <result property="targetScope" column="target_scope" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <resultMap id="merchantNoticeMemberOptionResult"
+               type="com.ruoyi.system.model.rental.MerchantNoticeMemberOption">
+        <id property="memberId" column="member_id" />
+        <result property="merchantName" column="merchant_name" />
+        <result property="memberCode" column="member_code" />
+    </resultMap>
+
+    <sql id="merchantNoticeListColumns">
+        n.merchant_notice_id, n.notice_title, n.notice_type,
+        n.target_scope, n.status, n.create_time,
+        (
+            select group_concat(
+                coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code)
+                order by m.member_id separator '、'
+            )
+            from `ry_rental`.`ry_rental_member` m
+            inner join sys_merchant_notice_member tm on tm.member_id = m.member_id
+                and tm.merchant_notice_id = n.merchant_notice_id and tm.is_delete = 0
+            where m.is_delete = 0
+        ) as target_member_names
+    </sql>
+
+    <select id="selectMerchantNoticeList" parameterType="com.ruoyi.system.domain.SysMerchantNotice"
+            resultMap="merchantNoticeListResult">
+        select
+        <include refid="merchantNoticeListColumns" />
+        from sys_merchant_notice n
+        <where>
+            n.is_delete = 0
+            <if test="noticeTitle != null and noticeTitle != ''">
+                and n.notice_title like concat('%', #{noticeTitle}, '%')
+            </if>
+            <if test="noticeType != null">and n.notice_type = #{noticeType}</if>
+            <if test="targetScope != null">and n.target_scope = #{targetScope}</if>
+            <if test="status != null">and n.status = #{status}</if>
+        </where>
+        order by n.create_time desc, n.merchant_notice_id desc
+    </select>
+
+    <select id="selectMerchantNoticeById" resultMap="merchantNoticeEditResult">
+        select n.merchant_notice_id, n.notice_title, n.notice_type,
+               cast(n.notice_content as char) as notice_content, n.target_scope, n.status, n.remark
+        from sys_merchant_notice n
+        where n.merchant_notice_id = #{merchantNoticeId} and n.is_delete = 0
+    </select>
+
+    <select id="selectTargetMemberIds" resultType="long">
+        select member_id
+        from sys_merchant_notice_member
+        where merchant_notice_id = #{merchantNoticeId} and is_delete = 0
+        order by member_id
+    </select>
+
+    <select id="selectMemberOptions" resultMap="merchantNoticeMemberOptionResult">
+        select m.member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchant_name,
+               m.member_code
+        from `ry_rental`.`ry_rental_member` m
+        where m.is_delete = 0 and m.status = 0 and m.auth_status = 3
+        order by merchant_name, m.member_id
+    </select>
+
+    <insert id="insertMerchantNotice" parameterType="com.ruoyi.system.domain.SysMerchantNotice"
+            useGeneratedKeys="true" keyProperty="merchantNoticeId">
+        insert into sys_merchant_notice
+        (notice_title, notice_type, notice_content, target_scope, status, create_by, create_time, remark, is_delete)
+        values
+        (#{noticeTitle}, #{noticeType}, #{noticeContent}, #{targetScope}, #{status}, #{createBy}, sysdate(), #{remark}, 0)
+    </insert>
+
+    <insert id="insertTargetMembers" parameterType="com.ruoyi.system.domain.SysMerchantNotice">
+        insert into sys_merchant_notice_member
+        (merchant_notice_id, member_id, create_by, create_time, is_delete)
+        values
+        <foreach collection="targetMemberIds" item="memberId" separator=",">
+            (#{merchantNoticeId}, #{memberId}, #{createBy}, sysdate(), 0)
+        </foreach>
+    </insert>
+
+    <update id="updateMerchantNotice" parameterType="com.ruoyi.system.domain.SysMerchantNotice">
+        update sys_merchant_notice
+        <set>
+            notice_title = #{noticeTitle},
+            notice_type = #{noticeType},
+            notice_content = #{noticeContent},
+            target_scope = #{targetScope},
+            status = #{status},
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        </set>
+        where merchant_notice_id = #{merchantNoticeId} and is_delete = 0
+    </update>
+
+    <update id="deleteTargetMembers">
+        update sys_merchant_notice_member
+        set is_delete = 1
+        where merchant_notice_id = #{merchantNoticeId} and is_delete = 0
+    </update>
+
+    <update id="deleteMerchantNotices">
+        update sys_merchant_notice
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where is_delete = 0 and merchant_notice_id in
+        <foreach collection="noticeIds" item="noticeId" open="(" separator="," close=")">
+            #{noticeId}
+        </foreach>
+    </update>
+
+    <resultMap id="merchantNoticeSummaryResult" type="com.ruoyi.system.api.model.MerchantNoticeSummary">
+        <id property="noticeId" column="notice_id" />
+        <result property="noticeTitle" column="notice_title" />
+        <result property="noticeType" column="notice_type" />
+        <result property="createTime" column="create_time" />
+        <result property="isRead" column="is_read" />
+    </resultMap>
+
+    <select id="selectTopForMerchant" resultMap="merchantNoticeSummaryResult">
+        select n.merchant_notice_id as notice_id, n.notice_title, n.notice_type,
+               date_format(n.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               case when r.merchant_notice_id is null then 0 else 1 end as is_read
+        from sys_merchant_notice n
+        left join sys_merchant_notice_read r
+          on r.merchant_notice_id = n.merchant_notice_id
+         and r.member_id = #{memberId}
+         and r.merchant_user_id = #{merchantUserId}
+         and r.is_delete = 0
+        where n.status = 0 and n.is_delete = 0
+          and (n.target_scope = 1 or exists (
+              select 1 from sys_merchant_notice_member tm
+              where tm.merchant_notice_id = n.merchant_notice_id
+                and tm.member_id = #{memberId} and tm.is_delete = 0
+          ))
+        order by n.create_time desc, n.merchant_notice_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectUnreadCountForMerchant" resultType="int">
+        select count(1)
+        from sys_merchant_notice n
+        where n.status = 0 and n.is_delete = 0
+          and (n.target_scope = 1 or exists (
+              select 1 from sys_merchant_notice_member tm
+              where tm.merchant_notice_id = n.merchant_notice_id
+                and tm.member_id = #{memberId} and tm.is_delete = 0
+          ))
+          and not exists (
+              select 1 from sys_merchant_notice_read r
+              where r.merchant_notice_id = n.merchant_notice_id
+                and r.member_id = #{memberId}
+                and r.merchant_user_id = #{merchantUserId}
+                and r.is_delete = 0
+          )
+    </select>
+
+    <resultMap id="merchantNoticeDetailResult" type="com.ruoyi.system.api.model.MerchantNoticeDetail">
+        <id property="noticeId" column="notice_id" />
+        <result property="noticeTitle" column="notice_title" />
+        <result property="noticeType" column="notice_type" />
+        <result property="noticeContent" column="notice_content" />
+        <result property="publisherName" column="publisher_name" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectDetailForMerchant" resultMap="merchantNoticeDetailResult">
+        select n.merchant_notice_id as notice_id, n.notice_title, n.notice_type,
+               cast(n.notice_content as char) as notice_content,
+               coalesce(nullif(u.nick_name, ''), '平台') as publisher_name,
+               date_format(n.create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from sys_merchant_notice n
+        left join sys_user u on u.user_id = n.create_by and u.is_delete = 0
+        where n.merchant_notice_id = #{noticeId} and n.status = 0 and n.is_delete = 0
+          and (n.target_scope = 1 or exists (
+              select 1 from sys_merchant_notice_member tm
+              where tm.merchant_notice_id = n.merchant_notice_id
+                and tm.member_id = #{memberId} and tm.is_delete = 0
+          ))
+    </select>
+</mapper>

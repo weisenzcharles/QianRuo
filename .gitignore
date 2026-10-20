@@ -1,0 +1,61 @@
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+target/
+coverage/
+
+# Local environment overrides
+.env.local
+.env.*.local
+deploy/.env
+deploy/.env.aliyun
+deploy/.generated/
+.workbuddy/
+
+# Local database backups may contain credentials and business data.
+database/backups/
+
+# Private source documents and generated design deliverables are not published.
+docs/design/*.docx
+docs/design/*.pdf
+docs/design/rendered_*/
+
+# Deployment credentials and private key material.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+**/kubeconfig
+**/kubeconfig.*
+**/secrets.*
+
+# IDE/editor
+.idea/
+.vscode/
+*.iml
+
+# OS temporary files
+.DS_Store
+*.tmp
+*.swp
+__pycache__/
+*.pyc
+
+# The global Git ignore on some development machines ignores directories named
+# "log". This package contains Java source code and must always be versioned.
+!backend/ruoyi-cloud/ruoyi-common/ruoyi-common-log/src/main/java/com/ruoyi/common/log/
+!backend/ruoyi-cloud/ruoyi-common/ruoyi-common-log/src/main/java/com/ruoyi/common/log/**

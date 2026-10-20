@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantMenuMapper">
+    <resultMap id="menu" type="MerchantMenu">
+        <id property="menuId" column="menu_id" />
+        <result property="menuName" column="menu_name" />
+        <result property="parentId" column="parent_id" />
+        <result property="orderNum" column="order_num" />
+        <result property="path" column="path" />
+        <result property="component" column="component" />
+        <result property="query" column="query" />
+        <result property="routeName" column="route_name" />
+        <result property="isFrame" column="is_frame" />
+        <result property="isCache" column="is_cache" />
+        <result property="menuType" column="menu_type" />
+        <result property="visible" column="visible" />
+        <result property="status" column="status" />
+        <result property="perms" column="perms" />
+        <result property="icon" column="icon" />
+    </resultMap>
+    <sql id="columns">
+        m.menu_id, m.menu_name, m.parent_id, m.order_num, m.path, m.component, m.`query`, m.route_name,
+        m.is_frame, m.is_cache, m.menu_type, m.visible, m.status, m.perms, m.icon
+    </sql>
+    <select id="selectCatalog" resultMap="menu">
+        select <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
+        where m.tenant_id = 0 and m.member_id = 0 and m.is_delete = 0
+        order by m.parent_id, m.order_num, m.menu_id
+    </select>
+    <select id="selectByUser" resultMap="menu">
+        select distinct <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
+        where m.tenant_id = 0 and m.member_id = 0 and m.is_delete = 0
+          and m.status = 0 and m.menu_type in ('M', 'C') and (
+            exists (select 1 from `ry_rental`.`ry_rental_merchant_user_menu` um
+                where um.tenant_id = #{tenantId} and um.member_id = #{merchantId}
+                  and um.merchant_user_id = #{userId} and um.menu_id = m.menu_id
+                  and um.is_delete = 0)
+            or exists (select 1 from `ry_rental`.`ry_rental_merchant_user_role` ur
+                inner join `ry_rental`.`ry_rental_merchant_role` r
+                    on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id and r.role_id = ur.role_id
+                inner join `ry_rental`.`ry_rental_merchant_role_menu` rm
+                    on rm.tenant_id = ur.tenant_id and rm.member_id = ur.member_id and rm.role_id = ur.role_id
+                where ur.tenant_id = #{tenantId} and ur.member_id = #{merchantId}
+                  and ur.merchant_user_id = #{userId} and rm.menu_id = m.menu_id
+                  and ur.is_delete = 0 and rm.is_delete = 0
+                  and r.status = 0 and r.is_delete = 0)
+          )
+        order by m.parent_id, m.order_num, m.menu_id
+    </select>
+    <select id="selectDefaultPreviewMenus" resultMap="menu">
+        select <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
+        where m.tenant_id = 0 and m.member_id = 0 and m.is_delete = 0
+          and m.status = 0 and m.menu_type in ('M', 'C')
+        order by m.parent_id, m.order_num, m.menu_id
+    </select>
+    <select id="selectById" resultMap="menu">
+        select <include refid="columns" /> from `ry_rental`.`ry_rental_merchant_menu` m
+        where m.tenant_id = 0 and m.member_id = 0 and m.menu_id = #{menuId} and m.is_delete = 0
+    </select>
+    <select id="selectIdsByRole" resultType="Long">
+        select m.menu_id from `ry_rental`.`ry_rental_merchant_menu` m
+        inner join `ry_rental`.`ry_rental_merchant_role_menu` rm on rm.menu_id = m.menu_id
+        where rm.tenant_id = #{tenantId} and rm.member_id = #{merchantId} and rm.role_id = #{roleId}
+          and rm.is_delete = 0 and m.tenant_id = 0 and m.member_id = 0 and m.is_delete = 0
+        <if test="strict">
+          and m.menu_id not in (
+            select child.parent_id from `ry_rental`.`ry_rental_merchant_menu` child
+            inner join `ry_rental`.`ry_rental_merchant_role_menu` child_rm on child_rm.menu_id = child.menu_id
+            where child_rm.tenant_id = #{tenantId} and child_rm.member_id = #{merchantId}
+              and child_rm.role_id = #{roleId} and child.tenant_id = 0 and child.member_id = 0
+              and child_rm.is_delete = 0 and child.is_delete = 0)
+        </if>
+        order by m.parent_id, m.order_num, m.menu_id
+    </select>
+    <select id="countValidMenuIds" resultType="Integer">
+        select count(1) from `ry_rental`.`ry_rental_merchant_menu`
+        where tenant_id = 0 and member_id = 0 and is_delete = 0
+          and (perms is null or perms = '' or perms like 'merchant:%')
+          and menu_id in
+        <foreach collection="menuIds" item="menuId" open="(" separator="," close=")">#{menuId}</foreach>
+    </select>
+</mapper>

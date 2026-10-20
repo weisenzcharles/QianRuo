@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantFinanceWithdrawalMapper">
+    <sql id="withdrawalColumns">
+        w.withdrawal_no, w.amount, w.fee, w.actual_amount, w.withdrawal_channel,
+        w.payee_name,
+        case when char_length(w.payee_account) &lt;= 7 then '******'
+             else concat(left(w.payee_account, 3), '****', right(w.payee_account, 4)) end as payee_account,
+        w.withdrawal_status, w.review_remark,
+        date_format(w.review_time, '%Y-%m-%d %H:%i:%s') as review_time,
+        date_format(w.paid_time, '%Y-%m-%d %H:%i:%s') as paid_time,
+        date_format(w.create_time, '%Y-%m-%d %H:%i:%s') as create_time, w.remark
+    </sql>
+
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <select id="selectCashAccountForUpdate" resultType="map">
+        select account_id as accountId, available_amount as availableAmount,
+               frozen_amount as frozenAmount, version, account_status as accountStatus
+        from ry_rental.ry_rental_finance_account
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and account_type = #{accountType} and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <insert id="insertCashAccount">
+        insert ignore into ry_rental.ry_rental_finance_account
+            (tenant_id, member_id, account_type, available_amount, frozen_amount, account_status,
+             version, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{accountType}, 0.00, 0.00, 1,
+                0, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <update id="updateCashAccount">
+        update ry_rental.ry_rental_finance_account
+        set available_amount = #{availableAmount}, frozen_amount = #{frozenAmount},
+            version = version + 1, update_by = #{operatorId}, update_time = now()
+        where account_id = #{accountId} and version = #{version} and account_status = 1 and is_delete = 0
+    </update>
+
+    <select id="selectByIdempotency" resultType="com.ruoyi.merchant.model.MerchantWithdrawalVO">
+        select <include refid="withdrawalColumns" />
+        from ry_rental.ry_rental_finance_withdrawal w
+        where w.tenant_id = #{tenantId} and w.member_id = #{memberId}
+          and w.idempotency_key = #{idempotencyKey} and w.is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectByIdempotencyForUpdate" resultType="com.ruoyi.merchant.model.MerchantWithdrawalVO">
+        select <include refid="withdrawalColumns" />
+        from ry_rental.ry_rental_finance_withdrawal w
+        where w.tenant_id = #{tenantId} and w.member_id = #{memberId}
+          and w.idempotency_key = #{idempotencyKey} and w.is_delete = 0
+        limit 1 for update
+    </select>
+
+    <insert id="insertWithdrawal">
+        insert into ry_rental.ry_rental_finance_withdrawal
+            (tenant_id, member_id, account_id, account_type, withdrawal_no, idempotency_key,
+             amount, fee, actual_amount, withdrawal_channel, payee_name, payee_account,
+             withdrawal_status, create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{accountId}, #{accountType}, #{withdrawalNo}, #{idempotencyKey},
+                #{amount}, #{fee}, #{actualAmount}, #{withdrawalChannel}, #{payeeName}, #{payeeAccount},
+                0, #{operatorId}, now(), #{operatorId}, now(), #{remark}, 0)
+    </insert>
+
+    <select id="selectByNo" resultType="com.ruoyi.merchant.model.MerchantWithdrawalVO">
+        select <include refid="withdrawalColumns" />
+        from ry_rental.ry_rental_finance_withdrawal w
+        where w.tenant_id = #{tenantId} and w.member_id = #{memberId}
+          and w.withdrawal_no = #{withdrawalNo} and w.is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectList" resultType="com.ruoyi.merchant.model.MerchantWithdrawalVO">
+        select <include refid="withdrawalColumns" />
+        from ry_rental.ry_rental_finance_withdrawal w
+        where w.tenant_id = #{tenantId} and w.member_id = #{memberId} and w.is_delete = 0
+        <if test="withdrawalStatus != null">and w.withdrawal_status = #{withdrawalStatus}</if>
+        order by w.create_time desc, w.withdrawal_id desc
+    </select>
+
+    <insert id="insertFinanceLedger">
+        insert into ry_rental.ry_rental_finance_ledger
+            (tenant_id, member_id, account_type, ledger_no, direction, biz_type, amount, balance_after,
+             ref_type, ref_id, pay_channel, pay_order_no, ledger_status, create_by, create_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{accountType}, #{ledgerNo}, #{direction}, #{bizType}, #{amount}, #{balanceAfter},
+                'withdrawal', #{refId}, #{payChannel}, #{payOrderNo}, 1, #{operatorId}, now(), #{remark}, 0)
+    </insert>
+</mapper>

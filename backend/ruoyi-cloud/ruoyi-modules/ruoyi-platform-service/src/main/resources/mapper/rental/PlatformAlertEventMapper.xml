@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformAlertEventMapper">
+
+    <sql id="alertEventColumns">
+        alert_event_id, alert_type, alert_level, title, detail, source_type, source_key, occurrence_count,
+        event_status,
+        date_format(first_seen_time, '%Y-%m-%d %H:%i:%s') as first_seen_time,
+        date_format(last_seen_time, '%Y-%m-%d %H:%i:%s') as last_seen_time,
+        date_format(ack_time, '%Y-%m-%d %H:%i:%s') as ack_time,
+        date_format(resolved_time, '%Y-%m-%d %H:%i:%s') as resolved_time,
+        resolved_remark
+    </sql>
+
+    <select id="selectList" resultType="com.ruoyi.system.model.rental.PlatformAlertEventVO">
+        select <include refid="alertEventColumns" />
+        from ry_rental.ry_rental_platform_operations_alert_event
+        <where>
+            is_delete = 0
+            <if test="query.alertType != null">and alert_type = #{query.alertType}</if>
+            <if test="query.alertLevel != null">and alert_level = #{query.alertLevel}</if>
+            <if test="query.eventStatus != null">and event_status = #{query.eventStatus}</if>
+            <if test="query.keyword != null and query.keyword != ''">
+                and (title like concat('%', #{query.keyword}, '%')
+                  or detail like concat('%', #{query.keyword}, '%')
+                  or source_key like concat('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+        order by field(event_status, 0, 1, 2), alert_level desc, last_seen_time desc, alert_event_id desc
+    </select>
+
+    <select id="countOpenEvents" resultType="int">
+        select count(1)
+        from ry_rental.ry_rental_platform_operations_alert_event
+        where event_status in (0, 1) and is_delete = 0
+    </select>
+
+    <select id="selectRecentFailedJobs" resultType="map">
+        select concat('JOB_FAILURE:', coalesce(job_name, ''), ':', coalesce(invoke_target, '')) as alert_key,
+               concat('调度任务执行失败：', coalesce(nullif(job_name, ''), '未命名任务')) as title,
+               coalesce(nullif(max(exception_info), ''), nullif(max(job_message), ''), '调度任务执行失败') as detail,
+               coalesce(max(invoke_target), max(job_name), '未知任务') as source_key,
+               count(1) as occurrence_count
+        from `ry-cloud`.sys_job_log
+        where is_delete = 0
+          and status = '1'
+          and create_time >= date_sub(now(), interval 24 hour)
+        group by job_name, invoke_target
+    </select>
+
+    <insert id="upsertScheduledTaskAlert">
+        insert into ry_rental.ry_rental_platform_operations_alert_event
+        (alert_event_key, alert_type, alert_level, title, detail, source_type, source_key, occurrence_count,
+         event_status, first_seen_time, last_seen_time, create_by, create_time, update_by, update_time, is_delete)
+        values (#{alertEventKey}, 1, 3, #{title}, #{detail}, 'sys_job_log', #{sourceKey}, #{occurrenceCount},
+                0, now(), now(), #{operator}, now(), #{operator}, now(), 0)
+        on duplicate key update
+            alert_level = values(alert_level),
+            title = values(title),
+            detail = values(detail),
+            source_type = values(source_type),
+            source_key = values(source_key),
+            occurrence_count = values(occurrence_count),
+            first_seen_time = case when event_status = 2 then now() else first_seen_time end,
+            last_seen_time = now(),
+            ack_by = case when event_status = 2 then null else ack_by end,
+            ack_time = case when event_status = 2 then null else ack_time end,
+            resolved_by = case when event_status = 2 then null else resolved_by end,
+            resolved_time = case when event_status = 2 then null else resolved_time end,
+            resolved_remark = case when event_status = 2 then null else resolved_remark end,
+            event_status = case when event_status = 2 then 0 else event_status end,
+            update_by = #{operator}, update_time = now(), is_delete = 0
+    </insert>
+
+    <insert id="upsertStorageAlert">
+        insert into ry_rental.ry_rental_platform_operations_alert_event
+        (alert_event_key, alert_type, alert_level, title, detail, source_type, source_key, occurrence_count,
+         event_status, first_seen_time, last_seen_time, create_by, create_time, update_by, update_time, is_delete)
+        values (#{alertEventKey}, #{alertType}, #{alertLevel}, #{title}, #{detail}, 'platform_capacity', #{sourceKey},
+                1, 0, now(), now(), #{operator}, now(), #{operator}, now(), 0)
+        on duplicate key update
+            alert_type = values(alert_type),
+            alert_level = values(alert_level),
+            title = values(title),
+            detail = values(detail),
+            source_type = values(source_type),
+            source_key = values(source_key),
+            occurrence_count = occurrence_count + 1,
+            first_seen_time = case when event_status = 2 then now() else first_seen_time end,
+            last_seen_time = now(),
+            ack_by = case when event_status = 2 then null else ack_by end,
+            ack_time = case when event_status = 2 then null else ack_time end,
+            resolved_by = case when event_status = 2 then null else resolved_by end,
+            resolved_time = case when event_status = 2 then null else resolved_time end,
+            resolved_remark = case when event_status = 2 then null else resolved_remark end,
+            event_status = case when event_status = 2 then 0 else event_status end,
+            update_by = #{operator}, update_time = now(), is_delete = 0
+    </insert>
+
+    <update id="resolveStorageAlert">
+        update ry_rental.ry_rental_platform_operations_alert_event
+        set event_status = 2, resolved_by = #{operator}, resolved_time = now(),
+            resolved_remark = #{remark}, update_by = #{operator}, update_time = now()
+        where alert_event_key = #{alertEventKey} and event_status in (0, 1) and is_delete = 0
+    </update>
+
+    <insert id="upsertExternalInterfaceAlert">
+        insert into ry_rental.ry_rental_platform_operations_alert_event
+        (alert_event_key, alert_type, alert_level, title, detail, source_type, source_key, occurrence_count,
+         event_status, first_seen_time, last_seen_time, create_by, create_time, update_by, update_time, is_delete)
+        values (#{alertEventKey}, 2, #{alertLevel}, #{title}, #{detail}, 'external_interface', #{sourceKey},
+                1, 0, now(), now(), #{operator}, now(), #{operator}, now(), 0)
+        on duplicate key update
+            alert_level = values(alert_level),
+            title = values(title),
+            detail = values(detail),
+            source_type = values(source_type),
+            source_key = values(source_key),
+            occurrence_count = occurrence_count + 1,
+            first_seen_time = case when event_status = 2 then now() else first_seen_time end,
+            last_seen_time = now(),
+            ack_by = case when event_status = 2 then null else ack_by end,
+            ack_time = case when event_status = 2 then null else ack_time end,
+            resolved_by = case when event_status = 2 then null else resolved_by end,
+            resolved_time = case when event_status = 2 then null else resolved_time end,
+            resolved_remark = case when event_status = 2 then null else resolved_remark end,
+            event_status = case when event_status = 2 then 0 else event_status end,
+            update_by = #{operator}, update_time = now(), is_delete = 0
+    </insert>
+
+    <update id="resolveExternalInterfaceAlert">
+        update ry_rental.ry_rental_platform_operations_alert_event
+        set event_status = 2, resolved_by = #{operator}, resolved_time = now(),
+            resolved_remark = #{remark}, update_by = #{operator}, update_time = now()
+        where alert_event_key = #{alertEventKey} and alert_type = 2
+          and event_status in (0, 1) and is_delete = 0
+    </update>
+
+    <update id="resolveMissingScheduledTaskAlerts">
+        update ry_rental.ry_rental_platform_operations_alert_event
+        set event_status = 2, resolved_by = #{operator}, resolved_time = now(),
+            resolved_remark = '观察窗口内未再次发现调度失败', update_by = #{operator}, update_time = now()
+        where alert_type = 1 and event_status in (0, 1) and is_delete = 0
+          and last_seen_time &lt; date_sub(now(), interval 24 hour)
+        <if test="alertEventKeys != null and alertEventKeys.size() > 0">
+            and alert_event_key not in
+            <foreach collection="alertEventKeys" item="alertEventKey" open="(" separator="," close=")">
+                #{alertEventKey}
+            </foreach>
+        </if>
+    </update>
+
+    <select id="selectById" resultType="com.ruoyi.system.model.rental.PlatformAlertEventVO">
+        select <include refid="alertEventColumns" />
+        from ry_rental.ry_rental_platform_operations_alert_event
+        where alert_event_id = #{alertEventId} and is_delete = 0
+    </select>
+
+    <update id="acknowledge">
+        update ry_rental.ry_rental_platform_operations_alert_event
+        set event_status = 1, ack_by = #{operator}, ack_time = now(), update_by = #{operator}, update_time = now()
+        where alert_event_id = #{alertEventId} and event_status = 0 and is_delete = 0
+    </update>
+
+    <update id="resolve">
+        update ry_rental.ry_rental_platform_operations_alert_event
+        set event_status = 2, resolved_by = #{operator}, resolved_time = now(),
+            resolved_remark = #{remark}, update_by = #{operator}, update_time = now()
+        where alert_event_id = #{alertEventId} and event_status in (0, 1) and is_delete = 0
+    </update>
+</mapper>

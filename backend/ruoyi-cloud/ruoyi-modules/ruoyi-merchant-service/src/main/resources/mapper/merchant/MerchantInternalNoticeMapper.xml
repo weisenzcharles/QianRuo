@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantInternalNoticeMapper">
+    <resultMap id="notice" type="com.ruoyi.merchant.model.MerchantInternalNoticeVO">
+        <id property="internalNoticeId" column="internal_notice_id" />
+        <result property="noticeTitle" column="notice_title" />
+        <result property="noticeType" column="notice_type" />
+        <result property="noticeTypeName" column="notice_type_name" />
+        <result property="noticeContent" column="notice_content" />
+        <result property="targetScope" column="target_scope" />
+        <result property="targetScopeName" column="target_scope_name" />
+        <result property="status" column="status" />
+        <result property="statusName" column="status_name" />
+        <result property="effectiveTime" column="effective_time" />
+        <result property="offlineTime" column="offline_time" />
+        <result property="roleNames" column="role_names" />
+        <result property="isRead" column="is_read" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <resultMap id="roleOption" type="com.ruoyi.merchant.model.MerchantInternalNoticeRoleOptionVO">
+        <id property="roleId" column="role_id" />
+        <result property="roleName" column="role_name" />
+    </resultMap>
+
+    <resultMap id="readStat" type="com.ruoyi.merchant.model.MerchantInternalNoticeReadStatVO">
+        <result property="displayName" column="display_name" />
+        <result property="roleNames" column="role_names" />
+        <result property="readStatus" column="read_status" />
+        <result property="readStatusName" column="read_status_name" />
+        <result property="readTime" column="read_time" />
+    </resultMap>
+
+    <sql id="noticeColumns">
+        n.internal_notice_id, n.notice_title, n.notice_type, n.notice_content,
+        n.target_scope, n.status, n.effective_time, n.offline_time,
+        n.create_time, n.update_time, n.remark,
+        case n.notice_type when 1 then '通知' when 2 then '公告' else '未知类型' end as notice_type_name,
+        case n.target_scope when 1 then '全体员工' when 2 then '指定员工组' else '未知范围' end as target_scope_name,
+        case n.status when 0 then '草稿' when 1 then '已发布' when 2 then '已下架' else '未知状态' end as status_name
+    </sql>
+
+    <select id="selectManagementList" resultMap="notice">
+        select <include refid="noticeColumns" />,
+               coalesce(group_concat(distinct r.role_name order by r.role_sort, r.role_id separator '、'), '') as role_names
+        from `ry_rental`.`ry_rental_merchant_internal_notice` n
+        left join `ry_rental`.`ry_rental_merchant_internal_notice_role` nr
+          on nr.internal_notice_id = n.internal_notice_id and nr.tenant_id = n.tenant_id
+         and nr.member_id = n.member_id and nr.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_role` r
+          on r.role_id = nr.role_id and r.tenant_id = n.tenant_id and r.member_id = n.member_id
+         and r.is_delete = 0
+        where n.tenant_id = #{tenantId} and n.member_id = #{memberId} and n.is_delete = 0
+        <if test="query.noticeTitle != null and query.noticeTitle != ''">
+            and n.notice_title like concat('%', #{query.noticeTitle}, '%')
+        </if>
+        <if test="query.noticeType != null">and n.notice_type = #{query.noticeType}</if>
+        <if test="query.targetScope != null">and n.target_scope = #{query.targetScope}</if>
+        <if test="query.status != null">and n.status = #{query.status}</if>
+        group by n.internal_notice_id, n.notice_title, n.notice_type, n.notice_content,
+                 n.target_scope, n.status, n.effective_time, n.offline_time,
+                 n.create_time, n.update_time, n.remark
+        order by n.create_time desc, n.internal_notice_id desc
+    </select>
+
+    <select id="selectManagementById" resultMap="notice">
+        select <include refid="noticeColumns" />,
+               coalesce(group_concat(distinct r.role_name order by r.role_sort, r.role_id separator '、'), '') as role_names
+        from `ry_rental`.`ry_rental_merchant_internal_notice` n
+        left join `ry_rental`.`ry_rental_merchant_internal_notice_role` nr
+          on nr.internal_notice_id = n.internal_notice_id and nr.tenant_id = n.tenant_id
+         and nr.member_id = n.member_id and nr.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_role` r
+          on r.role_id = nr.role_id and r.tenant_id = n.tenant_id and r.member_id = n.member_id
+         and r.is_delete = 0
+        where n.tenant_id = #{tenantId} and n.member_id = #{memberId}
+          and n.internal_notice_id = #{noticeId} and n.is_delete = 0
+        group by n.internal_notice_id, n.notice_title, n.notice_type, n.notice_content,
+                 n.target_scope, n.status, n.effective_time, n.offline_time,
+                 n.create_time, n.update_time, n.remark
+    </select>
+
+    <select id="selectReadStats" resultMap="readStat">
+        select coalesce(nullif(u.nick_name, ''), u.user_name) as display_name,
+               coalesce(group_concat(distinct r.role_name order by r.role_sort, r.role_id separator '、'), '') as role_names,
+               case when rd.merchant_user_id is null then 0 else 1 end as read_status,
+               case when rd.merchant_user_id is null then '未读' else '已读' end as read_status_name,
+               rd.read_time
+        from `ry_rental`.`ry_rental_merchant_user` u
+        inner join `ry_rental`.`ry_rental_merchant_internal_notice` n
+          on n.tenant_id = u.tenant_id and n.member_id = u.member_id
+         and n.internal_notice_id = #{noticeId} and n.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_user_role` ur
+          on ur.tenant_id = u.tenant_id and ur.member_id = u.member_id
+         and ur.merchant_user_id = u.merchant_user_id and ur.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_role` r
+          on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id
+         and r.role_id = ur.role_id and r.status = 0 and r.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_internal_notice_read` rd
+          on rd.tenant_id = n.tenant_id and rd.member_id = n.member_id
+         and rd.internal_notice_id = n.internal_notice_id
+         and rd.merchant_user_id = u.merchant_user_id and rd.is_delete = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+          and u.status = 0 and u.is_delete = 0
+          and (n.target_scope = 1 or exists (
+              select 1
+              from `ry_rental`.`ry_rental_merchant_internal_notice_role` target_role
+              inner join `ry_rental`.`ry_rental_merchant_user_role` target_user_role
+                on target_user_role.tenant_id = target_role.tenant_id
+               and target_user_role.member_id = target_role.member_id
+               and target_user_role.role_id = target_role.role_id
+               and target_user_role.merchant_user_id = u.merchant_user_id
+               and target_user_role.is_delete = 0
+              inner join `ry_rental`.`ry_rental_merchant_role` target_role_item
+                on target_role_item.tenant_id = target_role.tenant_id
+               and target_role_item.member_id = target_role.member_id
+               and target_role_item.role_id = target_role.role_id
+               and target_role_item.status = 0 and target_role_item.is_delete = 0
+              where target_role.internal_notice_id = n.internal_notice_id
+                and target_role.tenant_id = n.tenant_id
+                and target_role.member_id = n.member_id
+                and target_role.is_delete = 0))
+        group by u.merchant_user_id, u.nick_name, u.user_name,
+                 rd.merchant_user_id, rd.read_time
+        order by read_status asc, u.merchant_user_id asc
+    </select>
+
+    <select id="selectVisibleTop" resultMap="notice">
+        select <include refid="noticeColumns" />,
+               case when rd.internal_notice_id is null then 0 else 1 end as is_read,
+               coalesce(group_concat(distinct r.role_name order by r.role_sort, r.role_id separator '、'), '') as role_names
+        from `ry_rental`.`ry_rental_merchant_internal_notice` n
+        left join `ry_rental`.`ry_rental_merchant_internal_notice_role` nr
+          on nr.internal_notice_id = n.internal_notice_id and nr.tenant_id = n.tenant_id
+         and nr.member_id = n.member_id and nr.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_role` r
+          on r.role_id = nr.role_id and r.tenant_id = n.tenant_id and r.member_id = n.member_id
+         and r.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_internal_notice_read` rd
+          on rd.internal_notice_id = n.internal_notice_id and rd.tenant_id = n.tenant_id
+         and rd.member_id = n.member_id and rd.merchant_user_id = #{merchantUserId} and rd.is_delete = 0
+        where n.tenant_id = #{tenantId} and n.member_id = #{memberId} and n.is_delete = 0
+          and n.status = 1 and (n.effective_time is null or n.effective_time &lt;= now())
+          and (n.offline_time is null or n.offline_time &gt; now())
+          and (n.target_scope = 1 or exists (
+              select 1
+              from `ry_rental`.`ry_rental_merchant_internal_notice_role` target_role
+              inner join `ry_rental`.`ry_rental_merchant_user_role` user_role
+                on user_role.tenant_id = target_role.tenant_id and user_role.member_id = target_role.member_id
+               and user_role.role_id = target_role.role_id and user_role.merchant_user_id = #{merchantUserId}
+               and user_role.is_delete = 0
+              inner join `ry_rental`.`ry_rental_merchant_role` target_role_item
+                on target_role_item.tenant_id = target_role.tenant_id and target_role_item.member_id = target_role.member_id
+               and target_role_item.role_id = target_role.role_id and target_role_item.status = 0
+               and target_role_item.is_delete = 0
+              where target_role.internal_notice_id = n.internal_notice_id
+                and target_role.tenant_id = n.tenant_id and target_role.member_id = n.member_id
+                and target_role.is_delete = 0))
+        group by n.internal_notice_id, n.notice_title, n.notice_type, n.notice_content,
+                 n.target_scope, n.status, n.effective_time, n.offline_time,
+                 n.create_time, n.update_time, n.remark, rd.internal_notice_id
+        order by n.create_time desc, n.internal_notice_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectVisibleById" resultMap="notice">
+        select <include refid="noticeColumns" />,
+               case when rd.internal_notice_id is null then 0 else 1 end as is_read,
+               coalesce(group_concat(distinct r.role_name order by r.role_sort, r.role_id separator '、'), '') as role_names
+        from `ry_rental`.`ry_rental_merchant_internal_notice` n
+        left join `ry_rental`.`ry_rental_merchant_internal_notice_role` nr
+          on nr.internal_notice_id = n.internal_notice_id and nr.tenant_id = n.tenant_id
+         and nr.member_id = n.member_id and nr.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_role` r
+          on r.role_id = nr.role_id and r.tenant_id = n.tenant_id and r.member_id = n.member_id
+         and r.is_delete = 0
+        left join `ry_rental`.`ry_rental_merchant_internal_notice_read` rd
+          on rd.internal_notice_id = n.internal_notice_id and rd.tenant_id = n.tenant_id
+         and rd.member_id = n.member_id and rd.merchant_user_id = #{merchantUserId} and rd.is_delete = 0
+        where n.tenant_id = #{tenantId} and n.member_id = #{memberId} and n.is_delete = 0
+          and n.internal_notice_id = #{noticeId} and n.status = 1
+          and (n.effective_time is null or n.effective_time &lt;= now())
+          and (n.offline_time is null or n.offline_time &gt; now())
+          and (n.target_scope = 1 or exists (
+              select 1
+              from `ry_rental`.`ry_rental_merchant_internal_notice_role` target_role
+              inner join `ry_rental`.`ry_rental_merchant_user_role` user_role
+                on user_role.tenant_id = target_role.tenant_id and user_role.member_id = target_role.member_id
+               and user_role.role_id = target_role.role_id and user_role.merchant_user_id = #{merchantUserId}
+               and user_role.is_delete = 0
+              inner join `ry_rental`.`ry_rental_merchant_role` target_role_item
+                on target_role_item.tenant_id = target_role.tenant_id and target_role_item.member_id = target_role.member_id
+               and target_role_item.role_id = target_role.role_id and target_role_item.status = 0
+               and target_role_item.is_delete = 0
+              where target_role.internal_notice_id = n.internal_notice_id
+                and target_role.tenant_id = n.tenant_id and target_role.member_id = n.member_id
+                and target_role.is_delete = 0))
+        group by n.internal_notice_id, n.notice_title, n.notice_type, n.notice_content,
+                 n.target_scope, n.status, n.effective_time, n.offline_time,
+                 n.create_time, n.update_time, n.remark, rd.internal_notice_id
+    </select>
+
+    <select id="selectUnreadCount" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_merchant_internal_notice` n
+        where n.tenant_id = #{tenantId} and n.member_id = #{memberId} and n.is_delete = 0
+          and n.status = 1 and (n.effective_time is null or n.effective_time &lt;= now())
+          and (n.offline_time is null or n.offline_time &gt; now())
+          and (n.target_scope = 1 or exists (
+              select 1
+              from `ry_rental`.`ry_rental_merchant_internal_notice_role` target_role
+              inner join `ry_rental`.`ry_rental_merchant_user_role` user_role
+                on user_role.tenant_id = target_role.tenant_id and user_role.member_id = target_role.member_id
+               and user_role.role_id = target_role.role_id and user_role.merchant_user_id = #{merchantUserId}
+               and user_role.is_delete = 0
+              inner join `ry_rental`.`ry_rental_merchant_role` target_role_item
+                on target_role_item.tenant_id = target_role.tenant_id and target_role_item.member_id = target_role.member_id
+               and target_role_item.role_id = target_role.role_id and target_role_item.status = 0
+               and target_role_item.is_delete = 0
+              where target_role.internal_notice_id = n.internal_notice_id
+                and target_role.tenant_id = n.tenant_id and target_role.member_id = n.member_id
+                and target_role.is_delete = 0))
+          and not exists (
+              select 1 from `ry_rental`.`ry_rental_merchant_internal_notice_read` rd
+              where rd.internal_notice_id = n.internal_notice_id and rd.tenant_id = n.tenant_id
+                and rd.member_id = n.member_id and rd.merchant_user_id = #{merchantUserId} and rd.is_delete = 0)
+    </select>
+
+    <select id="selectRoleOptions" resultMap="roleOption">
+        select role_id, role_name
+        from `ry_rental`.`ry_rental_merchant_role`
+        where tenant_id = #{tenantId} and member_id = #{memberId} and status = 0 and is_delete = 0
+        order by role_sort, role_id
+    </select>
+
+    <select id="countValidRoles" resultType="int">
+        select count(1) from `ry_rental`.`ry_rental_merchant_role`
+        where tenant_id = #{tenantId} and member_id = #{memberId} and status = 0 and is_delete = 0
+          and role_id in <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId}</foreach>
+    </select>
+
+    <insert id="insertNotice" useGeneratedKeys="true" keyProperty="command.internalNoticeId">
+        insert into `ry_rental`.`ry_rental_merchant_internal_notice`
+            (tenant_id, member_id, notice_title, notice_type, notice_content, target_scope, status,
+             effective_time, offline_time, create_by, create_time, remark)
+        values
+            (#{tenantId}, #{memberId}, #{command.noticeTitle}, #{command.noticeType}, #{command.noticeContent},
+             #{command.targetScope}, #{command.status}, #{command.effectiveTime}, #{command.offlineTime},
+             #{operator}, sysdate(), #{command.remark})
+    </insert>
+
+    <select id="selectLastInsertId" resultType="Long">select last_insert_id()</select>
+
+    <update id="updateNotice">
+        update `ry_rental`.`ry_rental_merchant_internal_notice`
+        set notice_title = #{command.noticeTitle}, notice_type = #{command.noticeType},
+            notice_content = #{command.noticeContent}, target_scope = #{command.targetScope},
+            effective_time = #{command.effectiveTime}, offline_time = #{command.offlineTime},
+            remark = #{command.remark}, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and internal_notice_id = #{command.internalNoticeId} and is_delete = 0
+    </update>
+
+    <update id="updateStatus">
+        update `ry_rental`.`ry_rental_merchant_internal_notice`
+        set status = #{status}, effective_time = #{effectiveTime}, offline_time = #{offlineTime},
+            update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and internal_notice_id = #{noticeId} and is_delete = 0
+    </update>
+
+    <update id="softDelete">
+        update `ry_rental`.`ry_rental_merchant_internal_notice`
+        set is_delete = 1, remove_by = #{operator}, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and internal_notice_id = #{noticeId} and is_delete = 0
+    </update>
+
+    <select id="selectTargetRoleIds" resultType="Long">
+        select role_id from `ry_rental`.`ry_rental_merchant_internal_notice_role`
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and internal_notice_id = #{noticeId} and is_delete = 0 order by role_id
+    </select>
+
+    <update id="deleteTargetRoles">
+        update `ry_rental`.`ry_rental_merchant_internal_notice_role`
+        set is_delete = 1
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and internal_notice_id = #{noticeId} and is_delete = 0
+    </update>
+
+    <insert id="insertTargetRoles">
+        insert into `ry_rental`.`ry_rental_merchant_internal_notice_role`
+            (internal_notice_id, tenant_id, member_id, role_id, create_by, create_time, is_delete)
+        values
+        <foreach collection="roleIds" item="roleId" separator=",">
+            (#{noticeId}, #{tenantId}, #{memberId}, #{roleId}, #{operator}, sysdate(), 0)
+        </foreach>
+        on duplicate key update is_delete = 0
+    </insert>
+
+    <insert id="insertRead">
+        insert into `ry_rental`.`ry_rental_merchant_internal_notice_read`
+            (internal_notice_id, tenant_id, member_id, merchant_user_id, read_time, is_delete)
+        select n.internal_notice_id, n.tenant_id, n.member_id, #{merchantUserId}, sysdate(), 0
+        from `ry_rental`.`ry_rental_merchant_internal_notice` n
+        where n.tenant_id = #{tenantId} and n.member_id = #{memberId}
+          and n.internal_notice_id = #{noticeId} and n.is_delete = 0 and n.status = 1
+          and (n.effective_time is null or n.effective_time &lt;= now())
+          and (n.offline_time is null or n.offline_time &gt; now())
+          and (n.target_scope = 1 or exists (
+              select 1 from `ry_rental`.`ry_rental_merchant_internal_notice_role` target_role
+              inner join `ry_rental`.`ry_rental_merchant_user_role` user_role
+                on user_role.tenant_id = target_role.tenant_id and user_role.member_id = target_role.member_id
+               and user_role.role_id = target_role.role_id and user_role.merchant_user_id = #{merchantUserId}
+               and user_role.is_delete = 0
+              inner join `ry_rental`.`ry_rental_merchant_role` target_role_item
+                on target_role_item.tenant_id = target_role.tenant_id and target_role_item.member_id = target_role.member_id
+               and target_role_item.role_id = target_role.role_id and target_role_item.status = 0
+               and target_role_item.is_delete = 0
+              where target_role.internal_notice_id = n.internal_notice_id
+                and target_role.tenant_id = n.tenant_id and target_role.member_id = n.member_id
+                and target_role.is_delete = 0)
+          )
+        on duplicate key update read_time = sysdate(), is_delete = 0
+    </insert>
+
+    <insert id="insertReadAll">
+        insert into `ry_rental`.`ry_rental_merchant_internal_notice_read`
+            (internal_notice_id, tenant_id, member_id, merchant_user_id, read_time, is_delete)
+        select n.internal_notice_id, n.tenant_id, n.member_id, #{merchantUserId}, sysdate(), 0
+        from `ry_rental`.`ry_rental_merchant_internal_notice` n
+        where n.tenant_id = #{tenantId} and n.member_id = #{memberId} and n.is_delete = 0
+          and n.internal_notice_id in
+          <foreach collection="noticeIds" item="noticeId" open="(" separator="," close=")">#{noticeId}</foreach>
+          and n.status = 1 and (n.effective_time is null or n.effective_time &lt;= now())
+          and (n.offline_time is null or n.offline_time &gt; now())
+          and (n.target_scope = 1 or exists (
+              select 1 from `ry_rental`.`ry_rental_merchant_internal_notice_role` target_role
+              inner join `ry_rental`.`ry_rental_merchant_user_role` user_role
+                on user_role.tenant_id = target_role.tenant_id and user_role.member_id = target_role.member_id
+               and user_role.role_id = target_role.role_id and user_role.merchant_user_id = #{merchantUserId}
+               and user_role.is_delete = 0
+              inner join `ry_rental`.`ry_rental_merchant_role` target_role_item
+                on target_role_item.tenant_id = target_role.tenant_id and target_role_item.member_id = target_role.member_id
+               and target_role_item.role_id = target_role.role_id and target_role_item.status = 0
+               and target_role_item.is_delete = 0
+              where target_role.internal_notice_id = n.internal_notice_id
+                and target_role.tenant_id = n.tenant_id and target_role.member_id = n.member_id
+                and target_role.is_delete = 0)
+          )
+        on duplicate key update read_time = sysdate(), is_delete = 0
+    </insert>
+</mapper>

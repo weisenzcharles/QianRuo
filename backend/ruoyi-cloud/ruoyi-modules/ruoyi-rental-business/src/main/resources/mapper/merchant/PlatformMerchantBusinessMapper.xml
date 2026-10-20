@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformMerchantBusinessMapper">
+    <!-- 平台经营明细只读查询，所有过滤都绑定可信的租户和商户范围。 -->
+    <select id="selectWarehouses" resultType="com.ruoyi.system.api.model.PlatformMerchantWarehouseView">
+        select w.warehouse_code as warehouseCode, w.warehouse_name as warehouseName,
+               w.city, w.return_enabled as returnEnabled,
+               w.alliance_share_enabled as allianceShareEnabled, w.status
+        from ry_business.ry_rental_warehouse w
+        where w.tenant_id = #{tenantId} and w.member_id = #{memberId} and w.is_delete = 0
+        order by w.sort_no asc, w.create_time desc, w.warehouse_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectProducts" resultType="com.ruoyi.system.api.model.PlatformMerchantProductView">
+        select p.product_code as productCode, p.product_name as productName,
+               cast(p.product_type as char) as productType, cast(p.stock_mode as char) as stockMode,
+               p.brand, p.model_name as modelName, p.custom_flag as customFlag, p.status
+        from ry_business.ry_rental_product p
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.is_delete = 0
+        order by p.create_time desc, p.product_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectPackages" resultType="com.ruoyi.system.api.model.PlatformMerchantPackageView">
+        select p.package_code as packageCode, p.package_name as packageName,
+               coalesce((select max(mp.model_name)
+                         from ry_business.ry_rental_product mp
+                         where mp.tenant_id = p.tenant_id and mp.member_id = p.member_id
+                           and mp.model_id = p.model_id and mp.is_delete = 0
+                           and cast(mp.product_type as char) in ('1', 'device')),
+                        '-') as modelName,
+               p.source_type as sourceType, p.custom_flag as customFlag,
+               v.version_no as versionNo, v.version_status as versionStatus, p.status
+        from ry_business.ry_rental_merchant_package p
+        left join ry_business.ry_rental_merchant_package_version v
+          on v.package_id = p.package_id and v.tenant_id = p.tenant_id and v.member_id = p.member_id
+         and v.version_status = 1 and v.is_delete = 0
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.is_delete = 0
+        order by p.create_time desc, p.package_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectInventories" resultType="com.ruoyi.system.api.model.PlatformMerchantInventoryView">
+        select w.warehouse_name as warehouseName, p.product_code as productCode,
+               p.product_name as productName, cast(p.product_type as char) as productType,
+               coalesce(i.total_quantity, 0) as totalQuantity,
+               coalesce(i.available_quantity, 0) as availableQuantity,
+               coalesce(i.reserved_quantity, 0) as reservedQuantity,
+               coalesce(i.rented_quantity, 0) as rentedQuantity,
+               coalesce(i.repairing_quantity, 0) as repairingQuantity,
+               coalesce(i.damaged_quantity, 0) as damagedQuantity, i.status
+        from ry_business.ry_rental_merchant_inventory i
+        left join ry_business.ry_rental_product p
+          on p.product_id = i.product_id and p.tenant_id = i.tenant_id
+         and p.member_id = i.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_warehouse w
+          on w.warehouse_id = i.warehouse_id and w.tenant_id = i.tenant_id
+         and w.member_id = i.member_id and w.is_delete = 0
+        where i.tenant_id = #{tenantId} and i.member_id = #{memberId} and i.is_delete = 0
+        order by i.create_time desc, i.inventory_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectGovernance" resultType="com.ruoyi.system.api.model.PlatformMerchantGovernanceView">
+        select
+            coalesce((select count(1)
+                      from ry_business.ry_rental_order o
+                      where o.tenant_id = #{tenantId} and o.member_id = #{memberId}
+                        and o.is_delete = 0), 0) as totalOrderCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_order o
+                      where o.tenant_id = #{tenantId} and o.member_id = #{memberId}
+                        and o.order_status in (10, 15) and o.is_delete = 0), 0) as pendingOrderCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_order o
+                      where o.tenant_id = #{tenantId} and o.member_id = #{memberId}
+                        and o.order_status in (20, 25, 30, 40, 45, 70) and o.is_delete = 0), 0) as activeOrderCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_order o
+                      where o.tenant_id = #{tenantId} and o.member_id = #{memberId}
+                        and o.order_status = 50 and o.is_delete = 0), 0) as completedOrderCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_order o
+                      where o.tenant_id = #{tenantId} and o.member_id = #{memberId}
+                        and (o.order_status in (60, 65)
+                             or cast(o.time_effect_status as char) in ('1', 'overdue'))
+                        and o.is_delete = 0), 0) as overdueOrderCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_after_sales_case c
+                      where c.tenant_id = #{tenantId} and c.member_id = #{memberId}
+                        and c.is_delete = 0), 0) as afterSalesCaseCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_after_sales_case c
+                      where c.tenant_id = #{tenantId} and c.member_id = #{memberId}
+                        and c.case_status = 0 and c.is_delete = 0), 0) as openAfterSalesCaseCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_logistics_order l
+                      where l.tenant_id = #{tenantId} and l.member_id = #{memberId}
+                        and l.is_delete = 0), 0) as logisticsCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_logistics_order l
+                      where l.tenant_id = #{tenantId} and l.member_id = #{memberId}
+                        and l.route_status in ('0', '1', '3') and l.is_delete = 0), 0) as pendingRouteCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_logistics_order l
+                      where l.tenant_id = #{tenantId} and l.member_id = #{memberId}
+                        and l.abnormal_flag = 1 and l.route_status not in ('2', '4')
+                        and l.is_delete = 0), 0) as abnormalLogisticsCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_inventory_alert_event e
+                      where e.tenant_id = #{tenantId} and e.member_id = #{memberId}
+                        and e.alert_status in (0, 1) and e.is_delete = 0), 0) as openInventoryAlertCount,
+            coalesce((select count(1)
+                      from ry_business.ry_rental_order_alliance_dispute d
+                      where d.tenant_id = #{tenantId}
+                        and (d.initiator_member_id = #{memberId} or d.respondent_member_id = #{memberId})
+                        and d.dispute_status in (0, 1, 2, 3) and d.is_delete = 0), 0) as openAllianceDisputeCount
+    </select>
+</mapper>

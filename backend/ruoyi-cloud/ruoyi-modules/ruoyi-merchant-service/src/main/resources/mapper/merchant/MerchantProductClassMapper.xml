@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantProductClassMapper">
+    <select id="selectClassIds" resultType="long">
+        select class_id
+        from `ry_rental`.`ry_rental_member_product_class`
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
+        order by class_id
+    </select>
+
+    <select id="countSelected" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_member_product_class`
+        where tenant_id = #{tenantId} and member_id = #{merchantId}
+          and class_id = #{classId} and is_delete = 0
+    </select>
+
+    <update id="softDeleteAll">
+        update `ry_rental`.`ry_rental_member_product_class`
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{merchantId} and is_delete = 0
+    </update>
+
+    <insert id="upsertSelections">
+        insert into `ry_rental`.`ry_rental_member_product_class`(
+            tenant_id, member_id, class_id, is_delete, create_by, create_time, update_by, update_time
+        ) values
+        <foreach collection="classIds" item="classId" separator=",">
+            (#{tenantId}, #{merchantId}, #{classId}, 0, #{operator}, sysdate(), #{operator}, sysdate())
+        </foreach>
+        on duplicate key update
+            is_delete = 0,
+            update_by = values(update_by),
+            update_time = values(update_time)
+    </insert>
+</mapper>

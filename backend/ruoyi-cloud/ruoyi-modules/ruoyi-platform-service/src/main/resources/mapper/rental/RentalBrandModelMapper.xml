@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalBrandModelMapper">
+    <resultMap id="brandModelResult" type="com.ruoyi.system.domain.rental.RentalBrandModel">
+        <id property="modelId" column="model_id" />
+        <result property="classId" column="class_id" />
+        <result property="className" column="class_name" />
+        <result property="brandId" column="brand_id" />
+        <result property="brand" column="brand" />
+        <result property="modelName" column="model_name" />
+        <result property="alias" column="alias" />
+        <result property="memorySpec" column="memory_spec" />
+        <result property="officialFlag" column="official_flag" />
+        <result property="status" column="status" />
+        <result property="isDelete" column="is_delete" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="columns">
+        m.model_id, m.class_id, concat_ws(' / ', class_parent.class_name, c.class_name) as class_name,
+        m.brand_id, b.brand_name as brand, m.model_name, m.`alias`, m.memory_spec,
+        m.official_flag, m.status, m.is_delete,
+        m.create_by, m.create_time, m.update_by, m.update_time, m.remark
+    </sql>
+
+    <select id="selectList" resultMap="brandModelResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_model` m
+        left join `ry_rental`.`ry_rental_product_class` c on c.class_id = m.class_id
+        left join `ry_rental`.`ry_rental_product_class` class_parent
+            on class_parent.class_id = c.parent_id and class_parent.class_level = 1
+           and class_parent.is_delete = 0
+        left join `ry_rental`.`ry_rental_brand` b on b.brand_id = m.brand_id and b.is_delete = 0
+        inner join `ry_rental`.`ry_rental_brand_class` bc
+            on bc.brand_id = m.brand_id and bc.class_id = m.class_id and bc.is_delete = 0
+        where m.is_delete = 0
+        <if test="classId != null">and m.class_id = #{classId}</if>
+        <if test="brand != null and brand != ''">and b.brand_name like concat('%', #{brand}, '%')</if>
+        <if test="modelName != null and modelName != ''">and m.model_name like concat('%', #{modelName}, '%')</if>
+        <if test="status != null">and m.status = #{status}</if>
+        order by m.create_time desc, m.model_id desc
+    </select>
+
+    <select id="selectActiveList" resultMap="brandModelResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_model` m
+        inner join `ry_rental`.`ry_rental_product_class` c
+            on c.class_id = m.class_id and c.status = 0 and c.is_delete = 0
+        left join `ry_rental`.`ry_rental_product_class` class_parent
+            on class_parent.class_id = c.parent_id and class_parent.class_level = 1
+           and class_parent.is_delete = 0
+        inner join `ry_rental`.`ry_rental_brand` b
+            on b.brand_id = m.brand_id and b.status = 0 and b.is_delete = 0
+        inner join `ry_rental`.`ry_rental_brand_class` bc
+            on bc.brand_id = m.brand_id and bc.class_id = m.class_id and bc.is_delete = 0
+        where m.status = 0 and m.is_delete = 0
+        order by c.ancestors, c.sort_no, c.class_id, b.brand_name, m.model_name, m.memory_spec, m.model_id
+    </select>
+
+    <select id="selectById" resultMap="brandModelResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_model` m
+        left join `ry_rental`.`ry_rental_product_class` c on c.class_id = m.class_id
+        left join `ry_rental`.`ry_rental_product_class` class_parent
+            on class_parent.class_id = c.parent_id and class_parent.class_level = 1
+           and class_parent.is_delete = 0
+        left join `ry_rental`.`ry_rental_brand` b on b.brand_id = m.brand_id and b.is_delete = 0
+        left join `ry_rental`.`ry_rental_brand_class` bc
+            on bc.brand_id = m.brand_id and bc.class_id = m.class_id and bc.is_delete = 0
+        where m.model_id = #{modelId} and m.is_delete = 0
+    </select>
+
+    <select id="countByIdentity" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_model`
+        where class_id = #{classId}
+          and brand_id = #{brandId}
+          and model_name = #{modelName}
+          and coalesce(memory_spec, '') = coalesce(#{memorySpec}, '')
+          and is_delete = 0
+        <if test="excludeModelId != null">and model_id != #{excludeModelId}</if>
+    </select>
+
+    <select id="countMerchantCommonModelReferences" resultType="int">
+        select count(1)
+        from `ry_rental`.`ry_rental_member_common_model`
+        where model_id = #{modelId} and is_delete = 0
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="modelId">
+        insert into `ry_rental`.`ry_rental_model`(
+            class_id, brand_id, model_name, `alias`, memory_spec, official_flag, status,
+            is_delete, create_by, create_time, remark
+        ) values (
+            #{classId}, #{brandId}, #{modelName}, #{alias}, #{memorySpec}, #{officialFlag}, #{status},
+            0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="update">
+        update `ry_rental`.`ry_rental_model`
+        set class_id = #{classId}, brand_id = #{brandId}, model_name = #{modelName}, `alias` = #{alias},
+            memory_spec = #{memorySpec}, official_flag = #{officialFlag}, status = #{status},
+            update_by = #{updateBy}, update_time = sysdate(), remark = #{remark}
+        where model_id = #{modelId} and is_delete = 0
+    </update>
+
+    <update id="softDelete">
+        update `ry_rental`.`ry_rental_model`
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where model_id = #{modelId} and is_delete = 0
+    </update>
+</mapper>

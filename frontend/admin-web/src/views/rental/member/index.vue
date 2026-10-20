@@ -1,0 +1,917 @@
+<template>
+  <div class="app-container">
+    <el-form
+      class="search-form member-search-form"
+      ref="queryRef"
+      :model="queryParams"
+      :inline="true"
+      v-show="showSearch">
+      <el-form-item label="商户编码" prop="memberCode">
+        <el-input
+          v-model="queryParams.memberCode"
+          placeholder="请输入商户编码"
+          clearable
+          style="width: 180px"
+          @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="店铺名称" prop="nickname">
+        <el-input
+          v-model="queryParams.nickname"
+          placeholder="请输入店铺名称"
+          clearable
+          style="width: 200px"
+          @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="企业名称" prop="legalSubjectName">
+        <el-input
+          v-model="queryParams.legalSubjectName"
+          placeholder="请输入企业名称"
+          clearable
+          style="width: 200px"
+          @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="商户类型" prop="memberType">
+        <el-select
+          v-model="queryParams.memberType"
+          placeholder="商户类型"
+          clearable
+          style="width: 150px">
+          <el-option
+            v-for="item in rentalMemberTypeOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="认证状态" prop="authStatus">
+        <el-select
+          v-model="queryParams.authStatus"
+          placeholder="认证状态"
+          clearable
+          style="width: 150px">
+          <el-option
+            v-for="item in rentalAuthStatusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="冻结状态" prop="status">
+        <el-select
+          v-model="queryParams.status"
+          placeholder="冻结状态"
+          clearable
+          style="width: 140px">
+          <el-option label="未冻结" :value="NORMAL_DISABLE_CODE.NORMAL" />
+          <el-option label="已冻结" :value="NORMAL_DISABLE_CODE.DISABLED" />
+        </el-select>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" icon="Search" @click="handleQuery">
+          搜索
+        </el-button>
+        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
+    <div class="page-toolbar">
+      <div class="toolbar-actions">
+        <el-button
+          type="primary"
+          plain
+          icon="Plus"
+          @click="handleAdd"
+          v-hasPermi="['platform:member:add']">
+          新增
+        </el-button>
+        <el-button
+          type="success"
+          plain
+          icon="Edit"
+          :disabled="single"
+          @click="handleUpdate"
+          v-hasPermi="['platform:member:edit']">
+          修改
+        </el-button>
+        <el-button
+          type="danger"
+          plain
+          icon="Delete"
+          :disabled="multiple"
+          @click="handleDelete"
+          v-hasPermi="['platform:member:remove']">
+          删除
+        </el-button>
+        <el-button
+          type="warning"
+          plain
+          icon="Download"
+          @click="handleExport"
+          v-hasPermi="['platform:member:export']">
+          导出
+        </el-button>
+      </div>
+      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
+    </div>
+
+    <el-table
+      v-loading="loading"
+      :data="memberList"
+      class="member-table"
+      border
+      @selection-change="handleSelectionChange">
+      <el-table-column type="selection" width="55" align="center" />
+      <el-table-column
+        label="编号"
+        align="center"
+        prop="memberId"
+        width="60" />
+
+      <el-table-column
+        label="商户编码"
+        align="center"
+        prop="memberCode"
+        min-width="140" />
+      <el-table-column label="店铺/企业" min-width="220" show-overflow-tooltip>
+        <template #default="scope">
+          <div class="member-name">
+            <span>{{ scope.row.nickname || "-" }}</span>
+            <small>{{ scope.row.legalSubjectName || "-" }}</small>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column
+        label="主账号"
+        align="center"
+        prop="mainAccount"
+        width="140"
+        show-overflow-tooltip />
+      <el-table-column label="类型" align="center" prop="memberType" width="90">
+        <template #default="scope">
+          <el-tag
+            :type="
+              findRentalOption(rentalMemberTypeOptions, scope.row.memberType)
+                .tagType
+            ">
+            {{
+              findRentalOption(rentalMemberTypeOptions, scope.row.memberType)
+                .label
+            }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column
+        label="认证"
+        align="center"
+        prop="authStatus"
+        width="100">
+        <template #default="scope">
+          <el-tag
+            :type="
+              findRentalOption(rentalAuthStatusOptions, scope.row.authStatus)
+                .tagType
+            ">
+            {{
+              findRentalOption(rentalAuthStatusOptions, scope.row.authStatus)
+                .label
+            }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column
+        label="联系人"
+        align="center"
+        prop="contactName"
+        width="110" />
+      <el-table-column
+        label="联系电话"
+        align="center"
+        prop="contactPhone"
+        width="140" />
+      <el-table-column
+        label="会员等级"
+        align="center"
+        prop="vipLevel"
+        width="100">
+        <template #default="scope">
+          <el-tag>{{ levelName(scope.row.levelId, scope.row.vipLevel) }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column
+        label="冻结状态"
+        align="center"
+        prop="status"
+        width="100">
+        <template #default="scope">
+          <el-tag
+            :type="
+              scope.row.status === NORMAL_DISABLE_CODE.DISABLED
+                ? 'danger'
+                : 'success'
+            ">
+            {{
+              scope.row.status === NORMAL_DISABLE_CODE.DISABLED
+                ? "已冻结"
+                : "未冻结"
+            }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column
+        label="创建时间"
+        align="center"
+        prop="createTime"
+        width="160">
+        <template #default="scope">
+          {{ parseTime(scope.row.createTime) }}
+        </template>
+      </el-table-column>
+      <el-table-column
+        label="操作"
+        width="300"
+        align="center"
+        fixed="right"
+        class-name="small-padding fixed-width">
+        <template #default="scope">
+          <div class="table-actions">
+            <el-button
+              link
+              type="primary"
+              icon="View"
+              @click="handleDetail(scope.row)"
+              v-hasPermi="['platform:member:query']">
+              详情
+            </el-button>
+            <el-button
+              v-if="scope.row.authStatus === RENTAL_CODE.AUTH_STATUS.PENDING"
+              link
+              type="success"
+              icon="Checked"
+              @click="handleAudit(scope.row)"
+              v-hasPermi="['platform:member:audit']">
+              审核
+            </el-button>
+            <el-button
+              v-if="scope.row.authStatus === RENTAL_CODE.AUTH_STATUS.PENDING"
+              link
+              type="warning"
+              icon="DocumentChecked"
+              @click="handleSupplement(scope.row)"
+              v-hasPermi="['platform:member:audit']">
+              要求补件
+            </el-button>
+            <el-button
+              link
+              type="primary"
+              icon="Edit"
+              @click="handleUpdate(scope.row)"
+              v-hasPermi="['platform:member:edit']">
+              修改
+            </el-button>
+            <el-button
+              link
+              type="danger"
+              icon="Delete"
+              @click="handleDelete(scope.row)"
+              v-hasPermi="['platform:member:remove']">
+              删除
+            </el-button>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <pagination
+      v-show="total > 0"
+      :total="total"
+      v-model:page="queryParams.pageNum"
+      v-model:limit="queryParams.pageSize"
+      @pagination="getList" />
+
+    <el-dialog
+      :title="title"
+      v-model="open"
+      width="min(1040px, 96vw)"
+      top="4vh"
+      append-to-body
+      destroy-on-close>
+      <member-editor
+        ref="memberEditorRef"
+        v-model="form"
+        :level-options="levelOptions" />
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" :loading="submitting" @click="submitForm">
+            确定
+          </el-button>
+          <el-button @click="cancel">取消</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <member-detail-drawer v-model="detailOpen" :member="detail" />
+
+    <el-dialog
+      title="审核商户申请"
+      v-model="auditOpen"
+      width="520px"
+      append-to-body
+      destroy-on-close>
+      <el-form
+        ref="auditFormRef"
+        :model="auditForm"
+        :rules="auditRules"
+        label-width="92px">
+        <el-form-item label="店铺名称">
+          <el-input :model-value="auditTarget?.nickname" disabled />
+        </el-form-item>
+        <el-form-item label="联系电话">
+          <el-input :model-value="auditTarget?.contactPhone" disabled />
+        </el-form-item>
+        <el-form-item label="审核结果" prop="authStatus">
+          <el-radio-group v-model="auditForm.authStatus">
+            <el-radio :value="RENTAL_CODE.AUTH_STATUS.VERIFIED">
+              审核通过
+            </el-radio>
+            <el-radio :value="RENTAL_CODE.AUTH_STATUS.REJECTED">
+              审核驳回
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="会员类型" prop="membershipType">
+          <el-select
+            v-model="auditForm.membershipType"
+            style="width: 100%"
+            placeholder="请选择审核通过后的会员类型">
+            <el-option
+              v-for="item in rentalMembershipTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="接单资格" prop="qualificationCodes">
+          <el-checkbox-group v-model="auditForm.qualificationCodes">
+            <el-checkbox
+              v-for="item in rentalQualificationOptions"
+              :key="item.value"
+              :label="item.value">
+              {{ item.label }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="审核意见" prop="auditRemark">
+          <el-input
+            v-model="auditForm.auditRemark"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="驳回时必须填写具体原因" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="auditOpen = false">取消</el-button>
+        <el-button type="primary" :loading="auditing" @click="submitAudit">
+          确认审核
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      title="要求商户补件"
+      v-model="supplementOpen"
+      width="560px"
+      append-to-body
+      destroy-on-close>
+      <el-form
+        ref="supplementFormRef"
+        :model="supplementForm"
+        :rules="supplementRules"
+        label-width="96px">
+        <el-form-item label="店铺名称">
+          <el-input :model-value="supplementTarget?.nickname" disabled />
+        </el-form-item>
+        <el-form-item label="补交材料" prop="materialTypes">
+          <el-checkbox-group v-model="supplementForm.materialTypes">
+            <el-checkbox
+              v-for="item in supplementMaterialOptions"
+              :key="item.value"
+              :label="item.value">
+              {{ item.label }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="补件说明" prop="auditRemark">
+          <el-input
+            v-model="supplementForm.auditRemark"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="请说明需要补交或修正的材料内容" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="supplementOpen = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="supplementing"
+          @click="submitSupplement">
+          发送补件要求
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup name="RentalMember">
+import {
+  addMember,
+  auditMember,
+  delMember,
+  getCertificationHistory,
+  getMember,
+  getMemberQualifications,
+  getMembershipHistory,
+  getQualificationHistory,
+  listMember,
+  requestMemberSupplement,
+  updateMember,
+} from "@/api/rental/member";
+import MemberDetailDrawer from "./components/MemberDetailDrawer.vue";
+import MemberEditor from "./components/MemberEditor.vue";
+import {
+  findRentalOption,
+  rentalAuthStatusOptions,
+  rentalMemberTypeOptions,
+  rentalMembershipTypeOptions,
+  rentalQualificationOptions,
+  RENTAL_CODE,
+} from "@/utils/rental/options";
+import { listMerchantLevel } from "@/api/rental/merchantLevel";
+import { NORMAL_DISABLE_CODE } from "@/utils/stateCode";
+
+const { proxy } = getCurrentInstance();
+const { rental_vip_level: rentalVipLevelOptions } = proxy.useDict("rental_vip_level");
+const memberEditorRef = ref();
+const memberList = ref([]);
+const levelOptions = ref([]);
+const open = ref(false);
+const detailOpen = ref(false);
+const detail = ref(null);
+const auditOpen = ref(false);
+const auditing = ref(false);
+const auditTarget = ref(null);
+const auditFormRef = ref();
+const supplementOpen = ref(false);
+const supplementing = ref(false);
+const supplementTarget = ref(null);
+const supplementFormRef = ref();
+const auditForm = reactive({
+  authStatus: RENTAL_CODE.AUTH_STATUS.VERIFIED,
+  auditRemark: "",
+  membershipType: "",
+  qualificationCodes: [],
+});
+const supplementForm = reactive({
+  materialTypes: [],
+  auditRemark: "",
+});
+const auditRules = {
+  authStatus: [
+    { required: true, message: "请选择审核结果", trigger: "change" },
+  ],
+  auditRemark: [{ validator: validateAuditRemark, trigger: "blur" }],
+};
+const supplementRules = {
+  materialTypes: [
+    {
+      required: true,
+      type: "array",
+      min: 1,
+      message: "请选择至少一项需要补交的材料",
+      trigger: "change",
+    },
+  ],
+  auditRemark: [
+    { required: true, message: "请输入补件说明", trigger: "blur" },
+  ],
+};
+const supplementMaterialOptions = [
+  { value: 1, label: "营业执照" },
+  { value: 2, label: "身份证人像面" },
+  { value: 3, label: "身份证国徽面" },
+  { value: 4, label: "签约合同" },
+  { value: 9, label: "其他认证材料" },
+];
+const loading = ref(true);
+const submitting = ref(false);
+const showSearch = ref(true);
+const ids = ref([]);
+const single = ref(true);
+const multiple = ref(true);
+const total = ref(0);
+const title = ref("");
+const form = ref(defaultForm());
+const queryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  memberCode: undefined,
+  nickname: undefined,
+  memberType: undefined,
+  authStatus: undefined,
+  legalSubjectName: undefined,
+  status: undefined,
+});
+
+/** 加载平台商户分页列表，并在请求结束后恢复表格加载状态。 */
+async function getList() {
+  loading.value = true;
+  try {
+    const response = await listMember(queryParams);
+    memberList.value = response.rows;
+    total.value = response.total;
+  } finally {
+    loading.value = false;
+  }
+}
+
+/** 加载平台商户等级选项，供列表显示以及商户新增和修改时选择。 */
+async function loadLevelOptions() {
+  levelOptions.value = (await listMerchantLevel()).data || [];
+}
+
+/**
+ * 根据等级编号返回平台配置的等级名称。
+ *
+ * @param {number|string} levelId 商户等级编号
+ * @returns {string} 等级名称
+ */
+function levelName(levelId, vipLevel) {
+  const dictLevel = rentalVipLevelOptions.value.find(
+    (item) => String(item.value) === String(vipLevel),
+  );
+  if (dictLevel?.label) return dictLevel.label;
+  return (
+    levelOptions.value.find((item) => String(item.levelId) === String(levelId))
+      ?.levelName || "-"
+  );
+}
+
+/**
+ * 创建平台商户编辑表单默认值，新增商户统一从待审核状态开始。
+ *
+ * @returns {object} 商户表单默认值
+ */
+function defaultForm() {
+  return {
+    memberId: undefined,
+    memberCode: undefined,
+    mainAccount: undefined,
+    memberType: RENTAL_CODE.MEMBER_TYPE.PERSONAL,
+    membershipType: RENTAL_CODE.MEMBERSHIP_TYPE.PERSONAL_MEMBER,
+    authStatus: RENTAL_CODE.AUTH_STATUS.PENDING,
+    legalSubjectName: undefined,
+    licenseNo: undefined,
+    nickname: undefined,
+    contactName: undefined,
+    contactPhone: undefined,
+    servicePhone: undefined,
+    contactEmail: undefined,
+    alipayRealName: undefined,
+    alipayAccount: undefined,
+    storeLogoUrl: undefined,
+    storeDescription: undefined,
+    registeredCapital: undefined,
+    businessScope: undefined,
+    licenseAddress: undefined,
+    licenseValidFrom: undefined,
+    licenseValidTo: undefined,
+    licenseLongTerm: RENTAL_CODE.YES_NO.NO,
+    licenseImageUrl: undefined,
+    legalRepresentativeName: undefined,
+    legalRepresentativeIdNo: undefined,
+    legalIdFrontUrl: undefined,
+    legalIdBackUrl: undefined,
+    signingDate: undefined,
+    contractValidFrom: undefined,
+    contractValidTo: undefined,
+    contractFileUrl: undefined,
+    auditTime: undefined,
+    auditRemark: undefined,
+    freezeTime: undefined,
+    freezeReason: undefined,
+    vipLevel: "free",
+    levelId: undefined,
+    storageQuotaMb: 1024,
+    externalAcceptEnabled: RENTAL_CODE.YES_NO.NO,
+    status: NORMAL_DISABLE_CODE.NORMAL,
+    remark: undefined,
+  };
+}
+
+/** 重置商户编辑数据和子表单校验状态。 */
+function reset() {
+  form.value = defaultForm();
+  nextTick(() => memberEditorRef.value?.resetFields());
+}
+
+/** 关闭商户编辑弹窗并清理未提交的表单数据。 */
+function cancel() {
+  open.value = false;
+  reset();
+}
+
+/** 从第一页重新执行当前商户筛选条件。 */
+function handleQuery() {
+  queryParams.pageNum = 1;
+  getList();
+}
+
+/** 清空商户查询条件并重新加载第一页。 */
+function resetQuery() {
+  proxy.resetForm("queryRef");
+  handleQuery();
+}
+
+/**
+ * 同步表格选中商户编号及批量操作按钮状态。
+ *
+ * @param {Array<object>} selection 当前选中的商户行
+ */
+function handleSelectionChange(selection) {
+  ids.value = selection.map((item) => item.memberId);
+  single.value = selection.length !== 1;
+  multiple.value = selection.length === 0;
+}
+
+/** 打开新增商户弹窗，并使用服务端认可的待审核默认状态。 */
+function handleAdd() {
+  reset();
+  open.value = true;
+  title.value = "新增商户";
+}
+
+/**
+ * 加载选中商户详情并打开资料编辑弹窗。
+ *
+ * @param {object} row 当前商户行，未传入时使用表格单选结果
+ */
+async function handleUpdate(row = {}) {
+  reset();
+  const memberId = row.memberId ?? ids.value[0];
+  const response = await getMember(memberId);
+  form.value = { ...defaultForm(), ...response.data };
+  open.value = true;
+  title.value = "修改商户";
+}
+
+/**
+ * 加载商户完整资料并打开只读详情抽屉。
+ *
+ * @param {object} row 当前商户行
+ */
+async function handleDetail(row) {
+  const [
+    memberResponse,
+    certificationResponse,
+    qualificationResponse,
+    membershipHistoryResponse,
+    qualificationHistoryResponse,
+  ] = await Promise.all([
+    getMember(row.memberId),
+    getCertificationHistory(row.memberId),
+    getMemberQualifications(row.memberId),
+    getMembershipHistory(row.memberId),
+    getQualificationHistory(row.memberId),
+  ]);
+  detail.value = {
+    ...memberResponse.data,
+    certificationHistory: certificationResponse.data || [],
+    qualifications: qualificationResponse.data || [],
+    membershipHistory: membershipHistoryResponse.data || [],
+    qualificationHistory: qualificationHistoryResponse.data || [],
+  };
+  detailOpen.value = true;
+}
+
+/** 校验并新增或修改商户资料，成功后关闭弹窗并刷新列表。 */
+async function submitForm() {
+  const valid = await memberEditorRef.value.validate().catch(() => false);
+  if (!valid) return;
+  submitting.value = true;
+  try {
+    if (form.value.memberId !== undefined) {
+      await updateMember(form.value);
+      proxy.$modal.msgSuccess("修改成功");
+    } else {
+      await addMember(form.value);
+      proxy.$modal.msgSuccess("新增成功");
+    }
+    open.value = false;
+    await getList();
+  } finally {
+    submitting.value = false;
+  }
+}
+
+/**
+ * 确认后删除当前商户或表格批量选中的商户记录。
+ *
+ * @param {object} row 当前商户行，未传入时使用批量选中结果
+ */
+function handleDelete(row = {}) {
+  const memberIds = row.memberId ?? ids.value;
+  proxy.$modal
+    .confirm(`是否确认删除商户编号为"${memberIds}"的数据项？`)
+    .then(() => delMember(memberIds))
+    .then(() => {
+      getList();
+      proxy.$modal.msgSuccess("删除成功");
+    })
+    .catch(() => {});
+}
+
+/** 使用当前筛选条件导出平台商户列表。 */
+function handleExport() {
+  proxy.download(
+    "/admin/rental/member/export",
+    { ...queryParams },
+    `rental_member_${Date.now()}.xlsx`,
+  );
+}
+
+/**
+ * 初始化审核表单并打开审核弹窗，只允许待审核商户进入该流程。
+ *
+ * @param {object} row 待审核商户行
+ */
+async function handleAudit(row) {
+  const certificationResponse = await getCertificationHistory(row.memberId);
+  const latestCertification = certificationResponse.data?.[0];
+  if (
+    latestCertification?.certificationStatus ===
+    RENTAL_CODE.CERTIFICATION_STATUS.SUPPLEMENT_REQUIRED
+  ) {
+    proxy.$modal.msgWarning("商户尚未提交补件材料，暂不能审核");
+    return;
+  }
+  auditTarget.value = row;
+  auditForm.authStatus = RENTAL_CODE.AUTH_STATUS.VERIFIED;
+  auditForm.auditRemark = "";
+  auditForm.membershipType =
+    row.membershipType ||
+    (row.memberType === RENTAL_CODE.MEMBER_TYPE.ENTERPRISE
+      ? RENTAL_CODE.MEMBERSHIP_TYPE.ORDINARY_ENTERPRISE_MEMBER
+      : RENTAL_CODE.MEMBERSHIP_TYPE.PERSONAL_MEMBER);
+  const response = await getMemberQualifications(row.memberId);
+  auditForm.qualificationCodes = (response.data || [])
+    .filter(
+      (item) =>
+        item.qualificationStatus === RENTAL_CODE.QUALIFICATION_STATUS.ENABLED,
+    )
+    .map((item) => item.qualificationCode);
+  auditOpen.value = true;
+  nextTick(() => auditFormRef.value?.clearValidate());
+}
+
+/** 初始化平台补件要求，默认勾选当前主体常见的认证材料。 */
+function handleSupplement(row) {
+  supplementTarget.value = row;
+  supplementForm.materialTypes =
+    row.memberType === RENTAL_CODE.MEMBER_TYPE.ENTERPRISE
+      ? [1, 2, 3, 4]
+      : [2, 3, 4];
+  supplementForm.auditRemark = "";
+  supplementOpen.value = true;
+  nextTick(() => supplementFormRef.value?.clearValidate());
+}
+
+/** 提交平台补件要求，并将当前认证版本置为待补件。 */
+async function submitSupplement() {
+  const valid = await supplementFormRef.value
+    .validate()
+    .catch(() => false);
+  if (!valid) return;
+  supplementing.value = true;
+  try {
+    await requestMemberSupplement(supplementTarget.value.memberId, {
+      ...supplementForm,
+    });
+    proxy.$modal.msgSuccess("补件要求已发送");
+    supplementOpen.value = false;
+    await getList();
+  } finally {
+    supplementing.value = false;
+  }
+}
+
+/**
+ * 校验并提交独立审核命令，审核通过后提示管理员账号已同步开通。
+ */
+async function submitAudit() {
+  const valid = await auditFormRef.value.validate().catch(() => false);
+  if (!valid) return;
+  auditing.value = true;
+  try {
+    await auditMember(auditTarget.value.memberId, { ...auditForm });
+    proxy.$modal.msgSuccess(
+      auditForm.authStatus === RENTAL_CODE.AUTH_STATUS.VERIFIED
+        ? "审核通过，商户管理员账号已开通"
+        : "审核已驳回",
+    );
+    auditOpen.value = false;
+    await getList();
+  } finally {
+    auditing.value = false;
+  }
+}
+
+/**
+ * 校验审核意见：通过时可选，驳回时必须填写可操作的具体原因。
+ *
+ * @param {object} rule Element Plus 校验规则
+ * @param {string} value 审核意见
+ * @param {Function} callback 校验完成回调
+ */
+function validateAuditRemark(rule, value, callback) {
+  if (
+    auditForm.authStatus === RENTAL_CODE.AUTH_STATUS.REJECTED &&
+    !value?.trim()
+  ) {
+    callback(new Error("审核驳回时必须填写原因"));
+    return;
+  }
+  callback();
+}
+
+getList();
+loadLevelOptions();
+</script>
+
+<style scoped>
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  margin-bottom: 16px;
+}
+
+.toolbar-actions,
+.table-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.toolbar-actions {
+  gap: 10px;
+}
+
+.page-toolbar :deep(.top-right-btn) {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.table-actions {
+  justify-content: center;
+}
+
+.table-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.member-table :deep(.el-table__cell) {
+  vertical-align: middle;
+}
+
+.member-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+
+.member-name small {
+  color: #909399;
+}
+
+:deep(.el-dialog__body) {
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .page-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-toolbar :deep(.top-right-btn) {
+    margin-left: 0;
+  }
+}
+</style>

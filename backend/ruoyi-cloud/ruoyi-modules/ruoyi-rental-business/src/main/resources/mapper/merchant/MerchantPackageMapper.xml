@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantPackageMapper">
+    <select id="selectList" resultType="map">
+        select p.package_id as packageId, p.package_code as packageCode, p.package_name as packageName,
+               p.source_type as sourceType, p.custom_flag as customFlag, p.platform_package_id as platformPackageId, p.class_id as classId,
+               p.model_id as modelId, p.status, p.sort_no as sortNo, v.package_version_id as packageVersionId,
+               v.version_no as versionNo, v.bom_hash as bomHash
+        from ry_business.ry_rental_merchant_package p
+        left join ry_business.ry_rental_merchant_package_version v on v.package_id=p.package_id
+          and v.version_status=1 and v.is_delete=0
+        where p.tenant_id=#{tenantId} and p.member_id=#{memberId} and p.is_delete=0
+        <if test="keyword != null and keyword != ''">and (p.package_code like concat('%',#{keyword},'%') or p.package_name like concat('%',#{keyword},'%'))</if>
+        <if test="status != null">and p.status=#{status}</if>
+        order by p.create_time desc, p.package_id desc
+    </select>
+    <select id="selectById" resultType="map">
+        select package_id as packageId, package_code as packageCode, package_name as packageName,
+          source_type as sourceType, custom_flag as customFlag, platform_package_id as platformPackageId, class_id as classId,
+          model_id as modelId, status, sort_no as sortNo, remark
+        from ry_business.ry_rental_merchant_package
+        where tenant_id=#{tenantId} and member_id=#{memberId} and package_id=#{packageId} and is_delete=0
+    </select>
+    <select id="selectItems" resultType="map">
+        select i.package_item_id as packageItemId, i.item_role as itemRole, i.product_id as productId,
+          i.accessory_id as accessoryId, i.accessory_item_product_id as accessoryItemProductId,
+          i.merchant_accessory_id as merchantAccessoryId,
+          case when i.item_role in (1, 4) then p.product_name
+               when i.item_role = 3 then coalesce(ma.accessory_name, p.product_name)
+               when i.item_role = 2 then '官方配件'
+          end as itemName,
+          p.product_code as itemCode, p.model_name as itemModelName,
+          p.product_type as productType, p.stock_mode as stockMode,
+          i.quantity, i.required_flag as requiredFlag, i.sort_no as sortNo
+        from ry_business.ry_rental_merchant_package_item i
+        left join ry_business.ry_rental_product p
+          on p.product_id = coalesce(i.product_id, i.accessory_item_product_id)
+         and p.tenant_id = i.tenant_id and p.member_id = i.member_id and p.is_delete = 0
+        left join ry_business.ry_rental_merchant_accessory ma
+          on ma.accessory_id = i.merchant_accessory_id
+         and ma.tenant_id = i.tenant_id and ma.member_id = i.member_id and ma.is_delete = 0
+        where i.package_version_id=#{packageVersionId} and i.is_delete=0
+        order by i.sort_no, i.package_item_id
+    </select>
+    <select id="selectVersionById" resultType="map">
+        select package_version_id as packageVersionId, package_id as packageId
+        from ry_business.ry_rental_merchant_package_version
+        where tenant_id=#{tenantId} and member_id=#{memberId} and package_id=#{packageId}
+          and version_status=1 and is_delete=0 order by version_no desc limit 1
+    </select>
+    <select id="selectProductByModel" resultType="map">
+        select product_id, model_id from ry_business.ry_rental_product
+        where tenant_id=#{tenantId} and member_id=#{memberId} and model_id=#{modelId}
+          and (product_type=1 or product_type='device') and is_delete=0 order by product_id limit 1
+    </select>
+    <select id="selectProduct" resultType="map">
+        select product_id, class_id, model_id, product_type from ry_business.ry_rental_product
+        where tenant_id=#{tenantId} and member_id=#{memberId} and product_id=#{productId}
+          and (product_type=1 or product_type='device') and is_delete=0 limit 1
+    </select>
+    <select id="selectPackageProduct" resultType="map">
+        select product_id, class_id, model_id, product_type, product_name, product_code, model_name
+        from ry_business.ry_rental_product
+        where tenant_id=#{tenantId} and member_id=#{memberId} and product_id=#{productId}
+          and status=0 and is_delete=0
+          and (product_type=1 or product_type='device' or product_type=2 or product_type='accessory')
+        limit 1
+    </select>
+    <select id="selectPackageProductByModel" resultType="map">
+        select product_id, class_id, model_id, product_type, product_name, product_code, model_name
+        from ry_business.ry_rental_product
+        where tenant_id=#{tenantId} and member_id=#{memberId} and model_id=#{modelId}
+          and status=0 and is_delete=0
+          and (product_type=1 or product_type='device' or product_type=2 or product_type='accessory')
+        order by product_type, product_id
+        limit 1
+    </select>
+    <select id="selectAccessoryProduct" resultType="map">
+        select p.product_id, p.model_id, p.product_type, a.accessory_id as merchant_accessory_id
+        from ry_business.ry_rental_product p
+        left join ry_business.ry_rental_merchant_accessory a
+          on a.tenant_id=p.tenant_id and a.member_id=p.member_id and a.product_id=p.product_id and a.is_delete=0
+        where p.tenant_id=#{tenantId} and p.member_id=#{memberId} and p.product_id=#{productId}
+          and (p.product_type=2 or p.product_type='accessory') and p.is_delete=0 limit 1
+    </select>
+    <select id="selectMerchantAccessory" resultType="map">
+        select accessory_id, product_id, class_id, custom_flag, status
+        from ry_business.ry_rental_merchant_accessory
+        where tenant_id=#{tenantId} and member_id=#{memberId} and accessory_id=#{accessoryId}
+          and custom_flag=1 and status=0 and is_delete=0 limit 1
+    </select>
+    <select id="selectMerchantAccessoryModelIds" resultType="long">
+        select model_id from ry_business.ry_rental_merchant_accessory_model
+        where tenant_id=#{tenantId} and member_id=#{memberId} and accessory_id=#{accessoryId}
+          and model_id=#{modelId} and is_delete=0
+    </select>
+    <select id="selectMerchantAccessoryOptions" resultType="map">
+        select a.accessory_id as merchantAccessoryId, a.product_id as productId,
+               a.accessory_code as productCode, p.product_name as productName,
+               a.class_id as classId,
+               group_concat(am.model_id order by am.model_id separator ',') as compatibleModelIds
+        from ry_business.ry_rental_merchant_accessory a
+        join ry_business.ry_rental_product p
+          on p.product_id=a.product_id and p.tenant_id=a.tenant_id and p.member_id=a.member_id
+         and p.is_delete=0 and (p.product_type=2 or p.product_type='accessory')
+        left join ry_business.ry_rental_merchant_accessory_model am
+          on am.tenant_id=a.tenant_id and am.member_id=a.member_id and am.accessory_id=a.accessory_id
+         and am.is_delete=0
+        where a.tenant_id=#{tenantId} and a.member_id=#{memberId} and a.custom_flag=1
+          and a.status=0 and a.is_delete=0
+        <if test="modelId != null">
+          and exists (select 1 from ry_business.ry_rental_merchant_accessory_model compatible_model
+                      where compatible_model.tenant_id=a.tenant_id
+                        and compatible_model.member_id=a.member_id
+                        and compatible_model.accessory_id=a.accessory_id
+                        and compatible_model.model_id=#{modelId}
+                        and compatible_model.is_delete=0)
+        </if>
+        group by a.accessory_id, a.product_id, a.accessory_code, p.product_name, a.class_id
+        order by a.create_time desc, a.accessory_id desc
+    </select>
+    <select id="selectMerchantAccessoryByModel" resultType="map">
+        select a.accessory_id, a.product_id
+        from ry_business.ry_rental_merchant_accessory a
+        join ry_business.ry_rental_merchant_accessory_model am
+          on am.tenant_id=a.tenant_id and am.member_id=a.member_id and am.accessory_id=a.accessory_id
+         and am.model_id=#{modelId} and am.is_delete=0
+        where a.tenant_id=#{tenantId} and a.member_id=#{memberId} and a.custom_flag=1
+          and a.status=0 and a.is_delete=0
+        order by a.create_time, a.accessory_id limit 1
+    </select>
+    <insert id="insertPackage">
+        insert into ry_business.ry_rental_merchant_package
+          (tenant_id,member_id,source_type,custom_flag,platform_package_id,class_id,model_id,package_code,package_name,status,sort_no,create_by,create_time,update_by,update_time,remark,is_delete)
+        values (#{tenantId},#{memberId},1,1,#{platformPackageId},#{classId},#{modelId},#{packageCode},#{packageName},0,#{sortNo},#{operator},now(),#{operator},now(),#{remark},0)
+    </insert>
+    <insert id="insertCustomPackage">
+        insert into ry_business.ry_rental_merchant_package
+          (tenant_id,member_id,source_type,custom_flag,platform_package_id,class_id,model_id,package_code,package_name,status,sort_no,create_by,create_time,update_by,update_time,remark,is_delete)
+        values (#{tenantId},#{memberId},2,1,null,#{classId},#{modelId},#{packageCode},#{packageName},#{status},#{sortNo},#{operator},now(),#{operator},now(),#{remark},0)
+    </insert>
+    <update id="updatePackage">
+        update ry_business.ry_rental_merchant_package
+        set class_id=#{classId}, model_id=#{modelId}, package_name=#{packageName}, custom_flag=1,
+            status=#{status}, sort_no=#{sortNo}, update_by=#{operator}, update_time=now(), remark=#{remark}
+        where tenant_id=#{tenantId} and member_id=#{memberId} and package_id=#{packageId} and is_delete=0
+    </update>
+    <update id="softDeletePackage">
+        update ry_business.ry_rental_merchant_package set is_delete=1, remove_by=#{operator}, remove_time=now(), update_by=#{operator}, update_time=now()
+        where tenant_id=#{tenantId} and member_id=#{memberId} and package_id=#{packageId} and is_delete=0
+    </update>
+    <update id="softDeletePackageVersions">
+        update ry_business.ry_rental_merchant_package_version set is_delete=1, version_status=2, remove_by=#{operator}, remove_time=now(), update_by=#{operator}, update_time=now()
+        where tenant_id=#{tenantId} and member_id=#{memberId} and package_id=#{packageId} and is_delete=0
+    </update>
+    <update id="softDeletePackageItems">
+        update ry_business.ry_rental_merchant_package_item set is_delete=1, remove_by=#{operator}, remove_time=now(), update_by=#{operator}, update_time=now()
+        where package_version_id=#{packageVersionId} and is_delete=0
+    </update>
+    <select id="selectNextVersionNo" resultType="int">
+        select coalesce(max(version_no), 0) + 1 from ry_business.ry_rental_merchant_package_version where package_id=#{packageId}
+    </select>
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+    <insert id="insertVersion">
+        insert into ry_business.ry_rental_merchant_package_version
+          (tenant_id,member_id,package_id,version_no,version_status,effective_time,bom_hash,create_by,create_time,update_by,update_time,is_delete)
+        values (#{tenantId},#{memberId},#{packageId},#{versionNo},1,now(),#{bomHash},#{operator},now(),#{operator},now(),0)
+    </insert>
+    <select id="selectLastVersionId" resultType="long">select last_insert_id()</select>
+    <insert id="insertItem">
+        insert into ry_business.ry_rental_merchant_package_item
+          (tenant_id,member_id,package_version_id,item_role,product_id,accessory_id,accessory_item_product_id,merchant_accessory_id,quantity,required_flag,sort_no,create_by,create_time,update_by,update_time,is_delete)
+        values (#{tenantId},#{memberId},#{packageVersionId},#{itemRole},#{productId},#{accessoryId},#{accessoryItemProductId},#{merchantAccessoryId},#{quantity},#{requiredFlag},#{sortNo},#{operator},now(),#{operator},now(),0)
+    </insert>
+</mapper>

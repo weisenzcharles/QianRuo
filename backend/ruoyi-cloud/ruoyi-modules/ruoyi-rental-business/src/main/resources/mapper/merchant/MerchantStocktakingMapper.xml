@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantStocktakingMapper">
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <select id="selectStocktakingList" resultType="map">
+        select s.stocktaking_id as stocktakingId, s.stocktaking_no as stocktakingNo,
+               s.warehouse_id as warehouseId, w.warehouse_name as warehouseName,
+               s.stocktaking_date as stocktakingDate, s.stocktaking_mode as mode,
+               s.stocktaking_scope as scope, s.scope_label as scopeLabel,
+               s.stocktaking_status as status, s.expected_quantity as expectedQuantity,
+               s.create_time as createTime, s.remark,
+               case when s.stocktaking_mode = 0 then
+                    (select count(1) from ry_business.ry_rental_stocktaking_item i
+                     where i.tenant_id = s.tenant_id and i.member_id = s.member_id
+                       and i.stocktaking_id = s.stocktaking_id and i.inventory_id is not null and i.is_delete = 0)
+                    else s.expected_quantity end as itemCount,
+               case when s.stocktaking_mode = 0 then
+                    (select count(1) from ry_business.ry_rental_stocktaking_item i
+                     where i.tenant_id = s.tenant_id and i.member_id = s.member_id
+                       and i.stocktaking_id = s.stocktaking_id and i.inventory_id is not null
+                       and i.counted_quantity is not null and i.is_delete = 0)
+                    else (select count(distinct i.scan_code) from ry_business.ry_rental_stocktaking_item i
+                     where i.tenant_id = s.tenant_id and i.member_id = s.member_id
+                       and i.stocktaking_id = s.stocktaking_id and i.scan_code is not null and i.is_delete = 0)
+                    end as completedCount,
+               case when s.stocktaking_mode = 0 then
+                    (select count(1) from ry_business.ry_rental_stocktaking_item i
+                     where i.tenant_id = s.tenant_id and i.member_id = s.member_id
+                       and i.stocktaking_id = s.stocktaking_id and i.difference_quantity &lt;&gt; 0 and i.is_delete = 0)
+                    else s.abnormal_count end as abnormalCount
+        from ry_business.ry_rental_stocktaking s
+        inner join ry_business.ry_rental_warehouse w
+          on w.warehouse_id = s.warehouse_id and w.tenant_id = s.tenant_id
+         and w.member_id = s.member_id and w.is_delete = 0
+        where s.tenant_id = #{tenantId} and s.member_id = #{memberId} and s.is_delete = 0
+        <if test="warehouseId != null">and s.warehouse_id = #{warehouseId}</if>
+        <if test="status != null">and s.stocktaking_status = #{status}</if>
+        <if test="mode != null">and s.stocktaking_mode = #{mode}</if>
+        <if test="beginDate != null">and s.stocktaking_date &gt;= #{beginDate}</if>
+        <if test="endDate != null">and s.stocktaking_date &lt;= #{endDate}</if>
+        <if test="keyword != null and keyword != ''">
+          and (s.stocktaking_no like concat('%', #{keyword}, '%')
+            or w.warehouse_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="!allWarehouseAccess">
+            <choose>
+                <when test="warehouseIds != null and warehouseIds.size() > 0">
+                    and s.warehouse_id in
+                    <foreach collection="warehouseIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+            </choose>
+        </if>
+        order by s.create_time desc, s.stocktaking_id desc
+    </select>
+
+    <select id="selectSummary" resultType="map">
+        select count(case when s.stocktaking_status = 0 then 1 end) as processingCount,
+               count(case when s.stocktaking_status = 3 then 1 end) as pendingReviewCount,
+               count(case when s.stocktaking_status = 1 and date(s.update_time) = current_date then 1 end) as completedTodayCount,
+               coalesce(sum(case when s.stocktaking_mode = 0 and s.stocktaking_status = 3 then
+                   (select count(1) from ry_business.ry_rental_stocktaking_item i
+                    where i.tenant_id = s.tenant_id and i.member_id = s.member_id
+                    and i.stocktaking_id = s.stocktaking_id and i.difference_quantity is not null
+                    and i.difference_quantity &lt;&gt; 0 and i.is_delete = 0)
+                   when s.stocktaking_mode = 1 and s.stocktaking_status = 0 then s.abnormal_count
+                   else 0 end), 0) as abnormalCount
+        from ry_business.ry_rental_stocktaking s
+        where s.tenant_id = #{tenantId} and s.member_id = #{memberId} and s.is_delete = 0
+        <if test="warehouseId != null">and s.warehouse_id = #{warehouseId}</if>
+        <if test="!allWarehouseAccess">
+            <choose>
+                <when test="warehouseIds != null and warehouseIds.size() > 0">
+                    and s.warehouse_id in
+                    <foreach collection="warehouseIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+            </choose>
+        </if>
+    </select>
+
+    <select id="selectStocktaking" resultType="map">
+        select s.stocktaking_id as stocktakingId, s.stocktaking_no as stocktakingNo,
+               s.warehouse_id as warehouseId, w.warehouse_name as warehouseName,
+               s.stocktaking_date as stocktakingDate, s.stocktaking_mode as mode,
+               s.stocktaking_scope as scope, s.scope_label as scopeLabel,
+               s.stocktaking_status as status, s.expected_quantity as expectedQuantity,
+               s.abnormal_count as abnormalCount, s.create_time as createTime,
+               s.update_time as updateTime, s.remark
+        from ry_business.ry_rental_stocktaking s
+        inner join ry_business.ry_rental_warehouse w
+          on w.warehouse_id = s.warehouse_id and w.tenant_id = s.tenant_id
+         and w.member_id = s.member_id and w.is_delete = 0
+        where s.tenant_id = #{tenantId} and s.member_id = #{memberId}
+          and s.stocktaking_id = #{stocktakingId} and s.is_delete = 0
+    </select>
+
+    <select id="selectScopeOptions" resultType="map">
+        <choose>
+            <when test="scope == 1">
+                select p.class_id as optionId,
+                       coalesce(nullif(concat_ws(' / ', nullif(p.category_level1, ''),
+                           nullif(p.category_level2, ''), nullif(p.category_level3, '')), ''), '未分类') as optionLabel
+                from ry_business.ry_rental_merchant_inventory i
+                inner join ry_business.ry_rental_product p
+                  on p.product_id = i.product_id and p.tenant_id = i.tenant_id
+                 and p.member_id = i.member_id and p.is_delete = 0
+                where i.tenant_id = #{tenantId} and i.member_id = #{memberId}
+                  and i.warehouse_id = #{warehouseId} and i.status = 0
+                  and i.available_quantity &gt; 0 and i.is_delete = 0 and p.class_id is not null
+                group by p.class_id, p.category_level1, p.category_level2, p.category_level3
+                order by optionLabel
+            </when>
+            <when test="scope == 2">
+                select p.model_id as optionId,
+                       coalesce(nullif(concat_ws(' ', nullif(p.brand, ''), nullif(p.model_name, ''),
+                           nullif(p.memory_spec, '')), ''), p.product_name) as optionLabel
+                from ry_business.ry_rental_merchant_inventory i
+                inner join ry_business.ry_rental_product p
+                  on p.product_id = i.product_id and p.tenant_id = i.tenant_id
+                 and p.member_id = i.member_id and p.is_delete = 0
+                where i.tenant_id = #{tenantId} and i.member_id = #{memberId}
+                  and i.warehouse_id = #{warehouseId} and i.status = 0
+                  and i.available_quantity &gt; 0 and i.is_delete = 0 and p.model_id is not null
+                group by p.model_id, p.brand, p.model_name, p.memory_spec, p.product_name
+                order by optionLabel
+            </when>
+        </choose>
+    </select>
+
+    <select id="selectStocktakingForUpdate" resultType="map">
+        select stocktaking_id as stocktakingId, warehouse_id as warehouseId,
+               stocktaking_mode as mode, stocktaking_status as status
+        from ry_business.ry_rental_stocktaking
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and is_delete = 0
+        for update
+    </select>
+
+    <select id="selectItems" resultType="map">
+        select i.item_id as itemId, i.sn_id as unitId, i.inventory_id as inventoryId,
+               i.product_id as productId, i.scan_code as scanCode,
+               coalesce(i.product_name_snapshot, p.product_name) as productName,
+               coalesce(i.model_name_snapshot, p.model_name) as modelName,
+               coalesce(i.system_status, u.unit_status) as systemStatus,
+               i.scan_result as scanResult, i.book_quantity as bookQuantity,
+               i.counted_quantity as countedQuantity, i.difference_quantity as differenceQuantity,
+               i.remark, i.create_time as createTime
+        from ry_business.ry_rental_stocktaking_item i
+        left join ry_business.ry_rental_merchant_inventory_unit u
+          on u.unit_id = i.sn_id and u.tenant_id = i.tenant_id and u.member_id = i.member_id
+        left join ry_business.ry_rental_product p
+          on p.product_id = coalesce(i.product_id, u.product_id)
+         and p.tenant_id = i.tenant_id and p.member_id = i.member_id
+        where i.tenant_id = #{tenantId} and i.member_id = #{memberId}
+          and i.stocktaking_id = #{stocktakingId} and i.is_delete = 0
+        order by case when i.inventory_id is not null then 0 else 1 end,
+                 coalesce(i.product_name_snapshot, p.product_name), i.item_id
+    </select>
+
+    <insert id="insertStocktaking">
+        insert into ry_business.ry_rental_stocktaking
+            (tenant_id, member_id, warehouse_id, stocktaking_no, stocktaking_date,
+             stocktaking_mode, stocktaking_scope, scope_class_id, scope_model_id, scope_label,
+             expected_quantity, stocktaking_status, abnormal_count,
+             create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{warehouseId}, #{stocktakingNo}, #{stocktakingDate},
+                #{mode}, #{scope}, #{classId}, #{modelId}, #{scopeLabel},
+                #{expectedQuantity}, 0, 0, #{operatorId}, now(), #{operatorId}, now(), #{remark}, 0)
+    </insert>
+
+    <select id="selectScopeLabel" resultType="string">
+        select case when #{scope} = 1
+                    then coalesce(nullif(concat_ws(' / ', nullif(p.category_level1, ''),
+                                   nullif(p.category_level2, ''), nullif(p.category_level3, '')), ''), '指定分类')
+                    else coalesce(nullif(concat_ws(' ', nullif(p.brand, ''), nullif(p.model_name, ''),
+                                   nullif(p.memory_spec, '')), ''), '指定型号') end
+        from ry_business.ry_rental_product p
+        where p.tenant_id = #{tenantId} and p.member_id = #{memberId} and p.status = 0 and p.is_delete = 0
+        <choose>
+            <when test="scope == 1">and p.class_id = #{classId}</when>
+            <when test="scope == 2">and p.model_id = #{modelId}</when>
+        </choose>
+        order by p.product_id limit 1
+    </select>
+
+    <select id="selectExpectedQuantity" resultType="int">
+        <choose>
+            <when test="mode == 1">
+                select count(1)
+                from ry_business.ry_rental_merchant_inventory_unit u
+                inner join ry_business.ry_rental_merchant_inventory i
+                  on i.inventory_id = u.inventory_id and i.tenant_id = u.tenant_id
+                 and i.member_id = u.member_id and i.is_delete = 0
+                inner join ry_business.ry_rental_product p
+                  on p.product_id = u.product_id and p.tenant_id = u.tenant_id
+                 and p.member_id = u.member_id and p.is_delete = 0
+                where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+                  and u.warehouse_id = #{warehouseId} and u.unit_status = 1 and u.is_delete = 0
+                  and i.status = 0 and i.available_quantity &gt; 0
+                <if test="scope == 1">and p.class_id = #{classId}</if>
+                <if test="scope == 2">and p.model_id = #{modelId}</if>
+            </when>
+            <otherwise>
+                select coalesce(sum(i.available_quantity), 0)
+                from ry_business.ry_rental_merchant_inventory i
+                inner join ry_business.ry_rental_product p
+                  on p.product_id = i.product_id and p.tenant_id = i.tenant_id
+                 and p.member_id = i.member_id and p.is_delete = 0
+                where i.tenant_id = #{tenantId} and i.member_id = #{memberId}
+                  and i.warehouse_id = #{warehouseId} and i.status = 0 and i.is_delete = 0
+                <if test="scope == 1">and p.class_id = #{classId}</if>
+                <if test="scope == 2">and p.model_id = #{modelId}</if>
+            </otherwise>
+        </choose>
+    </select>
+
+    <insert id="insertManualSnapshot">
+        insert into ry_business.ry_rental_stocktaking_item
+            (stocktaking_id, tenant_id, member_id, inventory_id, product_id, scan_code,
+             system_status, scan_result, book_quantity, counted_quantity, difference_quantity,
+             product_name_snapshot, model_name_snapshot, create_time, is_delete)
+        select #{stocktakingId}, i.tenant_id, i.member_id, i.inventory_id, i.product_id, null,
+               null, 0, i.available_quantity, null, null, p.product_name, p.model_name, now(), 0
+        from ry_business.ry_rental_merchant_inventory i
+        inner join ry_business.ry_rental_product p
+          on p.product_id = i.product_id and p.tenant_id = i.tenant_id
+         and p.member_id = i.member_id and p.is_delete = 0
+        where i.tenant_id = #{tenantId} and i.member_id = #{memberId}
+          and i.warehouse_id = #{warehouseId} and i.status = 0 and i.is_delete = 0
+          and i.available_quantity &gt; 0
+        <if test="scope == 1">and p.class_id = #{classId}</if>
+        <if test="scope == 2">and p.model_id = #{modelId}</if>
+    </insert>
+
+    <select id="countDuplicateScan" resultType="int">
+        select count(1) from ry_business.ry_rental_stocktaking_item
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and scan_code = #{scanCode} and is_delete = 0
+    </select>
+
+    <select id="selectUnitByCode" resultType="map">
+        select u.unit_id as unitId, u.warehouse_id as warehouseId,
+               w.warehouse_name as warehouseName, u.unit_code as unitCode,
+               u.unit_status as unitStatus, p.product_name as productName,
+               p.model_name as modelName
+        from ry_business.ry_rental_merchant_inventory_unit u
+        left join ry_business.ry_rental_warehouse w
+          on w.warehouse_id = u.warehouse_id and w.tenant_id = u.tenant_id
+         and w.member_id = u.member_id and w.is_delete = 0
+        left join ry_business.ry_rental_product p
+          on p.product_id = u.product_id and p.tenant_id = u.tenant_id
+         and p.member_id = u.member_id and p.is_delete = 0
+        where u.tenant_id = #{tenantId} and u.member_id = #{memberId}
+          and u.is_delete = 0 and (u.unit_code = #{code} or u.serial_number = #{code})
+        order by u.unit_id desc limit 1
+    </select>
+
+    <insert id="insertScanItem">
+        insert into ry_business.ry_rental_stocktaking_item
+            (stocktaking_id, tenant_id, member_id, sn_id, scan_code, system_status,
+             scan_result, matched_ref_type, matched_ref_id, product_name_snapshot,
+             model_name_snapshot, remark, create_time, is_delete)
+        values (#{stocktakingId}, #{tenantId}, #{memberId}, #{unitId}, #{scanCode}, #{systemStatus},
+                #{scanResult}, #{matchedRefType}, #{matchedRefId}, #{productName}, #{modelName},
+                #{remark}, now(), 0)
+    </insert>
+
+    <update id="incrementAbnormalCount">
+        update ry_business.ry_rental_stocktaking
+        set abnormal_count = abnormal_count + 1, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and stocktaking_status = 0 and is_delete = 0
+    </update>
+
+    <select id="selectItemForUpdate" resultType="map">
+        select item_id as itemId, inventory_id as inventoryId, book_quantity as bookQuantity,
+               counted_quantity as countedQuantity
+        from ry_business.ry_rental_stocktaking_item
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and item_id = #{itemId}
+          and inventory_id is not null and is_delete = 0
+        for update
+    </select>
+
+    <update id="updateCountedQuantity">
+        update ry_business.ry_rental_stocktaking_item
+        set counted_quantity = #{countedQuantity},
+            difference_quantity = #{countedQuantity} - book_quantity
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and item_id = #{itemId}
+          and inventory_id is not null and is_delete = 0
+    </update>
+
+    <select id="countUncountedItems" resultType="int">
+        select count(1) from ry_business.ry_rental_stocktaking_item
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and inventory_id is not null
+          and counted_quantity is null and is_delete = 0
+    </select>
+
+    <select id="countDifferentItems" resultType="int">
+        select count(1) from ry_business.ry_rental_stocktaking_item
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and inventory_id is not null
+          and difference_quantity is not null and difference_quantity &lt;&gt; 0 and is_delete = 0
+    </select>
+
+    <update id="updateStatus">
+        update ry_business.ry_rental_stocktaking
+        set stocktaking_status = #{toStatus}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and stocktaking_id = #{stocktakingId} and stocktaking_status = #{fromStatus} and is_delete = 0
+    </update>
+</mapper>

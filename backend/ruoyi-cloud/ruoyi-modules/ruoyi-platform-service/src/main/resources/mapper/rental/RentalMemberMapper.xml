@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalMemberMapper">
+
+    <resultMap type="com.ruoyi.system.domain.rental.RentalMember" id="RentalMemberResult">
+        <id property="memberId" column="member_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberCode" column="member_code" />
+        <result property="mainAccount" column="main_account" />
+        <result property="memberType" column="member_type" />
+        <result property="membershipType" column="membership_type" />
+        <result property="authStatus" column="auth_status" />
+        <result property="legalSubjectName" column="legal_subject_name" />
+        <result property="licenseNo" column="license_no" />
+        <result property="nickname" column="nickname" />
+        <result property="contactName" column="contact_name" />
+        <result property="contactPhone" column="contact_phone" />
+        <result property="servicePhone" column="service_phone" />
+        <result property="contactEmail" column="contact_email" />
+        <result property="alipayRealName" column="alipay_real_name" />
+        <result property="alipayAccount" column="alipay_account" />
+        <result property="storeLogoUrl" column="store_logo_url" />
+        <result property="storeDescription" column="store_description" />
+        <result property="registeredCapital" column="registered_capital" />
+        <result property="businessScope" column="business_scope" />
+        <result property="licenseAddress" column="license_address" />
+        <result property="licenseValidFrom" column="license_valid_from" />
+        <result property="licenseValidTo" column="license_valid_to" />
+        <result property="licenseLongTerm" column="license_long_term" />
+        <result property="licenseImageUrl" column="license_image_url" />
+        <result property="legalRepresentativeName" column="legal_representative_name" />
+        <result property="legalRepresentativeIdNo" column="legal_representative_id_no" />
+        <result property="legalIdFrontUrl" column="legal_id_front_url" />
+        <result property="legalIdBackUrl" column="legal_id_back_url" />
+        <result property="signingDate" column="signing_date" />
+        <result property="contractValidFrom" column="contract_valid_from" />
+        <result property="contractValidTo" column="contract_valid_to" />
+        <result property="contractFileUrl" column="contract_file_url" />
+        <result property="auditTime" column="audit_time" />
+        <result property="auditRemark" column="audit_remark" />
+        <result property="freezeTime" column="freeze_time" />
+        <result property="freezeReason" column="freeze_reason" />
+        <result property="wechatQrFileId" column="wechat_qr_file_id" />
+        <result property="vipLevel" column="vip_level" />
+        <result property="levelId" column="level_id" />
+        <result property="registrationMode" column="registration_mode" />
+        <result property="registrationStatus" column="registration_status" />
+        <result property="inviterMemberId" column="inviter_member_id" />
+        <result property="storageQuotaMb" column="storage_quota_mb" />
+        <result property="externalAcceptEnabled" column="external_accept_enabled" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+        <result property="isDelete" column="is_delete" />
+    </resultMap>
+
+    <sql id="selectRentalMemberVo">
+        select m.member_id, m.tenant_id, m.member_code, m.member_type, m.membership_type, m.auth_status,
+               m.legal_subject_name, m.license_no, m.nickname, m.contact_name, m.contact_phone,
+               m.service_phone, m.contact_email, m.alipay_real_name, m.alipay_account,
+               m.store_logo_url, m.store_description, m.registered_capital, m.business_scope,
+               m.license_address, m.license_valid_from, m.license_valid_to, m.license_long_term,
+               m.license_image_url, m.legal_representative_name, m.legal_representative_id_no,
+               m.legal_id_front_url, m.legal_id_back_url, m.signing_date, m.contract_valid_from,
+               m.contract_valid_to, m.contract_file_url, m.audit_time, m.audit_remark,
+               m.freeze_time, m.freeze_reason, m.wechat_qr_file_id, m.vip_level, m.level_id,
+               m.registration_mode, m.registration_status, m.inviter_member_id,
+               m.storage_quota_mb, m.external_accept_enabled, m.status, m.create_by,
+               m.create_time, m.update_by, m.update_time, m.remark, m.is_delete,
+               (
+                   select u.user_name
+                   from `ry_rental`.`ry_rental_user_member` um
+                   inner join `ry_rental`.`ry_rental_merchant_user` u
+                       on u.tenant_id = um.tenant_id
+                      and u.member_id = um.member_id
+                      and u.merchant_user_id = um.merchant_user_id
+                   where um.tenant_id = m.tenant_id
+                     and um.member_id = m.member_id
+                     and um.member_role = 'owner'
+                     and um.status = 0 and um.is_delete = 0
+                     and u.status = 0 and u.is_delete = 0
+                   order by um.id
+                   limit 1
+               ) as main_account
+        from `ry_rental`.`ry_rental_member` m
+    </sql>
+
+    <select id="selectRentalMemberList" parameterType="com.ruoyi.system.domain.rental.RentalMember" resultMap="RentalMemberResult">
+        <include refid="selectRentalMemberVo" />
+        <where>
+            m.is_delete = 0
+            <if test="tenantId != null">AND m.tenant_id = #{tenantId}</if>
+            <if test="memberCode != null and memberCode != ''">
+                AND m.member_code like concat('%', #{memberCode}, '%')
+            </if>
+            <if test="memberType != null">AND m.member_type = #{memberType}</if>
+            <if test="authStatus != null">AND m.auth_status = #{authStatus}</if>
+            <if test="legalSubjectName != null and legalSubjectName != ''">
+                AND m.legal_subject_name like concat('%', #{legalSubjectName}, '%')
+            </if>
+            <if test="nickname != null and nickname != ''">
+                AND m.nickname like concat('%', #{nickname}, '%')
+            </if>
+            <if test="contactName != null and contactName != ''">
+                AND m.contact_name like concat('%', #{contactName}, '%')
+            </if>
+            <if test="contactPhone != null and contactPhone != ''">
+                AND m.contact_phone like concat('%', #{contactPhone}, '%')
+            </if>
+            <if test="vipLevel != null and vipLevel != ''">AND m.vip_level = #{vipLevel}</if>
+            <if test="externalAcceptEnabled != null">
+                AND m.external_accept_enabled = #{externalAcceptEnabled}
+            </if>
+            <if test="status != null">AND m.status = #{status}</if>
+        </where>
+        order by m.create_time desc, m.member_id desc
+    </select>
+
+    <select id="selectRentalMemberById" parameterType="Long" resultMap="RentalMemberResult">
+        <include refid="selectRentalMemberVo" />
+        where m.member_id = #{memberId} and m.is_delete = 0
+    </select>
+
+    <select id="selectRentalMembersByIds" resultMap="RentalMemberResult">
+        <include refid="selectRentalMemberVo" />
+        where m.is_delete = 0
+          and m.member_id in
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+        order by m.member_id
+    </select>
+
+    <select id="selectRentalMemberIdsByKeyword" resultType="long">
+        select m.member_id
+        from `ry_rental`.`ry_rental_member` m
+        where m.is_delete = 0
+          and (m.member_code like concat('%', #{keyword}, '%')
+               or m.nickname like concat('%', #{keyword}, '%')
+               or m.legal_subject_name like concat('%', #{keyword}, '%'))
+        order by m.create_time desc, m.member_id desc
+    </select>
+
+    <resultMap type="com.ruoyi.system.model.rental.PlatformMerchantOverviewBase" id="PlatformMerchantOverviewBaseResult">
+        <id property="memberId" column="member_id" />
+        <result property="memberCode" column="member_code" />
+        <result property="nickname" column="nickname" />
+        <result property="legalSubjectName" column="legal_subject_name" />
+        <result property="authStatus" column="auth_status" />
+        <result property="status" column="status" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.system.model.rental.PlatformMerchantBusinessScope" id="PlatformMerchantBusinessScopeResult">
+        <id property="memberId" column="member_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberCode" column="member_code" />
+        <result property="merchantName" column="merchant_name" />
+    </resultMap>
+
+    <select id="selectRentalMemberOverviewPage" resultMap="PlatformMerchantOverviewBaseResult">
+        select m.member_id, m.member_code, m.nickname, m.legal_subject_name,
+               m.auth_status, m.status, m.create_time
+        from `ry_rental`.`ry_rental_member` m
+        where m.is_delete = 0
+        <if test="memberCode != null and memberCode != ''">
+            and m.member_code like concat('%', #{memberCode}, '%')
+        </if>
+        <if test="nickname != null and nickname != ''">
+            and m.nickname like concat('%', #{nickname}, '%')
+        </if>
+        <if test="legalSubjectName != null and legalSubjectName != ''">
+            and m.legal_subject_name like concat('%', #{legalSubjectName}, '%')
+        </if>
+        <if test="memberType != null">
+            and m.member_type = #{memberType}
+        </if>
+        <if test="authStatus != null">
+            and m.auth_status = #{authStatus}
+        </if>
+        <if test="status != null">
+            and m.status = #{status}
+        </if>
+        order by m.create_time desc, m.member_id desc
+    </select>
+
+    <select id="selectAllRentalMemberOverview" resultMap="PlatformMerchantOverviewBaseResult">
+        select m.member_id, m.member_code, m.nickname, m.legal_subject_name,
+               m.auth_status, m.status, m.create_time
+        from `ry_rental`.`ry_rental_member` m
+        where m.is_delete = 0
+        order by m.create_time desc, m.member_id desc
+    </select>
+
+    <select id="selectRentalMemberBusinessScopeByCode"
+            resultMap="PlatformMerchantBusinessScopeResult">
+        select m.tenant_id, m.member_id, m.member_code,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchant_name
+        from `ry_rental`.`ry_rental_member` m
+        where m.member_code = #{memberCode} and m.is_delete = 0
+        order by m.create_time desc, m.member_id desc
+        limit 1
+    </select>
+
+    <select id="selectRentalMemberByContactPhone" parameterType="String" resultMap="RentalMemberResult">
+        <include refid="selectRentalMemberVo" />
+        where m.contact_phone = #{contactPhone} and m.is_delete = 0
+        order by m.member_id desc limit 1
+    </select>
+
+    <insert id="insertRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember"
+            useGeneratedKeys="true" keyProperty="memberId">
+        insert into `ry_rental`.`ry_rental_member` (
+            tenant_id, member_code, member_type, membership_type, auth_status, legal_subject_name, license_no,
+            nickname, contact_name, contact_phone, service_phone, contact_email,
+            alipay_real_name, alipay_account, store_logo_url, store_description,
+            registered_capital, business_scope, license_address, license_valid_from,
+            license_valid_to, license_long_term, license_image_url, legal_representative_name,
+            legal_representative_id_no, legal_id_front_url, legal_id_back_url, signing_date,
+            contract_valid_from, contract_valid_to, contract_file_url, audit_time, audit_remark,
+            freeze_time, freeze_reason, wechat_qr_file_id, vip_level, level_id, registration_mode,
+            registration_status, inviter_member_id, storage_quota_mb,
+            external_accept_enabled, status, remark, create_by, create_time
+        ) values (
+            #{tenantId}, #{memberCode}, #{memberType}, #{membershipType}, #{authStatus}, #{legalSubjectName}, #{licenseNo},
+            #{nickname}, #{contactName}, #{contactPhone}, #{servicePhone}, #{contactEmail},
+            #{alipayRealName}, #{alipayAccount}, #{storeLogoUrl}, #{storeDescription},
+            #{registeredCapital}, #{businessScope}, #{licenseAddress}, #{licenseValidFrom},
+            #{licenseValidTo}, #{licenseLongTerm}, #{licenseImageUrl}, #{legalRepresentativeName},
+            #{legalRepresentativeIdNo}, #{legalIdFrontUrl}, #{legalIdBackUrl}, #{signingDate},
+            #{contractValidFrom}, #{contractValidTo}, #{contractFileUrl}, #{auditTime}, #{auditRemark},
+            #{freezeTime}, #{freezeReason}, #{wechatQrFileId}, #{vipLevel}, #{levelId}, #{registrationMode},
+            #{registrationStatus}, #{inviterMemberId}, #{storageQuotaMb},
+            #{externalAcceptEnabled}, #{status}, #{remark}, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember">
+        update `ry_rental`.`ry_rental_member`
+        set tenant_id = #{tenantId},
+            member_code = #{memberCode},
+            member_type = #{memberType},
+            membership_type = #{membershipType},
+            auth_status = #{authStatus},
+            legal_subject_name = #{legalSubjectName},
+            license_no = #{licenseNo},
+            nickname = #{nickname},
+            contact_name = #{contactName},
+            contact_phone = #{contactPhone},
+            service_phone = #{servicePhone},
+            contact_email = #{contactEmail},
+            alipay_real_name = #{alipayRealName},
+            alipay_account = #{alipayAccount},
+            store_logo_url = #{storeLogoUrl},
+            store_description = #{storeDescription},
+            registered_capital = #{registeredCapital},
+            business_scope = #{businessScope},
+            license_address = #{licenseAddress},
+            license_valid_from = #{licenseValidFrom},
+            license_valid_to = #{licenseValidTo},
+            license_long_term = #{licenseLongTerm},
+            license_image_url = #{licenseImageUrl},
+            legal_representative_name = #{legalRepresentativeName},
+            legal_representative_id_no = #{legalRepresentativeIdNo},
+            legal_id_front_url = #{legalIdFrontUrl},
+            legal_id_back_url = #{legalIdBackUrl},
+            signing_date = #{signingDate},
+            contract_valid_from = #{contractValidFrom},
+            contract_valid_to = #{contractValidTo},
+            contract_file_url = #{contractFileUrl},
+            audit_time = #{auditTime},
+            audit_remark = #{auditRemark},
+            freeze_time = #{freezeTime},
+            freeze_reason = #{freezeReason},
+            wechat_qr_file_id = #{wechatQrFileId},
+            vip_level = #{vipLevel},
+            level_id = #{levelId},
+            storage_quota_mb = #{storageQuotaMb},
+            external_accept_enabled = #{externalAcceptEnabled},
+            status = #{status},
+            remark = #{remark},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where member_id = #{memberId} and is_delete = 0
+    </update>
+
+    <update id="auditRentalMember" parameterType="com.ruoyi.system.domain.rental.RentalMember">
+        update `ry_rental`.`ry_rental_member`
+        set auth_status = #{authStatus}, membership_type = #{membershipType},
+            external_accept_enabled = #{externalAcceptEnabled}, audit_time = #{auditTime}, audit_remark = #{auditRemark},
+            update_by = #{updateBy}, update_time = sysdate()
+        where member_id = #{memberId} and auth_status = 2 and is_delete = 0
+    </update>
+
+    <update id="markRegistrationPending" parameterType="com.ruoyi.system.domain.rental.RentalMember">
+        update `ry_rental`.`ry_rental_member`
+        set auth_status = 2, audit_time = null, audit_remark = null,
+            update_by = #{updateBy}, update_time = sysdate()
+        where member_id = #{memberId} and auth_status = 4 and is_delete = 0
+    </update>
+
+    <update id="deleteRentalMemberByIds" parameterType="Long">
+        update `ry_rental`.`ry_rental_member`
+        set is_delete = 1, update_time = sysdate()
+        where member_id in
+        <foreach collection="array" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </update>
+
+</mapper>

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalAccessoryMapper">
+    <resultMap id="accessoryResult" type="com.ruoyi.system.domain.rental.RentalAccessory">
+        <id property="accessoryId" column="accessory_id" />
+        <result property="accessoryCode" column="accessory_code" />
+        <result property="accessoryName" column="accessory_name" />
+        <result property="classId" column="class_id" />
+        <result property="brandId" column="brand_id" />
+        <result property="className" column="class_name" />
+        <result property="brandName" column="brand_name" />
+        <result property="specification" column="specification" />
+        <result property="unit" column="unit" />
+        <result property="description" column="description" />
+        <result property="status" column="status" />
+        <result property="modelCount" column="model_count" />
+        <result property="isDelete" column="is_delete" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="columns">
+        a.accessory_id, a.accessory_code, a.accessory_name, a.class_id, a.brand_id,
+        concat_ws(' / ', parent_class.class_name, pc.class_name) as class_name,
+        b.brand_name, a.specification, a.unit, a.description, a.status, a.is_delete,
+        a.create_by, a.create_time, a.update_by, a.update_time, a.remark,
+        (select count(1) from `ry_rental`.`ry_rental_accessory_model` am
+          where am.accessory_id = a.accessory_id and am.is_delete = 0) as model_count
+    </sql>
+
+    <select id="selectList" resultMap="accessoryResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_accessory` a
+        inner join `ry_rental`.`ry_rental_product_class` pc
+          on pc.class_id = a.class_id and pc.class_level = 2 and pc.is_delete = 0
+        inner join `ry_rental`.`ry_rental_product_class` parent_class
+          on parent_class.class_id = pc.parent_id and parent_class.class_level = 1 and parent_class.is_delete = 0
+        left join `ry_rental`.`ry_rental_brand` b
+          on b.brand_id = a.brand_id and b.is_delete = 0
+        where a.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (a.accessory_code like concat('%', #{keyword}, '%') or a.accessory_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">and a.status = #{status}</if>
+        <if test="classId != null">and a.class_id = #{classId}</if>
+        <if test="brandId != null">and a.brand_id = #{brandId}</if>
+        <if test="modelId != null">
+            and exists (select 1 from `ry_rental`.`ry_rental_accessory_model` compatible_model
+                        where compatible_model.accessory_id = a.accessory_id
+                          and compatible_model.model_id = #{modelId}
+                          and compatible_model.status = 0
+                          and compatible_model.is_delete = 0)
+        </if>
+        order by a.create_time desc, a.accessory_id desc
+    </select>
+
+    <select id="selectById" resultMap="accessoryResult">
+        select <include refid="columns" />
+        from `ry_rental`.`ry_rental_accessory` a
+        inner join `ry_rental`.`ry_rental_product_class` pc
+          on pc.class_id = a.class_id and pc.class_level = 2 and pc.is_delete = 0
+        inner join `ry_rental`.`ry_rental_product_class` parent_class
+          on parent_class.class_id = pc.parent_id and parent_class.class_level = 1 and parent_class.is_delete = 0
+        left join `ry_rental`.`ry_rental_brand` b
+          on b.brand_id = a.brand_id and b.is_delete = 0
+        where a.accessory_id = #{accessoryId} and a.is_delete = 0
+    </select>
+
+    <select id="selectModelIds" resultType="long">
+        select model_id from `ry_rental`.`ry_rental_accessory_model`
+        where accessory_id = #{accessoryId} and is_delete = 0 order by model_id
+    </select>
+
+    <select id="selectActiveOptions" resultType="com.ruoyi.system.api.model.PlatformAccessoryOption">
+        select a.accessory_id as accessoryId, a.accessory_code as accessoryCode,
+               a.accessory_name as accessoryName, a.class_id as classId, a.brand_id as brandId,
+               a.specification, a.unit, a.status
+        from `ry_rental`.`ry_rental_accessory` a
+        where a.status = 0 and a.is_delete = 0
+        order by a.create_time desc, a.accessory_id desc
+    </select>
+
+    <select id="countByCode" resultType="int">
+        select count(1) from `ry_rental`.`ry_rental_accessory`
+        where accessory_code = #{accessoryCode} and is_delete = 0
+        <if test="excludeAccessoryId != null">and accessory_id != #{excludeAccessoryId}</if>
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="accessoryId">
+        insert into `ry_rental`.`ry_rental_accessory`
+        (accessory_code, accessory_name, class_id, brand_id, specification, unit, description, status,
+         create_by, create_time, remark, is_delete)
+        values (#{accessoryCode}, #{accessoryName}, #{classId}, #{brandId}, #{specification}, #{unit},
+                #{description}, #{status}, #{createBy}, sysdate(), #{remark}, 0)
+    </insert>
+
+    <update id="update">
+        update `ry_rental`.`ry_rental_accessory`
+        set accessory_code = #{accessoryCode}, accessory_name = #{accessoryName}, class_id = #{classId},
+            brand_id = #{brandId}, specification = #{specification}, unit = #{unit},
+            description = #{description}, status = #{status}, update_by = #{updateBy},
+            update_time = sysdate(), remark = #{remark}
+        where accessory_id = #{accessoryId} and is_delete = 0
+    </update>
+
+    <insert id="insertModel">
+        insert into `ry_rental`.`ry_rental_accessory_model`
+        (accessory_id, model_id, compatibility_type, status, create_by, create_time, is_delete)
+        values (#{accessoryId}, #{modelId}, 1, 0, #{operator}, sysdate(), 0)
+        on duplicate key update is_delete = 0, status = 0, update_by = #{operator}
+    </insert>
+
+    <delete id="deleteConflictingDeletedModels">
+        delete deleted_model
+        from `ry_rental`.`ry_rental_accessory_model` deleted_model
+        inner join `ry_rental`.`ry_rental_accessory_model` active_model
+          on active_model.accessory_id = deleted_model.accessory_id
+         and active_model.model_id = deleted_model.model_id
+         and active_model.is_delete = 0
+        where deleted_model.accessory_id = #{accessoryId}
+          and deleted_model.is_delete = 1
+    </delete>
+
+    <update id="deleteModels">
+        update `ry_rental`.`ry_rental_accessory_model`
+        set is_delete = 1, update_by = #{operator}
+        where accessory_id = #{accessoryId} and is_delete = 0
+    </update>
+
+    <update id="softDelete">
+        update `ry_rental`.`ry_rental_accessory`
+        set is_delete = 1, update_by = #{operator}, remove_by = #{operator}, remove_time = sysdate()
+        where accessory_id = #{accessoryId} and is_delete = 0
+    </update>
+</mapper>

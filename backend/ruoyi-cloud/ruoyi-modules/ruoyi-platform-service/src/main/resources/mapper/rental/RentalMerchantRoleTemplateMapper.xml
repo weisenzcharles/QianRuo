@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalMerchantRoleTemplateMapper">
+
+    <resultMap id="MerchantRoleTemplateResult" type="com.ruoyi.system.model.rental.MerchantRoleTemplateVO">
+        <id property="roleTemplateId" column="role_template_id" />
+        <result property="roleName" column="role_name" />
+        <result property="roleKey" column="role_key" />
+        <result property="roleSort" column="role_sort" />
+        <result property="menuCheckStrictly" column="menu_check_strictly" />
+        <result property="status" column="status" />
+        <result property="isDelete" column="is_delete" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="roleTemplateColumns">
+        role_template_id, role_name, role_key, role_sort, menu_check_strictly,
+        status, is_delete, create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectList" resultMap="MerchantRoleTemplateResult">
+        select <include refid="roleTemplateColumns" />
+        from `ry_rental`.`ry_rental_merchant_role_template`
+        where is_delete = 0
+        <if test="query.roleName != null and query.roleName != ''">
+            and role_name like concat('%', #{query.roleName}, '%')
+        </if>
+        <if test="query.roleKey != null and query.roleKey != ''">
+            and role_key like concat('%', #{query.roleKey}, '%')
+        </if>
+        <if test="query.status != null">
+            and status = #{query.status}
+        </if>
+        <if test="query.params.beginTime != null and query.params.beginTime != ''">
+            and date_format(create_time, '%Y%m%d') &gt;= date_format(#{query.params.beginTime}, '%Y%m%d')
+        </if>
+        <if test="query.params.endTime != null and query.params.endTime != ''">
+            and date_format(create_time, '%Y%m%d') &lt;= date_format(#{query.params.endTime}, '%Y%m%d')
+        </if>
+        order by role_sort, role_template_id
+    </select>
+
+    <select id="selectById" resultMap="MerchantRoleTemplateResult">
+        select <include refid="roleTemplateColumns" />
+        from `ry_rental`.`ry_rental_merchant_role_template`
+        where role_template_id = #{roleTemplateId} and is_delete = 0
+    </select>
+
+    <select id="selectByName" resultMap="MerchantRoleTemplateResult">
+        select <include refid="roleTemplateColumns" />
+        from `ry_rental`.`ry_rental_merchant_role_template`
+        where role_name = #{roleName} and is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectByKey" resultMap="MerchantRoleTemplateResult">
+        select <include refid="roleTemplateColumns" />
+        from `ry_rental`.`ry_rental_merchant_role_template`
+        where role_key = #{roleKey} and is_delete = 0
+        limit 1
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="command.roleTemplateId" keyColumn="role_template_id">
+        insert into `ry_rental`.`ry_rental_merchant_role_template`
+            (role_name, role_key, role_sort, menu_check_strictly, status, is_delete,
+             create_by, create_time, remark)
+        values (#{command.roleName}, #{command.roleKey}, #{command.roleSort},
+                #{command.menuCheckStrictly}, #{command.status}, 0,
+                #{operator}, sysdate(), #{command.remark})
+    </insert>
+
+    <update id="update">
+        update `ry_rental`.`ry_rental_merchant_role_template`
+        set role_name = #{command.roleName},
+            role_key = #{command.roleKey},
+            role_sort = #{command.roleSort},
+            menu_check_strictly = #{command.menuCheckStrictly},
+            status = #{command.status},
+            remark = #{command.remark},
+            update_by = #{operator},
+            update_time = sysdate()
+        where role_template_id = #{command.roleTemplateId} and is_delete = 0
+    </update>
+
+    <update id="softDelete">
+        update `ry_rental`.`ry_rental_merchant_role_template`
+        set is_delete = 1, update_by = #{operator}, update_time = sysdate()
+        where role_template_id in
+        <foreach collection="roleTemplateIds" item="roleTemplateId" open="(" separator="," close=")">
+            #{roleTemplateId}
+        </foreach>
+    </update>
+
+    <select id="selectMenuIds" resultType="Long">
+        select menu_id
+        from `ry_rental`.`ry_rental_merchant_role_template_menu`
+        where role_template_id = #{roleTemplateId} and is_delete = 0
+        order by menu_id
+    </select>
+
+    <update id="deleteMenus">
+        update `ry_rental`.`ry_rental_merchant_role_template_menu`
+        set is_delete = 1
+        where role_template_id = #{roleTemplateId}
+    </update>
+
+    <insert id="insertMenus">
+        insert into `ry_rental`.`ry_rental_merchant_role_template_menu`
+            (role_template_id, menu_id, is_delete)
+        values
+        <foreach collection="menuIds" item="menuId" separator=",">
+            (#{roleTemplateId}, #{menuId}, 0)
+        </foreach>
+        on duplicate key update is_delete = 0
+    </insert>
+</mapper>

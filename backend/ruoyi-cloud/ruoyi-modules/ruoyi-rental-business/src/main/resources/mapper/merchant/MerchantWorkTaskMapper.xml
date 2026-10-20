@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantWorkTaskMapper">
+    <sql id="taskVisibility">
+        and (
+            t.create_by = #{currentUserId}
+            or exists (
+                select 1 from ry_business.ry_rental_work_assignment va
+                where va.tenant_id = t.tenant_id and va.member_id = t.member_id
+                  and va.task_id = t.task_id and va.assignee_user_id = #{currentUserId}
+                  and va.is_delete = 0
+            )
+            or (
+                t.source_type = 1
+                and (
+                    t.warehouse_id is null
+                    <choose>
+                        <when test="allWarehouseAccess">
+                            or t.warehouse_id is not null
+                        </when>
+                        <when test="warehouseIds != null and warehouseIds.size() > 0">
+                            or t.warehouse_id in
+                            <foreach collection="warehouseIds" item="warehouseId" open="(" separator="," close=")">
+                                #{warehouseId}
+                            </foreach>
+                        </when>
+                    </choose>
+                )
+            )
+        )
+    </sql>
+
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <select id="selectTaskList" resultType="map">
+        select t.task_id as taskId, t.warehouse_id as warehouseId, w.warehouse_name as warehouseName,
+               t.task_title as title, t.task_content as content, t.source_type as sourceType,
+               t.task_type as taskType, t.task_status as taskStatus,
+               case when t.task_status in (0, 1, 2) and t.due_time is not null and t.due_time &lt; now()
+                    then 1 else 0 end as overdueFlag,
+               t.due_time as dueTime, t.create_by as creatorUserId,
+               t.create_time as createTime, t.update_time as updateTime, t.remark,
+               (select a.assignee_user_id from ry_business.ry_rental_work_assignment a
+                where a.task_id = t.task_id and a.is_delete = 0 order by a.assignment_id desc limit 1) as assigneeUserId,
+               (select a.assignment_status from ry_business.ry_rental_work_assignment a
+                where a.task_id = t.task_id and a.assignee_user_id = #{currentUserId} and a.is_delete = 0
+                order by a.assignment_id desc limit 1) as assignmentStatus,
+               (select r.score from ry_business.ry_rental_work_review r
+                where r.task_id = t.task_id and r.is_delete = 0
+                order by r.review_id desc limit 1) as latestScore
+        from ry_business.ry_rental_work_task t
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = t.warehouse_id
+            and w.tenant_id = t.tenant_id and w.member_id = t.member_id and w.is_delete = 0
+        where t.tenant_id = #{tenantId} and t.member_id = #{memberId} and t.is_delete = 0
+        <include refid="taskVisibility" />
+        <if test="warehouseId != null">
+            and t.warehouse_id = #{warehouseId}
+        </if>
+        <if test="status != null">
+            and (
+                t.task_status = #{status}
+                or (#{status} = 4 and t.task_status in (0, 1, 2) and t.due_time is not null and t.due_time &lt; now())
+            )
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (t.task_title like concat('%', #{keyword}, '%') or t.task_content like concat('%', #{keyword}, '%'))
+        </if>
+        order by case when t.task_status in (0, 1, 2) and t.due_time is not null and t.due_time &lt; now() then 0 else 1 end,
+                 case when t.due_time is null then 1 else 0 end, t.due_time asc, t.create_time desc, t.task_id desc
+    </select>
+
+    <select id="selectSummary" resultType="map">
+        select count(1) as totalCount,
+               sum(case when t.task_status = 0 and not (t.due_time is not null and t.due_time &lt; now()) then 1 else 0 end) as pendingCount,
+               sum(case when t.task_status = 1 and not (t.due_time is not null and t.due_time &lt; now()) then 1 else 0 end) as processingCount,
+               sum(case when t.task_status = 2 and not (t.due_time is not null and t.due_time &lt; now()) then 1 else 0 end) as reviewCount,
+               sum(case when t.task_status in (0, 1, 2) and t.due_time is not null and t.due_time &lt; now() then 1 else 0 end) as overdueCount,
+               sum(case when t.task_status = 3 then 1 else 0 end) as completedCount
+        from ry_business.ry_rental_work_task t
+        where t.tenant_id = #{tenantId} and t.member_id = #{memberId} and t.is_delete = 0
+        <include refid="taskVisibility" />
+    </select>
+
+    <select id="selectDailyReport" resultType="map">
+        select a.assignee_user_id as userId,
+               count(distinct a.assignment_id) as assignedCount,
+               count(distinct case when a.assignment_status = 3 then a.assignment_id end) as completedCount,
+               count(distinct case when a.assignment_status in (0, 1, 2, 4) then a.assignment_id end) as pendingCount,
+               count(distinct case when t.task_status in (0, 1, 2)
+                         and t.due_time is not null
+                         and t.due_time &lt; date_add(#{reportDate}, interval 1 day)
+                         and a.assignment_status &lt;&gt; 3 then a.assignment_id end) as overdueCount,
+               count(reviewDay.assignmentId) as scoreCount,
+               coalesce(sum(reviewDay.scoreTotal), 0) as scoreTotal,
+               coalesce(round(avg(reviewDay.averageScore), 2), 0) as averageScore
+        from ry_business.ry_rental_work_assignment a
+        inner join ry_business.ry_rental_work_task t on t.task_id = a.task_id
+            and t.tenant_id = a.tenant_id and t.member_id = a.member_id and t.is_delete = 0
+        left join (
+            select s.assignment_id as assignmentId, avg(r.score) as averageScore, sum(r.score) as scoreTotal
+            from ry_business.ry_rental_work_submission s
+            inner join ry_business.ry_rental_work_review r on r.submission_id = s.submission_id
+                and r.tenant_id = s.tenant_id and r.member_id = s.member_id and r.is_delete = 0
+            where s.tenant_id = #{tenantId} and s.member_id = #{memberId} and s.is_delete = 0
+              and r.create_time &gt;= #{reportDate}
+              and r.create_time &lt; date_add(#{reportDate}, interval 1 day)
+            group by s.assignment_id
+        ) reviewDay on reviewDay.assignmentId = a.assignment_id
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId} and a.is_delete = 0
+          and a.assigned_time &gt;= #{reportDate}
+          and a.assigned_time &lt; date_add(#{reportDate}, interval 1 day)
+        <include refid="taskVisibility" />
+        <if test="warehouseId != null">
+            and t.warehouse_id = #{warehouseId}
+        </if>
+        group by a.assignee_user_id
+        order by completedCount desc, assignedCount desc, a.assignee_user_id asc
+    </select>
+
+    <select id="selectTask" resultType="map">
+        select t.task_id as taskId, t.warehouse_id as warehouseId, w.warehouse_name as warehouseName,
+               t.task_title as title, t.task_content as content, t.source_type as sourceType,
+               t.task_type as taskType, t.task_status as taskStatus,
+               case when t.task_status in (0, 1, 2) and t.due_time is not null and t.due_time &lt; now()
+                    then 1 else 0 end as overdueFlag,
+               t.due_time as dueTime, t.create_by as creatorUserId,
+               t.create_time as createTime, t.update_time as updateTime, t.remark
+        from ry_business.ry_rental_work_task t
+        left join ry_business.ry_rental_warehouse w on w.warehouse_id = t.warehouse_id
+            and w.tenant_id = t.tenant_id and w.member_id = t.member_id and w.is_delete = 0
+        where t.tenant_id = #{tenantId} and t.member_id = #{memberId} and t.task_id = #{taskId} and t.is_delete = 0
+        <include refid="taskVisibility" />
+    </select>
+
+    <select id="selectAssignments" resultType="map">
+        select a.assignment_id as assignmentId, a.task_id as taskId, a.assignee_user_id as assigneeUserId,
+               a.assignment_status as assignmentStatus, a.read_time as readTime,
+               a.assigned_by as assignedBy, a.assigned_time as assignedTime
+        from ry_business.ry_rental_work_assignment a
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId} and a.task_id = #{taskId} and a.is_delete = 0
+        order by a.assigned_time desc, a.assignment_id desc
+    </select>
+
+    <select id="selectSubmissions" resultType="map">
+        select s.submission_id as submissionId, s.task_id as taskId, s.assignment_id as assignmentId,
+               s.submitter_user_id as submitterUserId,
+               s.completion_note as completionNote, s.evidence_json as evidenceJson,
+               s.submitted_time as submittedTime
+        from ry_business.ry_rental_work_submission s
+        where s.tenant_id = #{tenantId} and s.member_id = #{memberId} and s.task_id = #{taskId} and s.is_delete = 0
+        order by s.submitted_time desc, s.submission_id desc
+    </select>
+
+    <select id="selectReviews" resultType="map">
+        select r.review_id as reviewId, r.task_id as taskId, r.submission_id as submissionId,
+               r.reviewer_user_id as reviewerUserId,
+               r.score, r.review_result as reviewResult, r.review_comment as reviewComment, r.create_time as createTime
+        from ry_business.ry_rental_work_review r
+        where r.tenant_id = #{tenantId} and r.member_id = #{memberId} and r.task_id = #{taskId} and r.is_delete = 0
+        order by r.create_time desc, r.review_id desc
+    </select>
+
+    <select id="selectAssignmentForUpdate" resultType="map">
+        select assignment_id as assignmentId, task_id as taskId, assignee_user_id as assigneeUserId,
+               assignment_status as assignmentStatus
+        from ry_business.ry_rental_work_assignment
+        where tenant_id = #{tenantId} and member_id = #{memberId} and task_id = #{taskId}
+          and assignee_user_id = #{userId} and is_delete = 0
+        order by assignment_id desc limit 1 for update
+    </select>
+
+    <select id="selectLatestSubmission" resultType="map">
+        select submission_id as submissionId, task_id as taskId, assignment_id as assignmentId,
+               submitter_user_id as submitterUserId, completion_note as completionNote,
+               evidence_json as evidenceJson, submitted_time as submittedTime
+        from ry_business.ry_rental_work_submission
+        where tenant_id = #{tenantId} and member_id = #{memberId} and task_id = #{taskId} and is_delete = 0
+        order by submission_id desc limit 1
+    </select>
+
+    <insert id="insertTask">
+        insert into ry_business.ry_rental_work_task
+            (tenant_id, member_id, warehouse_id, task_title, task_content, source_type, task_type,
+             task_status, due_time, create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{warehouseId}, #{title}, #{content}, #{sourceType}, #{taskType},
+                0, #{dueTime}, #{operatorId}, now(), #{operatorId}, now(), #{remark}, 0)
+    </insert>
+
+    <insert id="insertAssignment">
+        insert into ry_business.ry_rental_work_assignment
+            (tenant_id, member_id, task_id, assignee_user_id, assignment_status,
+             assigned_by, assigned_time, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{taskId}, #{assigneeUserId}, 0,
+                #{assignedBy}, now(), #{assignedBy}, now(), #{assignedBy}, now(), 0)
+    </insert>
+
+    <insert id="insertSubmission">
+        insert into ry_business.ry_rental_work_submission
+            (tenant_id, member_id, task_id, assignment_id, submitter_user_id,
+             completion_note, evidence_json, submitted_time, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{taskId}, #{assignmentId}, #{submitterUserId},
+                #{completionNote}, #{evidenceJson}, now(), #{submitterUserId}, now(), #{submitterUserId}, now(), 0)
+    </insert>
+
+    <insert id="insertReview">
+        insert into ry_business.ry_rental_work_review
+            (tenant_id, member_id, task_id, submission_id, reviewer_user_id, score,
+             review_result, review_comment, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{taskId}, #{submissionId}, #{reviewerUserId}, #{score},
+                #{reviewResult}, #{reviewComment}, #{reviewerUserId}, now(), #{reviewerUserId}, now(), 0)
+    </insert>
+
+    <update id="updateTaskStatus">
+        update ry_business.ry_rental_work_task
+        set task_status = #{toStatus}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and task_id = #{taskId}
+          and task_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateAssignmentStatus">
+        update ry_business.ry_rental_work_assignment
+        set assignment_status = #{toStatus}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and assignment_id = #{assignmentId}
+          and assignment_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="markAssignmentRead">
+        update ry_business.ry_rental_work_assignment
+        set read_time = coalesce(read_time, now()), update_by = #{userId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and task_id = #{taskId}
+          and assignee_user_id = #{userId} and is_delete = 0
+    </update>
+</mapper>

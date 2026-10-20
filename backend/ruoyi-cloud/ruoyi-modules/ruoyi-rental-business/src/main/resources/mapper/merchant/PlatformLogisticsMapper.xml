@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformLogisticsMapper">
+    <sql id="logisticsColumns">
+        l.logistics_id as logisticsId, l.tenant_id as tenantId, l.member_id as memberId,
+        l.order_id as orderId, o.order_no as orderNo,
+        coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchantName,
+        m.member_code as merchantCode,
+        w.warehouse_name as warehouseName,
+        l.direction as direction, l.carrier as carrier, l.tracking_no as trackingNo,
+        l.source_type as sourceType, l.route_status as routeStatus,
+        l.abnormal_flag as abnormalFlag, l.route_available as routeAvailable,
+        l.route_provider as routeProvider, l.route_message as routeMessage,
+        date_format(l.pickup_time, '%Y-%m-%d %H:%i:%s') as pickupTime,
+        date_format(l.estimated_arrive_time, '%Y-%m-%d %H:%i:%s') as estimatedArriveTime,
+        date_format(l.route_query_time, '%Y-%m-%d %H:%i:%s') as routeQueryTime,
+        (select date_format(max(route.route_time), '%Y-%m-%d %H:%i:%s')
+           from ry_business.ry_rental_logistics_route route
+          where route.logistics_id = l.logistics_id
+             and route.is_delete = 0) as lastRouteTime,
+        l.fee_amount as feeAmount,
+        date_format(l.update_time, '%Y-%m-%d %H:%i:%s') as updateTime
+    </sql>
+
+    <!-- 订单详情只读查询运行在业务库账号下，不跨库读取商户控制面。 -->
+    <sql id="logisticsBusinessColumns">
+        l.logistics_id as logisticsId, l.tenant_id as tenantId, l.member_id as memberId,
+        l.order_id as orderId, o.order_no as orderNo,
+        null as merchantName,
+        null as merchantCode,
+        w.warehouse_name as warehouseName,
+        l.direction as direction, l.carrier as carrier, l.tracking_no as trackingNo,
+        l.source_type as sourceType, l.route_status as routeStatus,
+        l.abnormal_flag as abnormalFlag, l.route_available as routeAvailable,
+        l.route_provider as routeProvider, l.route_message as routeMessage,
+        date_format(l.pickup_time, '%Y-%m-%d %H:%i:%s') as pickupTime,
+        date_format(l.estimated_arrive_time, '%Y-%m-%d %H:%i:%s') as estimatedArriveTime,
+        date_format(l.route_query_time, '%Y-%m-%d %H:%i:%s') as routeQueryTime,
+        (select date_format(max(route.route_time), '%Y-%m-%d %H:%i:%s')
+           from ry_business.ry_rental_logistics_route route
+          where route.logistics_id = l.logistics_id
+             and route.is_delete = 0) as lastRouteTime,
+        l.fee_amount as feeAmount,
+        date_format(l.update_time, '%Y-%m-%d %H:%i:%s') as updateTime
+    </sql>
+
+    <sql id="logisticsScope">
+        l.is_delete = 0
+        and o.is_delete = 0
+        and m.is_delete = 0
+        <if test="query != null and query.keyword != null and query.keyword != ''">
+          and (o.order_no like concat('%', #{query.keyword}, '%')
+            or l.carrier like concat('%', #{query.keyword}, '%')
+            or l.tracking_no like concat('%', #{query.keyword}, '%'))
+        </if>
+        <if test="query != null and query.merchantKeyword != null and query.merchantKeyword != ''">
+          and (m.member_code like concat('%', #{query.merchantKeyword}, '%')
+            or m.nickname like concat('%', #{query.merchantKeyword}, '%')
+            or m.legal_subject_name like concat('%', #{query.merchantKeyword}, '%'))
+        </if>
+        <if test="query != null and query.direction != null">
+          and l.direction = #{query.direction}
+        </if>
+        <if test="query != null and query.routeStatus != null">
+          and l.route_status = #{query.routeStatus}
+        </if>
+        <if test="query != null and query.abnormalOnly != null and query.abnormalOnly">
+          and l.abnormal_flag = 1
+        </if>
+    </sql>
+
+    <select id="countLogistics" resultType="long">
+        select count(1)
+          from ry_business.ry_rental_logistics_order l
+          inner join ry_business.ry_rental_order o
+            on o.tenant_id = l.tenant_id
+           and o.member_id = l.member_id
+           and o.order_id = l.order_id
+          inner join ry_rental.ry_rental_member m
+            on m.tenant_id = l.tenant_id
+           and m.member_id = l.member_id
+          where <include refid="logisticsScope" />
+    </select>
+
+    <select id="selectLogistics" resultType="com.ruoyi.system.api.model.PlatformLogisticsView">
+        select <include refid="logisticsColumns" />
+          from ry_business.ry_rental_logistics_order l
+          inner join ry_business.ry_rental_order o
+            on o.tenant_id = l.tenant_id
+           and o.member_id = l.member_id
+           and o.order_id = l.order_id
+          inner join ry_rental.ry_rental_member m
+            on m.tenant_id = l.tenant_id
+           and m.member_id = l.member_id
+          left join ry_business.ry_rental_warehouse w
+            on w.tenant_id = l.tenant_id
+           and w.member_id = l.member_id
+           and w.warehouse_id = coalesce(l.warehouse_id,
+               case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end)
+           and w.is_delete = 0
+         where <include refid="logisticsScope" />
+         order by l.abnormal_flag desc,
+                  l.route_query_time is null desc,
+                  l.update_time desc,
+                  l.logistics_id desc
+         limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectLogisticsById" resultType="com.ruoyi.system.api.model.PlatformLogisticsView">
+        select <include refid="logisticsColumns" />
+          from ry_business.ry_rental_logistics_order l
+          inner join ry_business.ry_rental_order o
+            on o.tenant_id = l.tenant_id
+           and o.member_id = l.member_id
+           and o.order_id = l.order_id
+          inner join ry_rental.ry_rental_member m
+            on m.tenant_id = l.tenant_id
+           and m.member_id = l.member_id
+          left join ry_business.ry_rental_warehouse w
+            on w.tenant_id = l.tenant_id
+           and w.member_id = l.member_id
+           and w.warehouse_id = coalesce(l.warehouse_id,
+               case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end)
+           and w.is_delete = 0
+         where l.logistics_id = #{logisticsId}
+           and l.is_delete = 0
+           and o.is_delete = 0
+           and m.is_delete = 0
+         limit 1
+    </select>
+
+    <select id="selectLogisticsByOrder" resultType="com.ruoyi.system.api.model.PlatformLogisticsView">
+        select <include refid="logisticsBusinessColumns" />
+          from ry_business.ry_rental_logistics_order l
+          inner join ry_business.ry_rental_order o
+            on o.tenant_id = l.tenant_id
+           and o.member_id = l.member_id
+           and o.order_id = l.order_id
+          left join ry_business.ry_rental_warehouse w
+            on w.tenant_id = l.tenant_id
+           and w.member_id = l.member_id
+           and w.warehouse_id = coalesce(l.warehouse_id,
+               case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end)
+           and w.is_delete = 0
+         where l.tenant_id = #{tenantId}
+           and l.member_id = #{memberId}
+           and l.order_id = #{orderId}
+           and l.is_delete = 0
+           and o.is_delete = 0
+         order by l.direction, l.create_time desc, l.logistics_id desc
+    </select>
+
+    <select id="selectRoutes" resultType="com.ruoyi.system.api.model.PlatformLogisticsRouteView">
+        select r.route_status as routeStatus,
+               r.route_desc as routeDesc,
+               date_format(r.route_time, '%Y-%m-%d %H:%i:%s') as routeTime,
+               coalesce(nullif(r.city, ''), r.province) as location
+          from ry_business.ry_rental_logistics_route r
+          inner join ry_business.ry_rental_logistics_order l
+            on l.logistics_id = r.logistics_id
+           and l.tenant_id = #{tenantId}
+           and l.member_id = #{memberId}
+           and l.is_delete = 0
+         where r.logistics_id = #{logisticsId}
+           and r.is_delete = 0
+         order by r.route_time desc, r.route_id desc
+    </select>
+
+    <select id="selectProviderCalls" resultType="com.ruoyi.system.api.model.PlatformLogisticsCallView">
+        select c.provider as provider,
+               c.carrier as carrier,
+               c.tracking_no_masked as trackingNoMasked,
+               c.available as available,
+               c.provider_status as providerStatus,
+               c.route_status as routeStatus,
+               c.response_message as responseMessage,
+               c.duration_ms as durationMs,
+               c.error_type as errorType,
+               date_format(c.create_time, '%Y-%m-%d %H:%i:%s') as createTime
+          from ry_business.ry_rental_logistics_call_log c
+         where c.tenant_id = #{tenantId}
+           and c.member_id = #{memberId}
+           and c.logistics_id = #{logisticsId}
+           and c.is_delete = 0
+         order by c.create_time desc, c.call_log_id desc
+         limit 50
+    </select>
+</mapper>

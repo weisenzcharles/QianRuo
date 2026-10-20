@@ -1,0 +1,160 @@
+package com.ruoyi.system.service;
+
+import java.util.List;
+import java.util.Set;
+import com.ruoyi.system.domain.SysMenu;
+import com.ruoyi.system.domain.vo.RouterVo;
+import com.ruoyi.system.domain.vo.TreeSelect;
+
+/**
+ * 菜单 业务层
+ * 
+ * @author ruoyi
+ */
+public interface ISysMenuService
+{
+    /**
+     * 根据用户查询系统菜单列表
+     * 
+     * @param userId 用户唯一编号
+     * @return 菜单列表
+     */
+    public List<SysMenu> selectMenuList(Long userId);
+
+    /**
+     * 根据用户查询系统菜单列表
+     * 
+     * @param menu 菜单信息
+     * @param userId 用户唯一编号
+     * @return 菜单列表
+     */
+    public List<SysMenu> selectMenuList(SysMenu menu, Long userId);
+
+    /**
+     * 根据用户唯一编号查询权限
+     * 
+     * @param userId 用户唯一编号
+     * @return 权限列表
+     */
+    public Set<String> selectMenuPermsByUserId(Long userId);
+
+    /**
+     * 根据角色唯一编号查询权限
+     * 
+     * @param roleId 角色唯一编号
+     * @return 权限列表
+     */
+    public Set<String> selectMenuPermsByRoleId(Long roleId);
+
+    /**
+     * 根据用户唯一编号查询菜单树信息
+     * 
+     * @param userId 用户唯一编号
+     * @return 菜单列表
+     */
+    public List<SysMenu> selectMenuTreeByUserId(Long userId);
+
+    /**
+     * 根据角色唯一编号查询菜单树信息
+     * 
+     * @param roleId 角色唯一编号
+     * @return 选中菜单列表
+     */
+    public List<Long> selectMenuListByRoleId(Long roleId);
+
+    /**
+     * 构建前端路由所需要的菜单
+     * 
+     * @param menus 菜单列表
+     * @return 路由列表
+     */
+    public List<RouterVo> buildMenus(List<SysMenu> menus);
+
+    /**
+     * 构建前端所需要树结构
+     * 
+     * @param menus 菜单列表
+     * @return 树结构列表
+     */
+    public List<SysMenu> buildMenuTree(List<SysMenu> menus);
+
+    /**
+     * 构建前端所需要下拉树结构
+     * 
+     * @param menus 菜单列表
+     * @return 下拉树结构列表
+     */
+    public List<TreeSelect> buildMenuTreeSelect(List<SysMenu> menus);
+
+    /**
+     * 根据菜单唯一编号查询信息
+     * 
+     * @param menuId 菜单唯一编号
+     * @return 菜单信息
+     */
+    public SysMenu selectMenuById(Long menuId);
+
+    /**
+     * 是否存在菜单子节点
+     * 
+     * @param menuId 菜单唯一编号
+     * @return 结果 true 存在 false 不存在
+     */
+    public boolean hasChildByMenuId(Long menuId);
+
+    /**
+     * 查询菜单是否存在角色
+     * 
+     * @param menuId 菜单唯一编号
+     * @return 结果 true 存在 false 不存在
+     */
+    public boolean checkMenuExistRole(Long menuId);
+
+    /**
+     * 新增保存菜单信息
+     * 
+     * @param menu 菜单信息
+     * @return 结果
+     */
+    public int insertMenu(SysMenu menu);
+
+    /**
+     * 修改保存菜单信息
+     * 
+     * @param menu 菜单信息
+     * @return 结果
+     */
+    public int updateMenu(SysMenu menu);
+
+    /**
+     * 保存菜单排序
+     * 
+     * @param menuIds 菜单唯一编号
+     * @param orderNums 排序ID
+     */
+    public void updateMenuSort(String[] menuIds, String[] orderNums);
+
+    /**
+     * 删除菜单管理信息
+     * 
+     * @param menuId 菜单唯一编号
+     * @return 结果
+     */
+    public int deleteMenuById(Long menuId);
+
+    /**
+     * 校验菜单名称是否唯一
+     * 
+     * @param menu 菜单信息
+     * @return 结果
+     */
+    public boolean checkMenuNameUnique(SysMenu menu);
+
+    /**
+     * 校验路由组合是否唯一
+     *
+     * @param menu 菜单信息
+     * @return 结果
+     */
+    public boolean checkRouteConfigUnique(SysMenu menu);
+}

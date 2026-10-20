@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.RentalWorkflowMapper">
+    <select id="selectVisibleChannels" resultType="map">
+        select channel_id as channelId, channel_code as channelCode, channel_name as channelName,
+               channel_type as channelType, scope_type as scopeType, status, sort_no as sortNo
+        from ry_business.ry_rental_order_channel
+        where is_delete = 0
+          and ((scope_type = 1 and channel_type = 1 and status = 0)
+               or (scope_type = 2 and tenant_id = #{tenantId} and member_id = #{memberId}))
+        <if test="keyword != null and keyword != ''">
+            and (channel_code like concat('%', #{keyword}, '%') or channel_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">and status = #{status}</if>
+        order by scope_type, sort_no, channel_id desc
+    </select>
+
+    <select id="selectPlatformChannels" resultType="map">
+        select channel_id as channelId, channel_code as channelCode, channel_name as channelName,
+               channel_type as channelType, scope_type as scopeType, status, sort_no as sortNo
+        from ry_business.ry_rental_order_channel
+        where tenant_id = 0 and member_id = 0 and scope_type = 1
+          and channel_type = 1 and is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (channel_code like concat('%', #{keyword}, '%') or channel_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">and status = #{status}</if>
+        order by sort_no, channel_id desc
+    </select>
+
+    <select id="selectPlatformChannel" resultType="map">
+        select channel_id as channelId, tenant_id as tenantId, member_id as memberId,
+               channel_code as channelCode, channel_name as channelName, channel_type as channelType,
+               scope_type as scopeType, status, sort_no as sortNo
+        from ry_business.ry_rental_order_channel
+        where channel_id = #{channelId} and tenant_id = 0 and member_id = 0
+          and scope_type = 1 and channel_type = 1 and is_delete = 0
+    </select>
+
+    <select id="selectChannel" resultType="map">
+        select channel_id as channelId, tenant_id as tenantId, member_id as memberId,
+               channel_code as channelCode, channel_name as channelName, channel_type as channelType,
+               scope_type as scopeType, status, sort_no as sortNo
+        from ry_business.ry_rental_order_channel
+        where channel_id = #{channelId} and is_delete = 0
+        <choose>
+            <when test="ownOnly">and tenant_id = #{tenantId} and member_id = #{memberId} and scope_type = 2</when>
+            <otherwise>and ((scope_type = 1 and channel_type = 1 and status = 0)
+                         or (scope_type = 2 and tenant_id = #{tenantId} and member_id = #{memberId}))</otherwise>
+        </choose>
+    </select>
+
+    <insert id="insertChannel">
+        insert into ry_business.ry_rental_order_channel
+            (tenant_id, member_id, channel_code, channel_name, channel_type, scope_type, status, sort_no,
+             create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{code}, #{name}, #{type}, #{scope}, #{status}, #{sortNo},
+                #{operatorId}, now(), #{operatorId}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updateChannel">
+        update ry_business.ry_rental_order_channel
+        set channel_name = #{name}, status = #{status}, sort_no = #{sortNo},
+            update_by = #{operatorId}, update_time = now(), remark = #{remark}
+        where tenant_id = #{tenantId} and member_id = #{memberId} and channel_id = #{channelId}
+          and scope_type = 2 and is_delete = 0
+    </update>
+
+    <update id="updatePlatformChannel">
+        update ry_business.ry_rental_order_channel
+        set channel_name = #{name}, status = #{status}, sort_no = #{sortNo},
+            update_by = #{operatorId}, update_time = now(), remark = #{remark}
+        where channel_id = #{channelId} and tenant_id = 0 and member_id = 0
+          and scope_type = 1 and channel_type = 1 and is_delete = 0
+    </update>
+
+    <update id="softDeleteChannel">
+        update ry_business.ry_rental_order_channel
+        set is_delete = 1, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and channel_id = #{channelId}
+          and scope_type = 2 and is_delete = 0
+    </update>
+
+    <update id="softDeletePlatformChannel">
+        update ry_business.ry_rental_order_channel
+        set is_delete = 1, update_by = #{operatorId}, update_time = now()
+        where channel_id = #{channelId} and tenant_id = 0 and member_id = 0
+          and scope_type = 1 and channel_type = 1 and is_delete = 0
+    </update>
+
+    <select id="countPlatformChannelReferences" resultType="int">
+        select
+          (select count(1) from ry_business.ry_rental_package_channel where channel_id = #{channelId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_order o
+            inner join ry_business.ry_rental_order_channel c on c.channel_id = o.channel_id
+              and c.channel_id = #{channelId} and c.is_delete = 0
+            where o.is_delete = 0)
+    </select>
+
+    <select id="countChannelReferences" resultType="int">
+        select
+          (select count(1) from ry_business.ry_rental_package_channel
+            where tenant_id = #{tenantId} and member_id = #{memberId} and channel_id = #{channelId} and is_delete = 0)
+        + (select count(1) from ry_business.ry_rental_order
+            where tenant_id = #{tenantId} and member_id = #{memberId} and channel_id = #{channelId}
+              and is_delete = 0)
+    </select>
+
+    <select id="selectPackageChannels" resultType="map">
+        select pc.binding_id as bindingId, pc.package_id as packageId, pc.channel_id as channelId,
+               pc.is_default as isDefault, c.channel_code as channelCode, c.channel_name as channelName,
+               c.channel_type as channelType, c.scope_type as scopeType
+        from ry_business.ry_rental_package_channel pc
+        inner join ry_business.ry_rental_order_channel c on c.channel_id = pc.channel_id and c.is_delete = 0
+        where pc.tenant_id = #{tenantId} and pc.member_id = #{memberId} and pc.package_id = #{packageId}
+          and pc.is_delete = 0
+        order by pc.is_default desc, c.sort_no, pc.binding_id
+    </select>
+
+    <select id="selectPackage" resultType="map">
+        select package_id as packageId, package_name as packageName
+        from ry_business.ry_rental_package_template
+        where tenant_id = #{tenantId} and member_id = #{memberId} and package_id = #{packageId} and is_delete = 0
+    </select>
+
+    <select id="selectDefaultPackageChannel" resultType="map">
+        select package_id as packageId, channel_id as channelId
+        from ry_business.ry_rental_package_channel
+        where tenant_id = #{tenantId} and member_id = #{memberId} and package_id = #{packageId}
+          and is_default = 1 and is_delete = 0
+        order by binding_id desc limit 1
+    </select>
+
+    <update id="clearPackageDefault">
+        update ry_business.ry_rental_package_channel
+        set is_default = 0, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and package_id = #{packageId} and is_delete = 0
+    </update>
+
+    <insert id="insertPackageChannel">
+        insert into ry_business.ry_rental_package_channel
+            (tenant_id, member_id, package_id, channel_id, is_default, effective_time,
+             create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{packageId}, #{channelId}, #{isDefault}, now(),
+                #{operatorId}, now(), #{operatorId}, now(), 0)
+        on duplicate key update is_default = values(is_default), is_delete = 0,
+            update_by = values(update_by), update_time = now()
+    </insert>
+
+    <select id="selectPackageTransferByKey" resultType="map">
+        select transfer_id as transferId, package_id as packageId, to_channel_id as toChannelId
+        from ry_business.ry_rental_package_channel_transfer
+        where member_id = #{memberId} and idempotency_key = #{idempotencyKey} and is_delete = 0
+        limit 1
+    </select>
+
+    <insert id="insertPackageTransfer">
+        insert into ry_business.ry_rental_package_channel_transfer
+            (tenant_id, member_id, package_id, from_channel_id, to_channel_id, idempotency_key,
+             reason, operator_id, operator_name, create_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{packageId}, #{fromChannelId}, #{toChannelId}, #{idempotencyKey},
+                #{reason}, #{operatorId}, #{operatorName}, now(), 0)
+    </insert>
+
+    <select id="selectOrder" resultType="map">
+        select order_id as orderId, order_no as orderNo, channel_id as channelId, version
+        from ry_business.ry_rental_order
+        where tenant_id = #{tenantId} and member_id = #{memberId} and order_id = #{orderId} and is_delete = 0
+        for update
+    </select>
+
+    <select id="selectOrderTransferByKey" resultType="map">
+        select transfer_id as transferId, order_id as orderId, to_channel_id as toChannelId
+        from ry_business.ry_rental_order_channel_transfer
+        where member_id = #{memberId} and order_id = #{orderId} and idempotency_key = #{idempotencyKey}
+          and is_delete = 0 limit 1
+    </select>
+
+    <update id="updateOrderChannel">
+        update ry_business.ry_rental_order
+        set channel_id = #{channelId}, version = version + 1, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and order_id = #{orderId}
+          and version = #{version} and is_delete = 0
+    </update>
+
+    <insert id="insertOrderTransfer">
+        insert into ry_business.ry_rental_order_channel_transfer
+            (tenant_id, member_id, order_id, from_channel_id, to_channel_id, idempotency_key,
+             reason, operator_id, operator_name, create_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{orderId}, #{fromChannelId}, #{toChannelId}, #{idempotencyKey},
+                #{reason}, #{operatorId}, #{operatorName}, now(), 0)
+    </insert>
+
+    <select id="selectReservationByKeyForUpdate" resultType="map">
+        select reservation_id as reservationId, reservation_no as reservationNo, order_id as orderId,
+               package_id as packageId, warehouse_id as warehouseId, reserved_qty as quantity,
+               reservation_status as reservationStatus, idempotency_key as idempotencyKey, version
+        from ry_business.ry_rental_inventory_reservation
+        where tenant_id = #{tenantId} and member_id = #{memberId} and idempotency_key = #{idempotencyKey}
+          and is_delete = 0 limit 1 for update
+    </select>
+
+    <insert id="insertReservation">
+        insert into ry_business.ry_rental_inventory_reservation
+            (reservation_no, tenant_id, member_id, order_id, product_id, package_id, warehouse_id, reserved_qty,
+             reservation_status, idempotency_key, version, create_by, create_time, update_by, update_time, is_delete)
+        values (#{reservationNo}, #{tenantId}, #{memberId}, #{orderId}, 0, #{packageId}, #{warehouseId}, #{quantity},
+                1, #{idempotencyKey}, 0, #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectReservationForUpdate" resultType="map">
+        select reservation_id as reservationId, reservation_no as reservationNo, order_id as orderId,
+               package_id as packageId, warehouse_id as warehouseId, reserved_qty as quantity,
+               reservation_status as reservationStatus, idempotency_key as idempotencyKey, version
+        from ry_business.ry_rental_inventory_reservation
+        where tenant_id = #{tenantId} and member_id = #{memberId} and reservation_id = #{reservationId}
+          and is_delete = 0 for update
+    </select>
+
+    <update id="updateReservationStatus">
+        update ry_business.ry_rental_inventory_reservation
+        set reservation_status = #{toStatus}, release_reason = #{reason}, version = version + 1,
+            update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and reservation_id = #{reservationId}
+          and reservation_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateReservationItemStatus">
+        update ry_business.ry_rental_inventory_reservation_item
+        set reservation_status = #{toStatus}, version = version + 1, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and reservation_id = #{reservationId}
+          and reservation_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <select id="selectBalanceForUpdate" resultType="map">
+        select balance_id as id, on_hand_qty as quantity, version, stock_status as stockStatus
+        from ry_business.ry_rental_inventory_balance
+        where tenant_id = #{tenantId} and member_id = #{memberId} and product_id = #{productId}
+          and warehouse_id = #{warehouseId} and stock_status = #{stockStatus} and is_delete = 0 for update
+    </select>
+
+    <insert id="insertBalance">
+        insert into ry_business.ry_rental_inventory_balance
+            (tenant_id, member_id, product_id, warehouse_id, stock_status, on_hand_qty, version,
+             create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{productId}, #{warehouseId}, #{stockStatus}, #{quantity}, 0,
+                #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updateBalance">
+        update ry_business.ry_rental_inventory_balance
+        set on_hand_qty = #{quantity}, version = version + 1, update_by = #{operator}, update_time = now(), remark = #{remark}
+        where tenant_id = #{tenantId} and member_id = #{memberId} and balance_id = #{balanceId} and is_delete = 0
+    </update>
+
+    <select id="selectInventoryUnitForUpdate" resultType="map">
+        select unit_id as unitId, product_id as productId, warehouse_id as warehouseId, unit_code as unitCode,
+               unit_status as unitStatus, version
+        from ry_business.ry_rental_inventory_unit
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+        <choose>
+            <when test="unitId != null">and unit_id = #{unitId}</when>
+            <otherwise>and unit_code = #{unitCode}</otherwise>
+        </choose>
+        limit 1 for update
+    </select>
+
+    <select id="selectAssetSnForUpdate" resultType="map">
+        select sn_id as snId, product_id as productId, warehouse_id as warehouseId, sn_code as snCode,
+               asset_status as assetStatus
+        from ry_business.ry_rental_asset_sn
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+        <choose>
+            <when test="snId != null">and sn_id = #{snId}</when>
+            <otherwise>and sn_code = #{snCode}</otherwise>
+        </choose>
+        limit 1 for update
+    </select>
+
+    <update id="updateInventoryUnitStatus">
+        update ry_business.ry_rental_inventory_unit
+        set unit_status = #{toStatus}, version = version + 1, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and unit_id = #{unitId}
+          and unit_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateAssetSnStatus">
+        update ry_business.ry_rental_asset_sn
+        set asset_status = #{toStatus}, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and sn_id = #{snId}
+          and asset_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <insert id="insertInventoryTransition">
+        insert into ry_business.ry_rental_inventory_transition
+            (tenant_id, member_id, product_id, unit_id, warehouse_id, sn_id, from_status, to_status, change_qty,
+             idempotency_key, reason, operator_id, operator_name, create_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{productId}, #{unitId}, #{warehouseId}, #{snId}, #{fromStatus}, #{toStatus},
+                #{changeQty}, #{idempotencyKey}, #{reason}, #{operatorId}, #{operatorName}, now(), 0)
+    </insert>
+
+    <insert id="insertInventoryLedger">
+        insert into ry_business.ry_rental_inventory_ledger
+            (tenant_id, member_id, warehouse_id, product_id, change_type, from_status, to_status, change_qty,
+             ref_type, ref_id, reason, operator_name, create_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{warehouseId}, #{productId}, #{changeType}, #{fromStatus}, #{toStatus},
+                #{changeQty}, #{refType}, #{refId}, #{reason}, #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectIdempotentForUpdate" resultType="map">
+        select request_id as requestId, request_hash as requestHash, request_status as requestStatus,
+               response_json as responseJson
+        from ry_business.ry_rental_idempotent_request
+        where tenant_id = #{tenantId} and member_id = #{memberId} and request_scope = #{scope}
+          and idempotency_key = #{idempotencyKey} and is_delete = 0 and expire_time > now()
+        limit 1 for update
+    </select>
+
+    <insert id="insertIdempotentIgnore">
+        insert ignore into ry_business.ry_rental_idempotent_request
+            (tenant_id, member_id, request_scope, idempotency_key, request_hash, request_status, expire_time, create_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{scope}, #{idempotencyKey}, #{requestHash}, 1, #{expireTime}, now(), 0)
+    </insert>
+
+    <update id="completeIdempotent">
+        update ry_business.ry_rental_idempotent_request
+        set request_status = 2, response_json = JSON_OBJECT('businessId', #{businessId}), update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and request_scope = #{scope}
+          and idempotency_key = #{idempotencyKey} and is_delete = 0
+    </update>
+
+    <select id="selectQuotaForUpdate" resultType="map">
+        select quota_id as quotaId, quota_bytes as quotaBytes, used_bytes as usedBytes, version
+        from ry_business.ry_rental_file_quota_account
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0 for update
+    </select>
+
+    <insert id="insertQuota">
+        insert ignore into ry_business.ry_rental_file_quota_account
+            (tenant_id, member_id, quota_bytes, used_bytes, version, create_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{quotaBytes}, 0, 0, now(), 0)
+    </insert>
+
+    <update id="increaseQuota">
+        update ry_business.ry_rental_file_quota_account
+        set used_bytes = used_bytes + #{deltaBytes}, version = version + 1, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+          and used_bytes + #{deltaBytes} &lt;= quota_bytes
+    </update>
+
+    <insert id="insertQuotaLedger">
+        insert into ry_business.ry_rental_file_quota_ledger
+            (tenant_id, member_id, file_name, file_url, file_size, change_type, ref_type, ref_id,
+             operator_name, create_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{fileName}, #{fileUrl}, #{fileSize}, #{changeType}, #{refType}, #{refId},
+                #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectQuotaLedger" resultType="map">
+        select ledger_id as ledgerId, file_name as fileName, file_url as fileUrl, file_size as fileSize,
+               change_type as changeType, ref_type as refType, ref_id as refId, operator_name as operatorName,
+               create_time as createTime
+        from ry_business.ry_rental_file_quota_ledger
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+        order by ledger_id desc
+    </select>
+
+    <select id="selectProtocols" resultType="map">
+        select p.protocol_id as protocolId, p.protocol_key as protocolKey, p.version_no as versionNo,
+               p.protocol_title as protocolTitle, p.protocol_content as protocolContent, p.content_hash as contentHash,
+               p.protocol_status as protocolStatus, date_format(p.effective_time, '%Y-%m-%d %H:%i:%s') as effectiveTime,
+               coalesce(group_concat(distinct ps.scope_type order by ps.scope_type), '1') as scopeTypes
+        from ry_business.ry_rental_protocol p
+        left join ry_business.ry_rental_protocol_scope ps on ps.protocol_id = p.protocol_id and ps.is_delete = 0
+        where p.is_delete = 0
+        <if test="protocolKey != null and protocolKey != ''">and p.protocol_key = #{protocolKey}</if>
+        <if test="publishedOnly">
+            and p.protocol_status = 1 and (p.effective_time is null or p.effective_time &lt;= now())
+            and ps.scope_type = #{scopeType}
+            and p.protocol_id = (
+                select current_protocol.protocol_id
+                from ry_business.ry_rental_protocol current_protocol
+                inner join ry_business.ry_rental_protocol_scope current_scope
+                    on current_scope.protocol_id = current_protocol.protocol_id
+                   and current_scope.scope_type = #{scopeType}
+                   and current_scope.is_delete = 0
+                where current_protocol.protocol_key = p.protocol_key
+                  and current_protocol.protocol_status = 1
+                  and (current_protocol.effective_time is null or current_protocol.effective_time &lt;= now())
+                  and current_protocol.is_delete = 0
+                order by current_protocol.version_no desc
+                limit 1
+            )
+        </if>
+        group by p.protocol_id, p.protocol_key, p.version_no, p.protocol_title, p.protocol_content, p.content_hash,
+                 p.protocol_status, p.effective_time
+        order by p.protocol_key, p.version_no desc
+    </select>
+
+    <select id="selectProtocol" resultType="map">
+        select p.protocol_id as protocolId, p.protocol_key as protocolKey, p.version_no as versionNo,
+               p.protocol_title as protocolTitle, p.protocol_content as protocolContent, p.content_hash as contentHash,
+               p.protocol_status as protocolStatus,
+               date_format(p.effective_time, '%Y-%m-%d %H:%i:%s') as effectiveTime,
+               (select group_concat(distinct ps.scope_type order by ps.scope_type)
+                  from ry_business.ry_rental_protocol_scope ps
+                 where ps.protocol_id = p.protocol_id and ps.is_delete = 0) as scopeTypes
+        from ry_business.ry_rental_protocol p
+        where p.protocol_id = #{protocolId} and p.is_delete = 0
+    </select>
+
+    <select id="selectMaxProtocolVersion" resultType="int">
+        select coalesce(max(version_no), 0) from ry_business.ry_rental_protocol
+        where protocol_key = #{protocolKey} and is_delete = 0
+    </select>
+
+    <insert id="insertProtocol">
+        insert into ry_business.ry_rental_protocol
+            (protocol_key, version_no, protocol_title, protocol_content, content_hash, protocol_status,
+             effective_time, create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{protocolKey}, #{versionNo}, #{title}, #{content}, #{contentHash}, #{status},
+                case when #{status} = 1 then now() else null end, #{operator}, now(), #{operator}, now(), #{remark}, 0)
+    </insert>
+
+    <update id="updateProtocol">
+        update ry_business.ry_rental_protocol
+        set protocol_title = #{title}, protocol_content = #{content}, content_hash = #{contentHash},
+            protocol_status = #{status}, effective_time = case when #{status} = 1 then #{effectiveTime} else null end,
+            update_by = #{operator}, update_time = now(), remark = #{remark}
+        where protocol_id = #{protocolId} and is_delete = 0
+    </update>
+
+    <update id="retireProtocols">
+        update ry_business.ry_rental_protocol
+        set protocol_status = 2, update_by = #{operator}, update_time = now()
+        where protocol_key = #{protocolKey} and protocol_status = 1 and is_delete = 0
+    </update>
+
+    <update id="deleteProtocolScopes">
+        update ry_business.ry_rental_protocol_scope
+        set is_delete = 1, update_by = #{operator}, update_time = now()
+        where protocol_id = #{protocolId} and is_delete = 0
+    </update>
+
+    <insert id="insertProtocolScope">
+        insert into ry_business.ry_rental_protocol_scope
+            (protocol_id, scope_type, create_by, create_time, update_by, update_time, is_delete)
+        values (#{protocolId}, #{scopeType}, #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectAcceptance" resultType="map">
+        select acceptance_id as acceptanceId, accepted_time as acceptedTime
+        from ry_business.ry_rental_protocol_acceptance
+        where tenant_id = #{tenantId} and member_id = #{memberId} and merchant_user_id = #{userId}
+          and protocol_id = #{protocolId} and version_no = #{versionNo} and is_delete = 0 limit 1
+    </select>
+
+    <insert id="insertAcceptance">
+        insert into ry_business.ry_rental_protocol_acceptance
+            (tenant_id, member_id, merchant_user_id, protocol_id, protocol_key, version_no, content_hash,
+             accepted_time, operator_name, is_delete)
+        values (#{tenantId}, #{memberId}, #{userId}, #{protocolId}, #{protocolKey}, #{versionNo}, #{contentHash},
+                now(), #{operator}, 0)
+        on duplicate key update accepted_time = now(), operator_name = values(operator_name), is_delete = 0
+    </insert>
+</mapper>

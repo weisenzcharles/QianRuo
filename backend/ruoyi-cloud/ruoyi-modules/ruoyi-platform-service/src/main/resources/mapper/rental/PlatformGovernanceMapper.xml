@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformGovernanceMapper">
+
+    <select id="countOpenTickets" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_service_ticket
+        WHERE is_delete = 0 AND ticket_status NOT IN (5, 6, 7)
+    </select>
+
+    <insert id="upsertRiskEvent">
+        insert into ry_rental.ry_rental_platform_operations_risk_event
+        (risk_event_key, risk_type, risk_level, subject, risk_count, detail, event_status,
+         first_seen_time, last_seen_time, create_by, create_time, update_by, update_time, is_delete)
+        values (#{riskEventKey}, #{riskType}, #{riskLevel}, #{subject}, #{riskCount}, #{detail}, 0,
+                now(), now(), #{operator}, now(), #{operator}, now(), 0)
+        on duplicate key update
+            risk_type = values(risk_type),
+            risk_level = values(risk_level),
+            subject = values(subject),
+            risk_count = values(risk_count),
+            detail = values(detail),
+            last_seen_time = now(),
+            resolved_by = case when event_status = 2 then null else resolved_by end,
+            resolved_time = case when event_status = 2 then null else resolved_time end,
+            resolved_remark = case when event_status = 2 then null else resolved_remark end,
+            event_status = case when event_status = 2 then 0 else event_status end,
+            update_by = #{operator}, update_time = now(), is_delete = 0
+    </insert>
+
+    <sql id="riskEventColumns">
+        risk_event_id, risk_type, risk_level, subject, risk_count, detail, event_status,
+        date_format(first_seen_time, '%Y-%m-%d %H:%i:%s') as first_seen_time,
+        date_format(last_seen_time, '%Y-%m-%d %H:%i:%s') as last_seen_time
+    </sql>
+
+    <select id="selectRiskEventByKey" resultType="com.ruoyi.system.model.rental.PlatformOperationsRiskVO">
+        select <include refid="riskEventColumns" />
+        from ry_rental.ry_rental_platform_operations_risk_event
+        where risk_event_key = #{riskEventKey} and is_delete = 0
+    </select>
+
+    <update id="resolveMissingRiskEvents">
+        update ry_rental.ry_rental_platform_operations_risk_event
+        set event_status = 2, resolved_by = #{operator}, resolved_time = now(),
+            resolved_remark = '本次运营检查未再次发现', update_by = #{operator}, update_time = now()
+        where is_delete = 0 and event_status in (0, 1)
+        <if test="riskEventKeys != null and riskEventKeys.size() > 0">
+            and risk_event_key not in
+            <foreach collection="riskEventKeys" item="riskEventKey" open="(" separator="," close=")">
+                #{riskEventKey}
+            </foreach>
+        </if>
+    </update>
+
+    <select id="selectRiskEventById" resultType="com.ruoyi.system.model.rental.PlatformOperationsRiskVO">
+        select <include refid="riskEventColumns" />
+        from ry_rental.ry_rental_platform_operations_risk_event
+        where risk_event_id = #{riskEventId} and is_delete = 0
+    </select>
+
+    <update id="acknowledgeRiskEvent">
+        update ry_rental.ry_rental_platform_operations_risk_event
+        set event_status = 1, update_by = #{operator}, update_time = now()
+        where risk_event_id = #{riskEventId} and event_status = 0 and is_delete = 0
+    </update>
+
+    <sql id="ticketColumns">
+        t.ticket_id, t.ticket_no, t.member_id,
+        coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code, '平台工单') as member_name,
+        t.ticket_type, t.ref_type, t.ref_id, t.ticket_title as title, t.ticket_content as content,
+        t.ticket_status, t.priority, t.source_type, t.requester_user_id, requester.nick_name as requester_name,
+        t.assignee_user_id, assignee.nick_name as assignee_name,
+        date_format(t.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+        date_format(t.update_time, '%Y-%m-%d %H:%i:%s') as update_time, t.remark
+    </sql>
+
+    <select id="selectTickets" resultType="com.ruoyi.system.model.rental.PlatformTicketVO">
+        select <include refid="ticketColumns" />
+        from ry_rental.ry_rental_service_ticket t
+        left join ry_rental.ry_rental_member m on m.member_id = t.member_id and m.is_delete = 0
+        left join `ry-cloud`.sys_user requester on requester.user_id = t.requester_user_id and requester.is_delete = 0
+        left join `ry-cloud`.sys_user assignee on assignee.user_id = t.assignee_user_id and assignee.is_delete = 0
+        <where>
+            t.is_delete = 0
+            <if test="query.ticketNo != null and query.ticketNo != ''">
+                and t.ticket_no like concat('%', #{query.ticketNo}, '%')
+            </if>
+            <if test="query.ticketType != null">and t.ticket_type = #{query.ticketType}</if>
+            <if test="query.ticketStatus != null">and t.ticket_status = #{query.ticketStatus}</if>
+            <if test="query.priority != null">and t.priority = #{query.priority}</if>
+            <if test="query.memberKeyword != null and query.memberKeyword != ''">
+                and (m.member_code like concat('%', #{query.memberKeyword}, '%')
+                  or m.nickname like concat('%', #{query.memberKeyword}, '%')
+                  or m.legal_subject_name like concat('%', #{query.memberKeyword}, '%'))
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                and (t.ticket_title like concat('%', #{query.keyword}, '%')
+                  or t.ticket_content like concat('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+        order by field(t.priority, 3, 2, 1), t.create_time desc, t.ticket_id desc
+    </select>
+
+    <select id="selectTicket" resultType="com.ruoyi.system.model.rental.PlatformTicketVO">
+        select <include refid="ticketColumns" />
+        from ry_rental.ry_rental_service_ticket t
+        left join ry_rental.ry_rental_member m on m.member_id = t.member_id and m.is_delete = 0
+        left join `ry-cloud`.sys_user requester on requester.user_id = t.requester_user_id and requester.is_delete = 0
+        left join `ry-cloud`.sys_user assignee on assignee.user_id = t.assignee_user_id and assignee.is_delete = 0
+        where t.ticket_id = #{ticketId} and t.is_delete = 0
+    </select>
+
+    <select id="selectTicketByRef" resultType="com.ruoyi.system.model.rental.PlatformTicketVO">
+        select <include refid="ticketColumns" />
+        from ry_rental.ry_rental_service_ticket t
+        left join ry_rental.ry_rental_member m on m.member_id = t.member_id and m.is_delete = 0
+        left join `ry-cloud`.sys_user requester on requester.user_id = t.requester_user_id and requester.is_delete = 0
+        left join `ry-cloud`.sys_user assignee on assignee.user_id = t.assignee_user_id and assignee.is_delete = 0
+        where t.ref_type = #{refType} and t.ref_id = #{refId} and t.is_delete = 0
+        order by t.ticket_id desc
+        limit 1
+    </select>
+
+    <select id="selectTicketEvents" resultType="com.ruoyi.system.model.rental.PlatformTicketEventVO">
+        select e.event_id, e.event_type, e.from_status, e.to_status, e.event_detail as detail,
+               e.actor_user_id, u.nick_name as actor_name,
+               date_format(e.create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from ry_rental.ry_rental_ticket_event e
+        left join `ry-cloud`.sys_user u on u.user_id = e.actor_user_id and u.is_delete = 0
+        where e.ticket_id = #{ticketId} and e.is_delete = 0
+        order by e.create_time asc, e.event_id asc
+    </select>
+
+    <select id="selectTicketAssignments" resultType="com.ruoyi.system.model.rental.PlatformTicketAssignmentVO">
+        select a.assignment_id, a.assignee_user_id, u.nick_name as assignee_name,
+               a.assignment_status, date_format(a.assigned_time, '%Y-%m-%d %H:%i:%s') as assigned_time,
+               date_format(a.completed_time, '%Y-%m-%d %H:%i:%s') as completed_time
+        from ry_rental.ry_rental_ticket_assignment a
+        left join `ry-cloud`.sys_user u on u.user_id = a.assignee_user_id and u.is_delete = 0
+        where a.ticket_id = #{ticketId} and a.is_delete = 0
+        order by a.assigned_time desc, a.assignment_id desc
+    </select>
+
+    <select id="selectTicketAssignees" resultType="com.ruoyi.system.model.rental.PlatformTicketAssigneeVO">
+        select user_id, user_name, nick_name
+        from `ry-cloud`.sys_user
+        where is_delete = 0 and status = 0
+        order by nick_name asc, user_id asc
+    </select>
+
+    <select id="countActiveTicketAssignee" resultType="int">
+        select count(1)
+        from `ry-cloud`.sys_user
+        where user_id = #{userId} and is_delete = 0 and status = 0
+    </select>
+
+    <insert id="insertTicket">
+        insert into ry_rental.ry_rental_service_ticket
+        (ticket_no, tenant_id, member_id, ticket_type, ref_type, ref_id, ticket_title, ticket_content,
+         ticket_status, priority, source_type, requester_user_id, create_by, create_time, update_by, update_time, is_delete)
+        values
+        (#{ticketNo}, (select tenant_id from ry_rental.ry_rental_member where member_id = #{memberId} and is_delete = 0),
+         #{memberId}, #{ticketType}, #{refType}, #{refId}, #{title}, #{content}, 0, #{priority}, 1,
+         #{requesterUserId}, #{requesterUserId}, now(), #{requesterUserId}, now(), 0)
+    </insert>
+
+    <insert id="insertAfterSalesTicket">
+        insert ignore into ry_rental.ry_rental_service_ticket
+        (ticket_no, tenant_id, member_id, ticket_type, ref_type, ref_id, ticket_title, ticket_content,
+         ticket_status, priority, source_type, requester_user_id, create_by, create_time, update_by, update_time, is_delete)
+        values
+        (#{ticketNo}, (select tenant_id from ry_rental.ry_rental_member where member_id = #{memberId} and is_delete = 0),
+         #{memberId}, 2, 'after_sales_case', #{refId}, #{title}, #{content}, 0, #{priority}, 2,
+         null, null, now(), null, now(), 0)
+    </insert>
+
+    <select id="selectCreditRecordForAppeal" resultType="map">
+        select credit_record_id as creditRecordId, record_no as recordNo,
+               event_type as eventType, score_before as scoreBefore,
+               score_change as scoreChange, score_after as scoreAfter,
+               reversal_of_record_no as reversalOfRecordNo
+        from ry_rental.ry_rental_member_credit_record
+        where member_id = #{memberId} and record_no = #{recordNo} and is_delete = 0
+        limit 1
+    </select>
+
+    <insert id="insertMerchantCreditAppealTicket">
+        insert ignore into ry_rental.ry_rental_service_ticket
+        (ticket_no, tenant_id, member_id, ticket_type, ref_type, ref_id, ticket_title, ticket_content,
+         ticket_status, priority, source_type, requester_user_id, create_by, create_time, update_by, update_time, is_delete)
+        values
+        (#{ticketNo}, (select tenant_id from ry_rental.ry_rental_member where member_id = #{memberId} and is_delete = 0),
+         #{memberId}, 1, 'member_credit_record', #{refId}, #{title}, #{content}, 0, #{priority}, 2,
+         null, null, now(), null, now(), 0)
+    </insert>
+
+    <insert id="insertTicketEvent">
+        insert into ry_rental.ry_rental_ticket_event
+        (ticket_id, event_type, from_status, to_status, event_detail, actor_user_id,
+         create_by, create_time, update_by, update_time, is_delete)
+        values (#{ticketId}, #{eventType}, #{fromStatus}, #{toStatus}, #{detail}, #{actorUserId},
+                #{actorUserId}, now(), #{actorUserId}, now(), 0)
+    </insert>
+
+    <update id="updateTicket">
+        update ry_rental.ry_rental_service_ticket
+        set ticket_status = coalesce(#{toStatus}, ticket_status),
+            assignee_user_id = coalesce(#{assigneeUserId}, assignee_user_id),
+            update_by = #{operator}, update_time = now()
+        where ticket_id = #{ticketId} and is_delete = 0
+    </update>
+
+    <insert id="insertTicketAssignment">
+        insert into ry_rental.ry_rental_ticket_assignment
+        (ticket_id, assignee_user_id, assignment_status, assigned_by, assigned_time,
+         create_by, create_time, update_by, update_time, is_delete)
+        values (#{ticketId}, #{assigneeUserId}, 1, #{assignedBy}, now(),
+                #{assignedBy}, now(), #{assignedBy}, now(), 0)
+    </insert>
+
+    <select id="selectKnowledgeCategories" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeCategoryVO">
+        select category_id, parent_id, category_name, sort_no, status
+        from ry_rental.ry_rental_knowledge_category
+        where is_delete = 0 and status = 0
+        order by sort_no asc, category_id asc
+    </select>
+
+    <select id="selectKnowledgeArticles" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeArticleVO">
+        select a.article_id, a.category_id, c.category_name, a.article_title as title,
+               a.source_type, a.member_id, a.article_status as status, a.current_version_no, a.pinned,
+               (select count(1) from ry_rental.ry_rental_knowledge_read_record rr
+                 where rr.article_id = a.article_id and rr.is_delete = 0) as read_count,
+               date_format(a.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(a.update_time, '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_rental.ry_rental_knowledge_article a
+        left join ry_rental.ry_rental_knowledge_category c on c.category_id = a.category_id and c.is_delete = 0
+        <where>
+            a.is_delete = 0 and a.source_type = 1
+            <if test="query.title != null and query.title != ''">and a.article_title like concat('%', #{query.title}, '%')</if>
+            <if test="query.categoryId != null">and a.category_id = #{query.categoryId}</if>
+            <if test="query.status != null">and a.article_status = #{query.status}</if>
+        </where>
+        order by a.pinned desc, a.update_time desc, a.article_id desc
+    </select>
+
+    <select id="selectKnowledgeComplianceArticles" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeArticleVO">
+        select a.article_id, a.category_id, c.category_name, a.article_title as title,
+               a.source_type, a.member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as member_name,
+               a.article_status as status, a.current_version_no, a.pinned,
+               (select count(1) from ry_rental.ry_rental_knowledge_read_record rr
+                 where rr.article_id = a.article_id and rr.is_delete = 0) as read_count,
+               (select v.reason from ry_rental.ry_rental_knowledge_violation v
+                 where v.article_id = a.article_id and v.is_delete = 0
+                 order by v.create_time desc, v.violation_id desc limit 1) as violation_reason,
+               (select date_format(v.create_time, '%Y-%m-%d %H:%i:%s')
+                  from ry_rental.ry_rental_knowledge_violation v
+                 where v.article_id = a.article_id and v.is_delete = 0
+                 order by v.create_time desc, v.violation_id desc limit 1) as violation_time,
+               date_format(a.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(a.update_time, '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_rental.ry_rental_knowledge_article a
+        left join ry_rental.ry_rental_knowledge_category c on c.category_id = a.category_id and c.is_delete = 0
+        left join ry_rental.ry_rental_member m on m.member_id = a.member_id and m.is_delete = 0
+        <where>
+            a.is_delete = 0 and a.source_type = 2
+            <if test="query.title != null and query.title != ''">and a.article_title like concat('%', #{query.title}, '%')</if>
+            <if test="query.categoryId != null">and a.category_id = #{query.categoryId}</if>
+            <if test="query.status != null">and a.article_status = #{query.status}</if>
+            <if test="query.memberKeyword != null and query.memberKeyword != ''">
+                and (m.nickname like concat('%', #{query.memberKeyword}, '%')
+                  or m.legal_subject_name like concat('%', #{query.memberKeyword}, '%')
+                  or m.member_code like concat('%', #{query.memberKeyword}, '%'))
+            </if>
+        </where>
+        order by a.update_time desc, a.article_id desc
+    </select>
+
+    <select id="selectKnowledgeArticle" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeArticleVO">
+        select a.article_id, a.category_id, c.category_name, a.article_title as title,
+               a.source_type, a.article_status as status, a.current_version_no, a.pinned,
+               (select count(1) from ry_rental.ry_rental_knowledge_read_record rr
+                 where rr.article_id = a.article_id and rr.is_delete = 0) as read_count,
+               date_format(a.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(a.update_time, '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_rental.ry_rental_knowledge_article a
+        left join ry_rental.ry_rental_knowledge_category c on c.category_id = a.category_id and c.is_delete = 0
+        where a.article_id = #{articleId} and a.source_type = 1 and a.is_delete = 0
+    </select>
+
+    <select id="selectKnowledgeComplianceArticle" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeArticleVO">
+        select a.article_id, a.category_id, c.category_name, a.article_title as title,
+               a.source_type, a.member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as member_name,
+               a.article_status as status, a.current_version_no, a.pinned,
+               (select count(1) from ry_rental.ry_rental_knowledge_read_record rr
+                 where rr.article_id = a.article_id and rr.is_delete = 0) as read_count,
+               (select v.reason from ry_rental.ry_rental_knowledge_violation v
+                 where v.article_id = a.article_id and v.is_delete = 0
+                 order by v.create_time desc, v.violation_id desc limit 1) as violation_reason,
+               (select date_format(v.create_time, '%Y-%m-%d %H:%i:%s')
+                  from ry_rental.ry_rental_knowledge_violation v
+                 where v.article_id = a.article_id and v.is_delete = 0
+                 order by v.create_time desc, v.violation_id desc limit 1) as violation_time,
+               date_format(a.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(a.update_time, '%Y-%m-%d %H:%i:%s') as update_time
+        from ry_rental.ry_rental_knowledge_article a
+        left join ry_rental.ry_rental_knowledge_category c on c.category_id = a.category_id and c.is_delete = 0
+        left join ry_rental.ry_rental_member m on m.member_id = a.member_id and m.is_delete = 0
+        where a.article_id = #{articleId} and a.source_type = 2 and a.is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectKnowledgeVersions" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeVersionVO">
+        select version_id, version_no, cast(content as char) as content, version_status,
+               date_format(retention_until, '%Y-%m-%d %H:%i:%s') as retention_until,
+               date_format(create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from ry_rental.ry_rental_knowledge_version
+        where article_id = #{articleId} and is_delete = 0
+        order by version_no desc, version_id desc
+    </select>
+
+    <select id="selectKnowledgeComplianceVersions" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeVersionVO">
+        select version_id, version_no, cast(content as char) as content, version_status,
+               date_format(retention_until, '%Y-%m-%d %H:%i:%s') as retention_until,
+               date_format(create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from ry_rental.ry_rental_knowledge_version v
+        inner join ry_rental.ry_rental_knowledge_article a on a.article_id = v.article_id
+        where v.article_id = #{articleId} and a.source_type = 2
+          and v.is_delete = 0 and a.is_delete = 0
+        order by v.version_no desc, v.version_id desc
+    </select>
+
+    <select id="selectKnowledgeVersionAttachments" resultType="com.ruoyi.system.model.rental.PlatformKnowledgeAttachmentVO">
+        select attachment_id, attachment_name, file_url, file_type, file_size, sort_no
+        from ry_rental.ry_rental_knowledge_version_attachment
+        where version_id = #{versionId} and is_delete = 0
+        order by sort_no asc, attachment_id asc
+    </select>
+
+    <insert id="insertKnowledgeArticle">
+        insert into ry_rental.ry_rental_knowledge_article
+        (member_id, category_id, article_title, source_type, audience_type, article_status, current_version_no,
+         pinned, create_by, create_time, update_by, update_time, is_delete)
+        values (#{memberId}, #{categoryId}, #{title}, #{sourceType}, #{audienceType}, 0, 1,
+                coalesce(#{pinned}, 0), #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <insert id="insertKnowledgeVersion">
+        insert into ry_rental.ry_rental_knowledge_version
+        (article_id, version_no, content, version_status, retention_until,
+         create_by, create_time, update_by, update_time, is_delete)
+        values (#{articleId}, #{versionNo}, #{content}, #{versionStatus}, coalesce(#{retentionUntil}, date_add(now(), interval 3 year)),
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectKnowledgeVersionId" resultType="long">
+        select version_id
+        from ry_rental.ry_rental_knowledge_version
+        where article_id = #{articleId} and version_no = #{versionNo} and is_delete = 0
+        order by version_id desc
+        limit 1
+    </select>
+
+    <insert id="insertKnowledgeVersionAttachments">
+        insert into ry_rental.ry_rental_knowledge_version_attachment
+            (version_id, attachment_name, file_url, file_type, file_size, sort_no,
+             create_by, create_time, update_by, update_time, is_delete)
+        values
+        <foreach collection="attachments" item="attachment" index="index" separator=",">
+            (#{versionId}, #{attachment.attachmentName}, #{attachment.fileUrl}, #{attachment.fileType},
+             #{attachment.fileSize}, #{index}, #{operator}, now(), #{operator}, now(), 0)
+        </foreach>
+        on duplicate key update is_delete = 0, update_by = #{operator}, update_time = now()
+    </insert>
+
+    <update id="updateKnowledgeArticle">
+        update ry_rental.ry_rental_knowledge_article
+        set category_id = #{categoryId}, article_title = #{title}, article_status = 0, pinned = coalesce(#{pinned}, 0),
+            current_version_no = #{versionNo}, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and source_type = 1 and is_delete = 0
+    </update>
+
+    <update id="updateKnowledgeStatus">
+        update ry_rental.ry_rental_knowledge_article
+        set article_status = #{toStatus}, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and article_status = #{fromStatus} and source_type = 1 and is_delete = 0
+    </update>
+
+    <update id="updateKnowledgeVersionStatus">
+        update ry_rental.ry_rental_knowledge_version
+        set version_status = #{versionStatus}, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and version_no =
+          (select current_version_no from (select current_version_no from ry_rental.ry_rental_knowledge_article
+           where article_id = #{articleId} and source_type = 1) current_article) and is_delete = 0
+    </update>
+
+    <update id="updateMerchantKnowledgeStatus">
+        update ry_rental.ry_rental_knowledge_article
+        set article_status = #{toStatus}, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and source_type = 2
+          and article_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateMerchantKnowledgeVersionStatus">
+        update ry_rental.ry_rental_knowledge_version v
+        inner join ry_rental.ry_rental_knowledge_article a on a.article_id = v.article_id
+        set v.version_status = #{versionStatus}, v.update_by = #{operator}, v.update_time = now()
+        where v.article_id = #{articleId} and a.source_type = 2
+          and v.version_no = a.current_version_no and v.is_delete = 0 and a.is_delete = 0
+    </update>
+
+    <insert id="insertKnowledgeViolation">
+        insert into ry_rental.ry_rental_knowledge_violation
+            (article_id, member_id, action_type, reason, create_by, create_time,
+             update_by, update_time, is_delete)
+        values (#{articleId}, #{memberId}, #{actionType}, #{reason}, #{operator}, now(),
+                #{operator}, now(), 0)
+    </insert>
+
+    <insert id="insertKnowledgeRecycle">
+        insert into ry_rental.ry_rental_recycle_record
+        (object_type, object_id, object_code, object_name, member_id, snapshot_json,
+         deleted_by, deleted_time, expires_time, restore_status, create_by, create_time,
+         update_by, update_time, is_delete)
+        select 'knowledge_article', a.article_id,
+               concat('KNOWLEDGE-', a.article_id), a.article_title, a.member_id,
+               json_object(
+                   'articleId', a.article_id,
+                   'categoryId', a.category_id,
+                   'articleTitle', a.article_title,
+                   'sourceType', a.source_type,
+                   'audienceType', a.audience_type,
+                   'articleStatus', a.article_status,
+                   'currentVersionNo', a.current_version_no,
+                   'pinned', a.pinned,
+                   'currentContent', coalesce((select cast(v.content as char)
+                       from ry_rental.ry_rental_knowledge_version v
+                       where v.article_id = a.article_id and v.version_no = a.current_version_no
+                         and v.is_delete = 0 limit 1), '')
+               ),
+               #{operator}, now(), date_add(now(), interval 30 day), 0,
+               #{operator}, now(), #{operator}, now(), 0
+        from ry_rental.ry_rental_knowledge_article a
+        where a.article_id = #{articleId} and a.source_type = 1 and a.is_delete = 0
+    </insert>
+
+    <update id="deleteKnowledgeArticle">
+        update ry_rental.ry_rental_knowledge_article
+        set is_delete = 1, remove_by = #{operator}, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and source_type = 1 and is_delete = 0
+    </update>
+
+    <select id="selectRecycleRecords" resultType="com.ruoyi.system.model.rental.PlatformRecycleRecordVO">
+        select r.recycle_id, r.object_type, r.object_id, r.object_code, r.object_name, r.member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as member_name,
+               cast(r.snapshot_json as char) as snapshot_json, r.deleted_by,
+               date_format(r.deleted_time, '%Y-%m-%d %H:%i:%s') as deleted_time,
+               date_format(r.expires_time, '%Y-%m-%d %H:%i:%s') as expires_time,
+               r.restore_status, date_format(r.restored_time, '%Y-%m-%d %H:%i:%s') as restored_time,
+               r.restore_remark
+        from ry_rental.ry_rental_recycle_record r
+        left join ry_rental.ry_rental_member m on m.member_id = r.member_id and m.is_delete = 0
+        <where>
+            r.is_delete = 0
+            <if test="query.objectType != null and query.objectType != ''">and r.object_type = #{query.objectType}</if>
+            <if test="query.restoreStatus != null">and r.restore_status = #{query.restoreStatus}</if>
+            <if test="query.keyword != null and query.keyword != ''">
+                and (r.object_code like concat('%', #{query.keyword}, '%') or r.object_name like concat('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+        order by r.deleted_time desc, r.recycle_id desc
+    </select>
+
+    <select id="selectRecycleRecord" resultType="com.ruoyi.system.model.rental.PlatformRecycleRecordVO">
+        select recycle_id, object_type, object_id, object_code, object_name, member_id,
+               cast(snapshot_json as char) as snapshot_json, deleted_by,
+               date_format(deleted_time, '%Y-%m-%d %H:%i:%s') as deleted_time,
+               date_format(expires_time, '%Y-%m-%d %H:%i:%s') as expires_time,
+               restore_status, date_format(restored_time, '%Y-%m-%d %H:%i:%s') as restored_time,
+               restore_remark
+        from ry_rental.ry_rental_recycle_record
+        where recycle_id = #{recycleId} and is_delete = 0
+    </select>
+
+    <update id="restoreKnowledgeArticle">
+        update ry_rental.ry_rental_knowledge_article
+        set is_delete = 0, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and source_type = 1 and is_delete = 1
+    </update>
+
+    <update id="restoreMerchantNotice">
+        update `ry-cloud`.`sys_merchant_notice`
+        set is_delete = 0, update_by = #{operator}, update_time = now()
+        where merchant_notice_id = #{noticeId} and is_delete = 1
+    </update>
+
+    <update id="restoreMerchantNoticeMembers">
+        update `ry-cloud`.`sys_merchant_notice_member`
+        set is_delete = 0, create_by = coalesce(create_by, #{operator})
+        where merchant_notice_id = #{noticeId} and is_delete = 1
+    </update>
+
+    <update id="restoreMerchantNoticeReads">
+        update `ry-cloud`.`sys_merchant_notice_read`
+        set is_delete = 0
+        where merchant_notice_id = #{noticeId} and is_delete = 1
+    </update>
+
+    <insert id="insertMerchantNoticeRecycle">
+        insert into ry_rental.ry_rental_recycle_record
+        (object_type, object_id, object_code, object_name, member_id, snapshot_json,
+         deleted_by, deleted_time, expires_time, restore_status, create_by, create_time,
+         update_by, update_time, is_delete)
+        select 'merchant_notice', n.merchant_notice_id,
+               concat('NOTICE-', n.merchant_notice_id), n.notice_title, null,
+               json_object(
+                   'merchantNoticeId', n.merchant_notice_id,
+                   'noticeTitle', n.notice_title,
+                   'noticeType', n.notice_type,
+                   'noticeContent', cast(n.notice_content as char),
+                   'targetScope', n.target_scope,
+                   'status', n.status,
+                   'remark', n.remark,
+                   'targetMemberIds', coalesce((
+                       select json_arrayagg(tm.member_id)
+                       from `ry-cloud`.`sys_merchant_notice_member` tm
+                       where tm.merchant_notice_id = n.merchant_notice_id and tm.is_delete = 0
+                   ), json_array())
+               ),
+               #{operator}, now(), date_add(now(), interval 30 day), 0,
+               #{operator}, now(), #{operator}, now(), 0
+        from `ry-cloud`.`sys_merchant_notice` n
+        where n.merchant_notice_id = #{noticeId} and n.is_delete = 0
+    </insert>
+
+    <update id="markRecycleRestored">
+        update ry_rental.ry_rental_recycle_record
+        set restore_status = 1, restored_by = #{operator}, restored_time = now(),
+            restore_remark = #{remark}, update_by = #{operator}, update_time = now()
+        where recycle_id = #{recycleId} and restore_status = 0 and expires_time &gt;= now() and is_delete = 0
+    </update>
+
+    <update id="markExpiredRecycleRecords">
+        update ry_rental.ry_rental_recycle_record
+        set restore_status = 2, restore_remark = #{remark},
+            update_by = #{operator}, update_time = now()
+        where restore_status = 0 and expires_time &lt; now() and is_delete = 0
+    </update>
+</mapper>

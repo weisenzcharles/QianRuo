@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantMarketDepositMapper">
+    <select id="selectAccountForUpdate" resultType="map">
+        select account_id as accountId, available_amount as availableAmount,
+               frozen_amount as frozenAmount, version, account_status as accountStatus
+        from ry_rental.ry_rental_finance_account
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and account_type = #{accountType} and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <insert id="insertAccount">
+        insert ignore into ry_rental.ry_rental_finance_account
+            (tenant_id, member_id, account_type, available_amount, frozen_amount,
+             account_status, version, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{accountType}, 0.00, 0.00,
+                1, 0, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <update id="updateAccount">
+        update ry_rental.ry_rental_finance_account
+        set available_amount = #{availableAmount}, frozen_amount = #{frozenAmount},
+            version = version + 1, update_by = #{operatorId}, update_time = now()
+        where account_id = #{accountId} and version = #{version}
+          and account_status = 1 and is_delete = 0
+    </update>
+
+    <select id="selectLatestDeposit" resultType="map">
+        select direction, amount, ledger_status as ledgerStatus
+        from ry_rental.ry_rental_market_deposit_ledger
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and ref_type = 'market_post' and ref_id = #{postId} and is_delete = 0
+        order by deposit_ledger_id desc
+        limit 1 for update
+    </select>
+
+    <insert id="insertFinanceLedger">
+        insert into ry_rental.ry_rental_finance_ledger
+            (tenant_id, member_id, account_type, ledger_no, direction, biz_type, amount, balance_after,
+             ref_type, ref_id, pay_channel, pay_order_no, ledger_status, create_by, create_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{accountType}, #{ledgerNo}, #{direction}, #{bizType}, #{amount}, #{balanceAfter},
+                #{refType}, #{refId}, #{payChannel}, #{payOrderNo}, 1, #{operatorId}, now(), #{remark}, 0)
+    </insert>
+
+    <insert id="insertMarketDepositLedger">
+        insert into ry_rental.ry_rental_market_deposit_ledger
+            (tenant_id, member_id, amount, direction, ref_type, ref_id, ledger_status,
+             idempotency_key, create_by, create_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{amount}, #{direction}, #{refType}, #{refId}, 1,
+                #{idempotencyKey}, #{operatorId}, now(), #{remark}, 0)
+    </insert>
+</mapper>

@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformAllianceOrderMapper">
+    <resultMap id="allianceOrderView" type="com.ruoyi.system.api.model.PlatformAllianceOrderView">
+        <id property="allianceOrderId" column="alliance_order_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="sourceMemberId" column="source_member_id" />
+        <result property="targetMemberId" column="target_member_id" />
+        <result property="sourceOrderId" column="source_order_id" />
+        <result property="childOrderId" column="child_order_id" />
+        <result property="sourceOrderNo" column="source_order_no" />
+        <result property="childOrderNo" column="child_order_no" />
+        <result property="transferMode" column="transfer_mode" />
+        <result property="allianceOrderStatus" column="alliance_order_status" />
+        <result property="settlementPrice" column="settlement_price" />
+        <result property="createTime" column="create_time" />
+        <result property="acceptedTime" column="accepted_time" />
+        <result property="shippingCarrier" column="shipping_carrier" />
+        <result property="shippingTrackingNo" column="shipping_tracking_no" />
+        <result property="returnCarrier" column="return_carrier" />
+        <result property="returnTrackingNo" column="return_tracking_no" />
+        <result property="shippingRouteStatus" column="shipping_route_status" />
+        <result property="returnRouteStatus" column="return_route_status" />
+    </resultMap>
+
+    <sql id="scope">
+        a.is_delete = 0
+        <if test="query.viewMode == 1">and a.alliance_order_status != 5</if>
+        <if test="query.viewMode == 2">and a.alliance_order_status = 5</if>
+        <if test="query.status != null">and a.alliance_order_status = #{query.status}</if>
+        <if test="query.allianceId != null">and a.alliance_id = #{query.allianceId}</if>
+        <if test="query.sourceMemberId != null">and a.source_member_id = #{query.sourceMemberId}</if>
+        <if test="query.targetMemberId != null">and a.target_member_id = #{query.targetMemberId}</if>
+        <if test="query.beginTime != null and query.beginTime != ''">and a.create_time &gt;= #{query.beginTime}</if>
+        <if test="query.endTime != null and query.endTime != ''">and a.create_time &lt;= #{query.endTime}</if>
+    </sql>
+
+    <select id="count" resultType="long">
+        select count(1) from ry_business.ry_rental_order_alliance a
+        where <include refid="scope" />
+    </select>
+
+    <select id="select" resultMap="allianceOrderView">
+        select a.alliance_order_id, a.tenant_id, a.source_member_id, a.target_member_id,
+               a.source_order_id, a.child_order_id, a.transfer_mode, a.alliance_order_status,
+               source_order.order_no as source_order_no, child_order.order_no as child_order_no,
+               a.settlement_price, date_format(a.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(a.accepted_time, '%Y-%m-%d %H:%i:%s') as accepted_time,
+               coalesce((select l.carrier from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.child_order_id and l.member_id = a.target_member_id
+                    and l.direction = 1 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1),
+                 (select l.carrier from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.source_order_id and l.member_id = a.source_member_id
+                    and l.direction = 1 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1)) as shipping_carrier,
+               coalesce((select l.tracking_no from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.child_order_id and l.member_id = a.target_member_id
+                    and l.direction = 1 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1),
+                 (select l.tracking_no from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.source_order_id and l.member_id = a.source_member_id
+                    and l.direction = 1 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1)) as shipping_tracking_no,
+               coalesce((select l.carrier from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.child_order_id and l.member_id = a.target_member_id
+                    and l.direction = 2 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1),
+                 (select l.carrier from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.source_order_id and l.member_id = a.source_member_id
+                    and l.direction = 2 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1)) as return_carrier,
+               coalesce((select l.tracking_no from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.child_order_id and l.member_id = a.target_member_id
+                    and l.direction = 2 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1),
+                 (select l.tracking_no from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.source_order_id and l.member_id = a.source_member_id
+                    and l.direction = 2 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1)) as return_tracking_no,
+               coalesce((select l.route_status from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.child_order_id and l.member_id = a.target_member_id
+                    and l.direction = 1 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1),
+                 (select l.route_status from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.source_order_id and l.member_id = a.source_member_id
+                    and l.direction = 1 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1)) as shipping_route_status,
+               coalesce((select l.route_status from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.child_order_id and l.member_id = a.target_member_id
+                    and l.direction = 2 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1),
+                 (select l.route_status from ry_business.ry_rental_logistics_order l
+                  where l.order_id = a.source_order_id and l.member_id = a.source_member_id
+                    and l.direction = 2 and l.is_delete = 0
+                  order by l.create_time desc, l.logistics_id desc limit 1)) as return_route_status
+        from ry_business.ry_rental_order_alliance a
+        left join ry_business.ry_rental_order source_order on source_order.order_id = a.source_order_id
+            and source_order.tenant_id = a.tenant_id
+            and source_order.member_id = a.source_member_id
+            and source_order.is_delete = 0
+        left join ry_business.ry_rental_order child_order on child_order.order_id = a.child_order_id
+            and child_order.tenant_id = a.tenant_id
+            and child_order.member_id = a.target_member_id
+            and child_order.is_delete = 0
+        where <include refid="scope" />
+        order by a.create_time desc, a.alliance_order_id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectById" resultMap="allianceOrderView">
+        select a.alliance_order_id, a.tenant_id, a.source_member_id, a.target_member_id,
+               a.source_order_id, a.child_order_id, a.transfer_mode, a.alliance_order_status,
+               source_order.order_no as source_order_no, child_order.order_no as child_order_no,
+               a.settlement_price, date_format(a.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(a.accepted_time, '%Y-%m-%d %H:%i:%s') as accepted_time,
+               coalesce((select l.carrier from ry_business.ry_rental_logistics_order l where l.order_id = a.child_order_id and l.member_id = a.target_member_id and l.direction = 1 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1), (select l.carrier from ry_business.ry_rental_logistics_order l where l.order_id = a.source_order_id and l.member_id = a.source_member_id and l.direction = 1 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1)) as shipping_carrier,
+               coalesce((select l.tracking_no from ry_business.ry_rental_logistics_order l where l.order_id = a.child_order_id and l.member_id = a.target_member_id and l.direction = 1 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1), (select l.tracking_no from ry_business.ry_rental_logistics_order l where l.order_id = a.source_order_id and l.member_id = a.source_member_id and l.direction = 1 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1)) as shipping_tracking_no,
+               coalesce((select l.carrier from ry_business.ry_rental_logistics_order l where l.order_id = a.child_order_id and l.member_id = a.target_member_id and l.direction = 2 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1), (select l.carrier from ry_business.ry_rental_logistics_order l where l.order_id = a.source_order_id and l.member_id = a.source_member_id and l.direction = 2 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1)) as return_carrier,
+               coalesce((select l.tracking_no from ry_business.ry_rental_logistics_order l where l.order_id = a.child_order_id and l.member_id = a.target_member_id and l.direction = 2 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1), (select l.tracking_no from ry_business.ry_rental_logistics_order l where l.order_id = a.source_order_id and l.member_id = a.source_member_id and l.direction = 2 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1)) as return_tracking_no,
+               coalesce((select l.route_status from ry_business.ry_rental_logistics_order l where l.order_id = a.child_order_id and l.member_id = a.target_member_id and l.direction = 1 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1), (select l.route_status from ry_business.ry_rental_logistics_order l where l.order_id = a.source_order_id and l.member_id = a.source_member_id and l.direction = 1 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1)) as shipping_route_status,
+               coalesce((select l.route_status from ry_business.ry_rental_logistics_order l where l.order_id = a.child_order_id and l.member_id = a.target_member_id and l.direction = 2 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1), (select l.route_status from ry_business.ry_rental_logistics_order l where l.order_id = a.source_order_id and l.member_id = a.source_member_id and l.direction = 2 and l.is_delete = 0 order by l.create_time desc, l.logistics_id desc limit 1)) as return_route_status
+        from ry_business.ry_rental_order_alliance a
+        left join ry_business.ry_rental_order source_order on source_order.order_id = a.source_order_id
+            and source_order.tenant_id = a.tenant_id
+            and source_order.member_id = a.source_member_id
+            and source_order.is_delete = 0
+        left join ry_business.ry_rental_order child_order on child_order.order_id = a.child_order_id
+            and child_order.tenant_id = a.tenant_id
+            and child_order.member_id = a.target_member_id
+            and child_order.is_delete = 0
+        where a.alliance_order_id = #{allianceOrderId} and a.is_delete = 0
+    </select>
+
+    <select id="selectEvents" resultType="com.ruoyi.system.api.model.PlatformAllianceOrderEventView">
+        select event_id as eventId, event_type as eventType, from_status as fromStatus,
+               to_status as toStatus, operator_member_id as operatorMemberId,
+               operator_user_id as operatorUserId, event_data_json as eventDataJson,
+               date_format(create_time, '%Y-%m-%d %H:%i:%s') as createTime
+        from ry_business.ry_rental_order_alliance_event
+        where alliance_order_id = #{allianceOrderId} and is_delete = 0
+        order by create_time asc, event_id asc
+    </select>
+
+    <select id="selectSettlements" resultType="com.ruoyi.system.api.model.PlatformAllianceSettlementView">
+        select settlement_id as settlementId, source_member_id as sourceMemberId,
+               receiver_member_id as receiverMemberId, settlement_amount as settlementAmount,
+               express_amount as expressAmount, compensation_amount as compensationAmount,
+               settlement_status as settlementStatus,
+               date_format(create_time, '%Y-%m-%d %H:%i:%s') as createTime,
+               date_format(update_time, '%Y-%m-%d %H:%i:%s') as updateTime, remark
+        from ry_business.ry_rental_order_alliance_settlement
+        where alliance_order_id = #{allianceOrderId} and is_delete = 0
+        order by settlement_id desc
+    </select>
+
+    <select id="selectSettlementSummary" resultType="com.ruoyi.system.api.model.PlatformAllianceSettlementSummaryView">
+        select count(1) as totalOrderCount,
+               coalesce(sum(case when settlement_status = 0 then 1 else 0 end), 0) as pendingOrderCount,
+               coalesce(sum(case when settlement_status = 1 then 1 else 0 end), 0) as confirmedOrderCount,
+               coalesce(sum(case when settlement_status = 2 then 1 else 0 end), 0) as disputedOrderCount,
+               coalesce(sum(case when settlement_status = 3 then 1 else 0 end), 0) as closedOrderCount,
+               coalesce(sum(settlement_amount), 0) as settlementAmount,
+               coalesce(sum(case when settlement_status = 0 then settlement_amount else 0 end), 0) as pendingSettlementAmount,
+               coalesce(sum(case when settlement_status = 1 then settlement_amount else 0 end), 0) as confirmedSettlementAmount,
+               coalesce(sum(case when settlement_status = 2 then settlement_amount else 0 end), 0) as disputedSettlementAmount,
+               coalesce(sum(case when settlement_status = 3 then settlement_amount else 0 end), 0) as closedSettlementAmount,
+               coalesce(sum(express_amount), 0) as expressAmount,
+               coalesce(sum(compensation_amount), 0) as compensationAmount
+        from ry_business.ry_rental_order_alliance_settlement
+        where is_delete = 0
+    </select>
+</mapper>

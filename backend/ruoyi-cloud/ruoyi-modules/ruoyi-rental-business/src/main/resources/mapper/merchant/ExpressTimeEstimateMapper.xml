@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.ExpressTimeEstimateMapper">
+    <resultMap id="expressTimeEstimateRecord" type="com.ruoyi.rentalbusiness.domain.ExpressTimeEstimateRecord">
+        <id property="estimateId" column="estimate_id" />
+        <result property="fromAcode" column="from_acode" />
+        <result property="toAcode" column="to_acode" />
+        <result property="expressCompanyCode" column="express_company_code" />
+        <result property="expressType" column="express_type" />
+        <result property="deliveryExpendTime" column="delivery_expend_time" />
+        <result property="totalTime" column="total_time" />
+        <result property="remainTime" column="remain_time" />
+        <result property="providerCode" column="provider_code" />
+        <result property="lastQueryTime" column="last_query_time" />
+        <result property="expireTime" column="expire_time" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <select id="selectValid" resultMap="expressTimeEstimateRecord">
+        select estimate_id, from_acode, to_acode, express_company_code, express_type,
+               delivery_expend_time, total_time, remain_time, provider_code,
+               last_query_time, expire_time, create_time, update_time
+        from ry_business.ry_rental_express_time_estimate
+        where from_acode = #{fromAcode}
+          and to_acode = #{toAcode}
+          and express_company_code = #{expressCompanyCode}
+          and provider_code = #{providerCode}
+          and expire_time &gt; now()
+        <if test="expressType != null and expressType != ''">
+          and express_type = #{expressType}
+        </if>
+        order by update_time desc, estimate_id desc
+        limit 1
+    </select>
+
+    <insert id="upsert">
+        insert into ry_business.ry_rental_express_time_estimate
+            (from_acode, to_acode, express_company_code, express_type,
+             delivery_expend_time, total_time, remain_time, provider_code,
+             last_query_time, expire_time, create_time, update_time)
+        values
+            (#{record.fromAcode}, #{record.toAcode}, #{record.expressCompanyCode}, #{record.expressType},
+             #{record.deliveryExpendTime}, #{record.totalTime}, #{record.remainTime}, #{record.providerCode},
+             #{record.lastQueryTime}, #{record.expireTime}, now(), now())
+        on duplicate key update
+            delivery_expend_time = values(delivery_expend_time),
+            total_time = values(total_time),
+            remain_time = values(remain_time),
+            last_query_time = values(last_query_time),
+            expire_time = values(expire_time),
+            update_time = now()
+    </insert>
+</mapper>

@@ -1,0 +1,157 @@
+# 第 1 阶段完成状态
+
+日期：2026-08-14
+
+> 历史阶段验收记录，仅描述 2026-08-14 当时的范围，不代表当前整体开发状态。短信服务等后续变化见[集成说明](../integrations/aliyun-oss-sms.md)，当前进度以[开发进度快照](../development-progress.md)为准。
+
+## 阶段目标
+
+第 1 阶段目标是完成双前端与权限骨架：`merchant-web` 和 `admin-web` 分离，菜单、路由、登录态、权限、API 请求端类型和后端商户访问边界具备基础隔离能力。
+
+## 已完成
+
+- `admin-web` 与 `merchant-web` 已作为独立前端工程保留并构建，两个前端请求拦截器分别自动带 `X-Client-Type` 与 `X-App-Code`。
+- 平台端默认客户端类型统一为 `platform`，商家端默认客户端类型为 `merchant`。
+- `sys_menu` 增加 `client_type` 字段，支持 `platform`、`merchant`、`all` 三类菜单归属。
+- 平台商户管理菜单固定为 `platform`，商家端新增工作台、订单、库存、商品、物流、联盟、市场、设置 8 个菜单骨架。
+- 商家端菜单对应的 Vue 页面骨架已补齐，避免动态路由加载失败。
+- 后端菜单树、菜单列表、权限集合已按客户端类型过滤，避免平台端和商家端菜单权限互相透出。
+- 商家端进入工作台前会校验用户是否绑定有效商户主体，平台账号不能误进入商家工作台。
+- 平台商户管理接口增加端类型保护，商家端不能调用平台商户管理接口。
+- 商户端提供公开入驻页面，申请人使用手机号和四位验证码提交店铺及企业资质；申请进入 `pending` 后立即创建商户管理员账号、owner 绑定和基础角色，注册成功即可登录。
+- 平台商户列表提供独立审核操作，普通编辑接口不能修改认证状态；审核只允许 `pending -> verified/rejected`。
+- 注册或驳回重提后平台服务通过内部契约调用 `merchant-service`，幂等创建商户管理员、owner 绑定、管理员角色及菜单关系；平台服务不再直接写商户账号、角色或菜单关系表。审核通过后仅切换商户功能模式并加载完整权限。
+- 审核驳回必须填写原因，申请人可在公开页面通过手机号和四位验证码查询原资料，修改后重新提交并回到 `pending`，直至审核通过。
+- 当时商家管理员支持手机号验证码首次登录；该阶段的开发环境曾使用固定格式验证码。当前验证码实现以[短信集成说明](../integrations/aliyun-oss-sms.md)为准。待审核或驳回状态也可以登录，但只能进入默认只读预览模式。
+- 平台和商户用户分别使用各自用户表的 `must_change_password` 字段持久化密码初始化状态，不再通过 `pwd_update_date` 推断。
+- 登录页面不再显示初始密码提示或设置密码弹窗；未完成初始化的用户进入后台后只能访问初始密码页面或退出登录。
+- 平台与商户使用独立的初始密码接口，登录令牌记录客户端类型并与请求端类型交叉校验，避免密码操作跨用户体系执行。
+- 商户端角色、菜单、角色菜单关系、用户角色关系已拆分到 `ry_rental` 独立表，商户管理员可在商家端维护本商户角色菜单权限。
+- 商户登录成功后，服务端会将唯一有效绑定中的 `tenant_id`、`member_id`、商户内身份、仓库范围和指定仓库集合写入 Redis 登录态；业务接口不信任前端传入的租户或商户 ID。
+- 平台端“商户用户”支持配置全部仓库或指定仓库权限，指定仓库保存时会校验仓库启用状态及 `tenant_id + member_id` 归属，禁止跨商户授权。
+- 商户用户仓库权限保存在 `ry_rental_user_member.warehouse_scope_type` 和 `ry_rental_user_warehouse_scope`，商户所有者固定拥有全部仓库权限。
+- 公共安全模块提供 `MerchantContextUtils`，统一获取当前租户、商户、商户内身份和仓库范围，并提供单仓访问校验；订单、商品、SN、配件、套餐、仓库和库存接口均已复用该入口。
+- 平台修改商户用户角色、菜单、状态、密码或仓库范围后，会失效该商户用户的全部现有会话，重新登录后加载最新权限，避免旧令牌继续访问原仓库。
+- 平台用户接口固定使用 `/admin/user/**`，商户用户接口拆分到独立的 `/merchant/user/**` 控制器；商户端获取登录用户统一调用 `/merchant/user/getInfo`。
+- 商户前端访问系统服务的接口全部使用 `/merchant/**`，网关通过独立路由转发并保留该前缀；商户请求访问平台路径、平台请求访问商户路径均返回 403。
+- 商户个人资料、修改密码、初始密码和头像分别使用 `/merchant/user/profile`、`/merchant/user/profile/updatePwd`、`/merchant/user/profile/initPassword`、`/merchant/user/profile/avatar`，不再复用平台个人中心控制器。
+- 初始化种子数据包含商家管理员角色和商家端菜单模板，不创建演示商户主体或可登录的商户账号。
+- 商户端请求级日志继续由通用 `@Log` 链路写入平台 `ry-cloud.sys_oper_log`；商户页面统一读取 `ry_rental.ry_rental_audit_log` 业务审计事实表，不再把请求方式、请求地址等请求级字段作为商户日志展示内容。历史重复表 `ry_rental_merchant_business_audit_log` 已停用，不参与商户日志运行时写入和查询。
+- 商户业务审计只记录新增、修改、删除、登录、修改/重置密码、权限变更、导入导出、库存状态变更和协议确认等业务动作，按业务模块展示，并保存脱敏的变更前后 JSON 快照。
+- 当前商户日志数据源固定为 `ry_rental.ry_rental_audit_log`：商户服务直接写入，租赁业务服务和认证中心通过内部 Feign 写入；角色删除等软删除动作在实际更新成功后再记录，避免只记录部分编辑操作或产生虚假日志。
+- 商户操作日志列表、详情与导出分别使用 `/merchant/operlog/list`、`/merchant/operlog/{auditId}`、`/merchant/operlog/export`，查询 SQL 强制使用登录态中的 `tenant_id + member_id`，不能跨商户查看或导出。
+- 商户管理员角色默认拥有 `merchant:operlog:list`、`merchant:operlog:export`；其他用户可通过商户角色权限页面授权。审计日志不向商户端开放删除和清空功能。
+- 商户端操作日志菜单统一挂载在“用户管理”下，最终路由为 `/merchant/user/operlog`；历史顶级日志菜单仅软删除保留，避免菜单树出现重复入口。
+- 商户业务日志的唯一页面数据源为 `ry_rental.ry_rental_audit_log`；历史 `ry_rental_merchant_oper_log` 已通过 `V20260814_003__retire_legacy_merchant_request_log.sql` 软删除停用，重复业务审计表已通过 `V20260814_006__unify_merchant_business_audit_source.sql` 软删除停用，平台请求日志继续只保留在 `ry-cloud.sys_oper_log`。
+- 商户端新增用户管理页面，支持当前商户用户查询、资料与状态修改、角色分配和重置密码；用户权限由当前商户角色菜单权限计算，接口统一使用 `/merchant/user/manage/**`，不复用平台用户管理接口。
+- 平台商户管理补齐店铺联系与支付资料、店铺 Logo/描述、企业执照与有效期、法人身份资料、签约日期/合同、审核备注和冻结记录。
+- 商户编辑页面按店铺、企业、签约、审核四类资料组织；店铺主账号从 `ry_rental_user_member + ry_rental_merchant_user` 的有效 owner 绑定读取，不允许前端单独修改。
+- 认证通过/驳回和冻结时由平台服务自动记录时间，解冻会清理冻结时间与原因；证照及合同日期范围在服务端统一校验。
+- 联系方式、支付账号、法人身份证号及证件/合同文件地址已加入业务审计快照脱敏排除列表；超长快照会生成合法 JSON 摘要，不会直接截断为非法 JSON。
+
+## 本次订单与全局配置补充
+
+- 订单客户和收件人信息通过 `ry_business.ry_rental_order_recipient_history` 追加保存，使用 `tenant_id + member_id + order_no` 关联订单；每次新增或编辑订单都会记录客户字段、收件人字段、备注、行政区划编码/名称、高德 `citycode` 和解析状态，旧 `contact_*` 字段已通过版本化迁移删除。
+- 地址解析统一使用 `RegionAddressParser`，行政区划 `adcode` 与导入的高德 `citycode` 快照严格区分；高德天气只使用 `adcode`。解析失败不阻断订单保存，天气服务显示“待查询”并保留失败原因。
+- 平台端系统配置菜单已统一为“系统配置”，默认维护 `global.amap.api-keys`、`global.amap.weather-url` 和 `global.config.cache-ttl-days`；配置写入 Redis 后默认缓存 7 天，新增、修改、删除时刷新对应缓存。高德支持多个 Key，每 5000 次真实请求轮换一次。
+- 商户业务服务通过 `GlobalConfigService` 和内部 `/internal/platform/global-config/value` 契约读取全局配置，不读取平台数据库，不向前端暴露高德 API Key。
+- `AmapWeatherClient` 按行政区划 `adcode` 调用高德天气并缓存 1 小时，订单列表分别返回发货地、收货地城市和天气风险信息；订单列表不因第三方天气异常失败。
+- 迁移脚本为 `V20260814_008__order_recipient_history_global_config.sql`，部署脚本已纳入本地和云端迁移序列。
+
+## 已验证
+
+- 后端 `platform-service` 与 `merchant-service` 独立模块编译通过。
+- `admin-web` 生产构建通过。
+- `merchant-web` 生产构建通过。
+- 本地 MySQL 已验证仓库权限三张基础表存在，非法仓库范围记录为 0，跨商户或失效仓库范围记录为 0。
+- 本地 Docker 栈重建并启动通过。
+- 平台账号使用 `admin` 端类型可看到平台商户后台菜单。
+- 平台账号使用 `merchant` 端类型获取菜单会提示未绑定商户，无法进入商家端。
+- 商家账号使用 `merchant` 端类型可获取商家端菜单。
+
+## 商户注册、审核与管理员开通流程
+
+1. 历史注册流程从商户登录页进入 `/register`，申请人填写店铺资料、联系人手机号和企业资质；当时开发环境尚未接入短信服务，验证码规则以后续短信集成说明为准。
+2. `merchant-service` 的 `/merchant/public/registration/**` 负责公开请求校验，再通过内部 Feign 契约提交给 `platform-service`；公开 DTO 不包含 `tenantId`、`memberId`、认证状态、账号状态或角色字段。
+3. 平台服务生成商户编码并写入 `ry_rental_member`，认证状态固定为 `pending`；同一联系电话由数据库唯一索引和服务校验共同限制为一条有效申请。
+4. 平台人员在商户列表查看完整资料，通过独立“审核”操作选择通过或驳回。普通新增、修改接口不能直接设置认证状态，驳回时审核原因必填。
+5. 驳回后，申请人通过“查询或修改申请”使用原手机号和四位验证码读取资料；仅 `rejected` 状态允许修改重提，`pending` 只能查看，`verified` 直接引导登录。
+6. 审核通过时，平台事务先将主体改为 `verified`，再调用 `/internal/merchant/users/owner`。商户服务幂等创建 `ry_rental_merchant_user`、owner 绑定、`merchant_admin` 角色和全部商户菜单授权。
+7. 注册成功后管理员账号已经存在，`pending`、`rejected` 和 `verified` 状态均允许登录；未通过审核时仅下发默认 `list/query` 权限和全量页面路由，不下发新增、修改、删除、导出、授权等操作权限。
+8. 注册创建的管理员账号不设置初始密码，`must_change_password = 1`；首次必须使用手机号验证码登录，随后由路由守卫跳转到独立的“设置初始密码”页面。初始化密码接口是未审核状态唯一允许的业务写操作。
+9. 初始密码页面只填写新密码和确认密码；设置成功后 `must_change_password` 持久化为 `0` 并刷新登录缓存，之后可使用账号密码登录。
+10. 本阶段预留了统一验证码校验入口；短信平台集成不改变注册状态机、审核接口、账号开通或初始化密码流程。
+
+## 未审核商户只读预览规则
+
+- 未通过审核的商户仍然可以登录，前端显示平台维护的默认商户页面菜单，便于查看系统功能范围和准备资料；完成初始密码设置后不再强制跳转认证页。
+- 登录态仅携带 `merchant_default` 角色以及平台菜单中 `merchant:*:list`、`merchant:*:query` 权限；`add`、`edit`、`remove`、`export`、授权等权限不会下发。
+- 商户菜单服务在未通过审核时读取全局启用菜单模板，不读取商户个性化授权；审核通过后切换回当前商户用户的角色菜单和直接授权并集。
+- 后端所有写入、删除、导出、授权接口必须继续使用权限注解；没有权限注解的个人资料写入和头像接口由 `MerchantContextUtils.requireMerchantApproved()` 拦截。
+- 商户认证资料、注册状态、初始密码和退出登录是预览态的保留功能；仓库和页面列表可以读取，但不能改变任何业务数据。
+
+## 初始密码状态规则
+
+- 新平台用户和新商户用户默认 `must_change_password = 1`。
+- 历史平台用户迁移时默认视为已完成初始化，避免升级后集体触发强制修改。
+- 历史商户用户迁移时，密码为空的账号标记为必须初始化，已有密码的账号视为已初始化。
+- 管理员重置平台或商户用户密码时重新标记为必须修改。
+- 用户完成初始密码设置或在个人中心正常修改密码后，状态保持为已初始化。
+- `pwd_update_date` 只负责密码更新时间和过期计算；时间为空时不会被误判为初始密码或密码过期。
+- 截至合并切换点的历史迁移已汇总到 `database/migrations/V20261019_002__consolidated_project_baseline.sql`；部署账本保留在 `ry-config.qianruo_schema_migration`。旧库必须先达到 `V20261019_001__platform_merchant_menu_management` 且校验和一致，部署只登记新基线、不重放旧 SQL；更早状态不再支持升级。基线发布后保持不可变，后续变更新增版本化迁移。数据库脚本不包含订单、仓库或商品测试数据。
+- 升级前签发的旧令牌没有完整客户端和商户仓库上下文，部署后用户需重新登录一次；新令牌会固定平台或商户身份并加载最新仓库范围。
+
+## 商户用户隔离
+
+- 平台内部用户继续使用 RuoYi 原生 `sys_user`、`sys_role`、`sys_user_role`。
+- 商户端登录账号已拆分到 `ry_rental.ry_rental_merchant_user`，不再写入 `sys_user`。
+- 商户用户和商户主体的关系通过 `ry_rental_user_member.merchant_user_id` 绑定。
+- 平台全局商户角色模板维护在 `ry_rental.ry_rental_merchant_role_template`，模板菜单授权维护在 `ry_rental.ry_rental_merchant_role_template_menu`；两张表不包含 `tenant_id`、`member_id` 或用户归属字段，平台“商户角色”页面不再提供所属商户筛选。
+- 商户实际运行角色仍维护在 `ry_rental.ry_rental_merchant_role`，通过 `tenant_id + member_id` 隔离，并用 `role_template_id` 记录初始化来源；商户管理员修改的是本商户运行角色权限，不会回写平台模板或影响其他商户。
+- 商户菜单模板维护在 `ry_rental.ry_rental_merchant_menu`，平台角色模板只从全局菜单模板选择可下发的菜单。
+- 商户角色菜单授权维护在 `ry_rental.ry_rental_merchant_role_menu`，商户用户角色授权维护在 `ry_rental.ry_rental_merchant_user_role`，商户用户单独菜单授权维护在 `ry_rental.ry_rental_merchant_user_menu`。
+- 商家端 `角色权限` 页面只操作当前商户的角色和菜单授权，平台端 `商户用户` 页面还可按用户追加单独菜单；商家端实际菜单是用户直接菜单与有效角色菜单的并集，按 `tenant_id + member_id` 做服务端隔离。
+- 平台内部角色、菜单与商户角色、菜单完全隔离；商户员工、店长、仓库员等商户内角色后续继续落在租赁业务库。
+
+## 租户、商户与仓库上下文
+
+- 上下文来源是认证服务从 `ry_rental_merchant_user` 和唯一有效的 `ry_rental_user_member` 绑定构建的服务端登录态，不使用请求参数或可伪造的租户请求头。
+- 商户账号必须且只能存在一条有效商户绑定；绑定缺失、多条绑定、账号与绑定的租户/商户不一致时拒绝登录。
+- `LoginUser` 中统一保存 `tenantId`、`memberId`、`memberRole`、`warehouseScopeType`、`warehouseIds`；微服务通过原有令牌和 Redis 登录态读取，Feign 调用继续转发认证令牌即可。
+- `GET /merchant/context` 返回当前商户工作上下文，`GET /merchant/context/warehouses` 只返回当前用户有权访问的启用仓库。
+- `MerchantContextUtils.getTenantId()` 和 `getMemberId()` 用于给业务查询强制追加租户、商户条件；`checkWarehouseAccess(warehouseId)` 用于新增、修改、出入库等单仓操作前校验。
+- 全部仓库范围使用 `all`；指定仓库范围使用 `specified`，且必须至少选择一个属于当前商户的启用仓库。平台不能把其他商户仓库写入该用户权限。
+- 第 2 阶段新增仓库、商品、SN、订单和库存 Mapper 时，每个商户查询都必须从该上下文取隔离条件，禁止直接采用前端提交的 `tenantId` 或 `memberId`。
+
+## 接口命名空间
+
+- 平台端系统接口：统一为 `/admin/user/**`、`/admin/menu/**`、`/admin/role/**` 等平台路径，由 `platform-service` 提供。
+- 商户端系统接口：统一为 `/merchant/**`，禁止直接调用平台系统路径。
+- 商户用户信息：`GET /merchant/user/getInfo`。
+- 商户用户认证内部接口已迁移到独立服务：`GET /internal/merchant/users/by-username/{username}`、`GET /internal/merchant/users/by-phone/{phone}`、`PUT /internal/merchant/users/login-record`。
+- 商户公开入驻接口：`POST /merchant/public/registration`、`POST /merchant/public/registration/code`、`POST /merchant/public/registration/lookup`、`PUT /merchant/public/registration`。
+- 商户注册资料由商户服务调用平台内部 `/internal/platform/merchant-registration/**` 管理；注册和驳回重提后平台调用商户内部 `POST /internal/merchant/users/owner` 幂等同步管理员，审核状态只决定默认只读或完整业务权限，两类内部接口均要求可信服务来源。
+- 商户个人中心：`/merchant/user/profile/**`。
+- 商户菜单和角色：`/merchant/menu/**`、`/merchant/role/**`，由独立 `merchant-service` 提供；平台系统服务不再承载商户菜单、角色分支。
+- 商户前端已删除平台用户、部门、岗位、参数、字典、通知、日志、在线用户、调度和代码生成页面及 API；账户与角色源码统一归入 `views/merchant/**` 和 `api/merchant/**`。
+- 网关将全部 `/merchant/**` 固定转发到 `merchant-service`，请求层禁止平台、调度及代码生成路径，不再隐式改写接口前缀。
+- 已有环境通过 `V20260723_003__merchant_gateway_route.sql` 自动修正 Nacos 动态路由，不需要手工编辑配置中心。
+- 已有环境通过 `V20260724_004__platform_service_namespace.sql` 自动迁移平台服务名、`/admin/**` 路由与 `admin:*` 权限码，并清理平台表中的商户菜单、角色副本。
+- 已有环境通过 `V20260724_005__merchant_service_config.sql` 补齐商户服务独立 Nacos Data ID。
+- 平台与商户 JWT 写入可信终端类型，会话缓存分别使用 `login_tokens:admin:*` 与 `login_tokens:merchant:*`；网关和业务服务同时拒绝跨端访问。
+- Compose 和 Kubernetes 部署会自动创建最小权限数据库账号，平台、商户业务容器不再使用 MySQL root。
+- 商户 MyBatis 隔离契约覆盖查询/导出、修改、删除及批量授权，所有归属操作强制包含 `tenant_id + member_id`。
+- 尚未实现商户版本的部门、岗位、调度、代码生成等平台能力不会回落到平台控制器，访问时返回 403 或 404，避免跨体系读取平台数据。
+
+## 后续阶段
+
+第 1 阶段骨架已经可进入联调。商户完整认证材料、会员类型、接单资格及认证历史已完成数据模型、审核服务、平台查看和商户只读查看；当前新增的只读预览登录规则也已纳入本阶段验收。第 2 阶段的 `rental-business` 主数据基础 CRUD 已实现并进入联调，订单状态机、协议版本、工作任务、回收站、知识库、客服工单、资金账户和外部接口治理仍属于后续业务阶段。
+
+下一步进入第 2 阶段“治理基础与业务主数据”，按以下顺序推进：
+
+1. 协议版本与接受记录，以及认证材料上传、人工补件和认证冻结/解封的进一步运营流程。
+2. 在独立 `rental-business` 中继续落地物流适配、订单状态履约、天气定时批处理和来源设置；订单收件人历史、行政区划解析和订单列表天气基础能力已完成。
+3. 全部基础接口接入商户/仓库上下文、敏感字段脱敏、私有文件和不可变审计。
+4. 以跨商户、跨仓库、协议重新确认、认证历史和批量导入异常作为阶段验收用例。
+
+完整阶段划分见[开发计划](./ruoyi-cloud-development-plan.md)，新增需求与当前实现差异见[1.0 需求基线与实施差异](./requirements-baseline-and-gaps.md)。

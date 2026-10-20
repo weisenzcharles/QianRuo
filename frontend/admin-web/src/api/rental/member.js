@@ -1,0 +1,236 @@
+import request from '@/utils/request'
+
+/**
+ * 按平台筛选条件分页查询商户及入驻申请。
+ *
+ * @param {object} query 平台商户查询条件
+ * @returns {Promise} 商户分页数据
+ */
+export function listMember(query) {
+  return request({
+    url: '/admin/rental/member/list',
+    method: 'get',
+    params: query
+  })
+}
+
+/**
+ * 查询指定商户的完整平台管理资料。
+ *
+ * @param {number|string} memberId 商户编号
+ * @returns {Promise} 商户详情
+ */
+export function getMember(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId,
+    method: 'get'
+  })
+}
+
+/**
+ * 由平台人员手工创建待审核商户资料。
+ *
+ * @param {object} data 商户资料
+ * @returns {Promise} 新增结果
+ */
+export function addMember(data) {
+  return request({
+    url: '/admin/rental/member',
+    method: 'post',
+    data: data
+  })
+}
+
+/**
+ * 修改商户基础资料，不允许通过该接口绕过独立审核状态机。
+ *
+ * @param {object} data 商户资料
+ * @returns {Promise} 修改结果
+ */
+export function updateMember(data) {
+  return request({
+    url: '/admin/rental/member',
+    method: 'put',
+    data: data
+  })
+}
+
+/**
+ * 审核待处理的商户入驻申请，审核通过后后端同步开通商户管理员。
+ *
+ * @param {number|string} memberId 商户编号
+ * @param {{authStatus: string, auditRemark: string}} data 审核结果和审核意见
+ * @returns {Promise} 审核结果
+ */
+export function auditMember(memberId, data) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/audit',
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 要求待审核商户补交指定认证材料。
+ *
+ * @param {number|string} memberId 商户编号
+ * @param {{materialTypes: number[], auditRemark: string}} data 补件要求
+ * @returns {Promise} 补件操作结果
+ */
+export function requestMemberSupplement(memberId, data) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/supplement',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 查询商户全部认证版本和认证材料。
+ *
+ * @param {number|string} memberId 商户编号
+ * @returns {Promise} 认证版本历史
+ */
+export function getCertificationHistory(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/certification-history',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询商户当前接单资格快照。
+ *
+ * @param {number|string} memberId 商户编号
+ * @returns {Promise} 接单资格列表
+ */
+export function getMemberQualifications(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/qualifications',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询商户会员类型变更历史。
+ *
+ * @param {number|string} memberId 商户编号
+ * @returns {Promise} 会员类型历史
+ */
+export function getMembershipHistory(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/membership-history',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询商户接单资格变更历史。
+ *
+ * @param {number|string} memberId 商户编号
+ * @returns {Promise} 接单资格历史
+ */
+export function getQualificationHistory(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/qualification-history',
+    method: 'get'
+  })
+}
+
+/**
+ * 查询商户信用分、信用流水和黑名单历史。
+ *
+ * @param {number|string} memberId 商户编号
+ * @returns {Promise} 商户风险资料
+ */
+export function getMemberRisk(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/risk',
+    method: 'get'
+  })
+}
+
+/**
+ * 新增商户信用变更流水。
+ *
+ * @param {number|string} memberId 商户编号
+ * @param {object} data 信用变更内容
+ * @returns {Promise} 更新后的风险资料
+ */
+export function addMemberCreditRecord(memberId, data) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/credit-records',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 对指定信用流水追加一条申诉冲正流水，原流水不会被覆盖。
+ *
+ * @param {number|string} memberId 商户编号
+ * @param {string} recordNo 原信用记录编码
+ * @param {{reason: string}} data 冲正原因
+ * @returns {Promise} 更新后的风险资料
+ */
+export function reverseMemberCreditRecord(memberId, recordNo, data) {
+  return request({
+    url:
+      '/admin/rental/member/' +
+      memberId +
+      '/credit-records/' +
+      encodeURIComponent(recordNo) +
+      '/reverse',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 新增商户黑名单记录。
+ *
+ * @param {number|string} memberId 商户编号
+ * @param {object} data 黑名单内容
+ * @returns {Promise} 更新后的风险资料
+ */
+export function addMemberBlacklist(memberId, data) {
+  return request({
+    url: '/admin/rental/member/' + memberId + '/blacklist',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 解除商户黑名单记录。
+ *
+ * @param {number|string} memberId 商户编号
+ * @param {string} recordNo 黑名单业务记录编码
+ * @param {object} data 解除说明
+ * @returns {Promise} 更新后的风险资料
+ */
+export function releaseMemberBlacklist(memberId, recordNo, data) {
+  return request({
+    url:
+      '/admin/rental/member/' +
+      memberId +
+      '/blacklist/' +
+      encodeURIComponent(recordNo) +
+      '/release',
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 删除一个或多个平台商户记录。
+ *
+ * @param {number|string|Array} memberId 商户编号或编号集合
+ * @returns {Promise} 删除结果
+ */
+export function delMember(memberId) {
+  return request({
+    url: '/admin/rental/member/' + memberId,
+    method: 'delete'
+  })
+}

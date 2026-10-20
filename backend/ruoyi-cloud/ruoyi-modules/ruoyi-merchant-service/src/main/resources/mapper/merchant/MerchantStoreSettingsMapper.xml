@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantStoreSettingsMapper">
+    <resultMap id="storeProfile" type="com.ruoyi.merchant.model.MerchantStoreProfileVO">
+        <result property="memberType" column="member_type" />
+        <result property="membershipType" column="membership_type" />
+        <result property="authStatus" column="auth_status" />
+        <result property="status" column="status" />
+        <result property="nickname" column="nickname" />
+        <result property="contactName" column="contact_name" />
+        <result property="contactPhone" column="contact_phone" />
+        <result property="servicePhone" column="service_phone" />
+        <result property="contactEmail" column="contact_email" />
+        <result property="alipayRealName" column="alipay_real_name" />
+        <result property="alipayAccount" column="alipay_account" />
+        <result property="storeLogoUrl" column="store_logo_url" />
+        <result property="storeDescription" column="store_description" />
+        <result property="legalSubjectName" column="legal_subject_name" />
+        <result property="licenseNo" column="license_no" />
+        <result property="registeredCapital" column="registered_capital" />
+        <result property="businessScope" column="business_scope" />
+        <result property="licenseAddress" column="license_address" />
+        <result property="licenseValidFrom" column="license_valid_from" />
+        <result property="licenseValidTo" column="license_valid_to" />
+        <result property="licenseLongTerm" column="license_long_term" />
+        <result property="legalRepresentativeName" column="legal_representative_name" />
+        <result property="wechatQrConfigured" column="wechat_qr_configured" />
+        <result property="vipLevel" column="vip_level" />
+        <result property="vipLevelName" column="vip_level_name" />
+        <result property="storageQuotaMb" column="storage_quota_mb" />
+        <result property="externalAcceptEnabled" column="external_accept_enabled" />
+    </resultMap>
+
+    <select id="selectStoreProfile" resultMap="storeProfile">
+        select m.member_type, m.membership_type, m.auth_status, m.status,
+               m.nickname, m.contact_name, m.contact_phone, m.service_phone, m.contact_email,
+               m.alipay_real_name, m.alipay_account, m.store_logo_url, m.store_description,
+               m.legal_subject_name, m.license_no, m.registered_capital, m.business_scope,
+               m.license_address, date_format(m.license_valid_from, '%Y-%m-%d') as license_valid_from,
+               date_format(m.license_valid_to, '%Y-%m-%d') as license_valid_to,
+               m.license_long_term, m.legal_representative_name,
+               case when m.wechat_qr_file_id is not null and m.wechat_qr_file_id &gt; 0 then 1 else 0 end as wechat_qr_configured,
+               m.vip_level,
+               coalesce(nullif(ml.level_name, ''), '未设置') as vip_level_name,
+               m.storage_quota_mb, m.external_accept_enabled
+        from `ry_rental`.`ry_rental_member` m
+        left join `ry_rental`.`ry_rental_merchant_level` ml
+          on ml.level_id = m.level_id and ml.is_delete = 0
+        where m.tenant_id = #{tenantId} and m.member_id = #{memberId} and m.is_delete = 0
+        limit 1
+    </select>
+
+    <update id="updateStoreProfile">
+        update `ry_rental`.`ry_rental_member`
+        set nickname = #{nickname}, contact_name = #{contactName}, service_phone = #{servicePhone},
+            contact_email = #{contactEmail}, alipay_real_name = #{alipayRealName},
+            alipay_account = #{alipayAccount}, store_description = #{storeDescription},
+            external_accept_enabled = #{externalAcceptEnabled}, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+    </update>
+
+    <update id="updateStoreLogo">
+        update `ry_rental`.`ry_rental_member`
+        set store_logo_url = #{storeLogoUrl}, update_by = #{operator}, update_time = sysdate()
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+    </update>
+
+    <select id="selectSetting" resultType="com.ruoyi.merchant.domain.MerchantStoreSettingRecord">
+        select setting_id, setting_key, setting_value_json, version
+        from `ry_rental`.`ry_rental_member_setting`
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and setting_key = #{settingKey} and is_delete = 0
+        limit 1
+    </select>
+
+    <insert id="upsertSetting">
+        insert into `ry_rental`.`ry_rental_member_setting`
+            (tenant_id, member_id, setting_key, setting_value_json, version,
+             create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{settingKey}, #{settingValueJson}, 1,
+                #{operator}, sysdate(), #{operator}, sysdate(), 0)
+        on duplicate key update setting_value_json = values(setting_value_json),
+            version = version + 1, update_by = values(update_by), update_time = sysdate(),
+            is_delete = 0
+    </insert>
+</mapper>

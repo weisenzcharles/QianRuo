@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformOperationsLedgerMapper">
+
+    <sql id="backupColumns">
+        backup_record_id, backup_no, backup_type, backup_status, backup_key, file_name, file_size_bytes,
+        date_format(started_time, '%Y-%m-%d %H:%i:%s') as started_time,
+        date_format(completed_time, '%Y-%m-%d %H:%i:%s') as completed_time,
+        date_format(retention_until, '%Y-%m-%d %H:%i:%s') as retention_until,
+        failure_reason, date_format(create_time, '%Y-%m-%d %H:%i:%s') as create_time
+    </sql>
+
+    <select id="selectBackupRecords" resultType="com.ruoyi.system.model.rental.PlatformBackupRecordVO">
+        select <include refid="backupColumns" />
+        from ry_rental.ry_rental_platform_backup_record
+        <where>
+            is_delete = 0
+            <if test="query.backupType != null">and backup_type = #{query.backupType}</if>
+            <if test="query.backupStatus != null">and backup_status = #{query.backupStatus}</if>
+            <if test="query.keyword != null and query.keyword != ''">
+                and (backup_no like concat('%', #{query.keyword}, '%')
+                  or backup_key like concat('%', #{query.keyword}, '%')
+                  or file_name like concat('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+        order by started_time desc, backup_record_id desc
+    </select>
+
+    <select id="selectBackupByKey" resultType="com.ruoyi.system.model.rental.PlatformBackupRecordVO">
+        select <include refid="backupColumns" />
+        from ry_rental.ry_rental_platform_backup_record
+        where backup_key = #{backupKey} and is_delete = 0
+        limit 1
+    </select>
+
+    <insert id="insertBackupRecord">
+        insert into ry_rental.ry_rental_platform_backup_record
+        (backup_no, backup_type, backup_status, backup_key, file_name, file_size_bytes,
+         started_time, completed_time, retention_until, failure_reason,
+         create_by, create_time, update_by, update_time, is_delete)
+        values (#{backupNo}, #{backupType}, #{backupStatus}, #{backupKey}, #{fileName}, #{fileSizeBytes},
+                #{startedTime}, #{completedTime}, #{retentionUntil}, #{failureReason},
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectLatestSuccessfulBackup" resultType="com.ruoyi.system.model.rental.PlatformBackupRecordVO">
+        select <include refid="backupColumns" />
+        from ry_rental.ry_rental_platform_backup_record
+        where backup_status = 1 and is_delete = 0
+        order by completed_time desc, backup_record_id desc
+        limit 1
+    </select>
+
+    <select id="countBackupsByStatus" resultType="long">
+        select count(1)
+        from ry_rental.ry_rental_platform_backup_record
+        where backup_status = #{backupStatus} and is_delete = 0
+    </select>
+
+    <sql id="capacityColumns">
+        storage_ledger_id, scope_type, scope_key, scope_name, capacity_bytes, used_bytes, available_bytes,
+        changed_bytes, change_type, snapshot_source,
+        date_format(measured_time, '%Y-%m-%d %H:%i:%s') as measured_time,
+        date_format(create_time, '%Y-%m-%d %H:%i:%s') as create_time
+    </sql>
+
+    <select id="selectCapacityLedgers" resultType="com.ruoyi.system.model.rental.PlatformCapacityLedgerVO">
+        select <include refid="capacityColumns" />
+        from ry_rental.ry_rental_platform_storage_quota_ledger
+        <where>
+            is_delete = 0
+            <if test="query.scopeType != null">and scope_type = #{query.scopeType}</if>
+            <if test="query.keyword != null and query.keyword != ''">
+                and (scope_key like concat('%', #{query.keyword}, '%')
+                  or scope_name like concat('%', #{query.keyword}, '%')
+                  or snapshot_source like concat('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+        order by measured_time desc, storage_ledger_id desc
+    </select>
+
+    <select id="selectLatestCapacity" resultType="com.ruoyi.system.model.rental.PlatformCapacityLedgerVO">
+        select <include refid="capacityColumns" />
+        from ry_rental.ry_rental_platform_storage_quota_ledger current_row
+        where current_row.scope_type = #{scopeType}
+          and current_row.scope_key = #{scopeKey}
+          and current_row.is_delete = 0
+          and not exists (
+              select 1
+              from ry_rental.ry_rental_platform_storage_quota_ledger newer_row
+              where newer_row.scope_type = current_row.scope_type
+                and newer_row.scope_key = current_row.scope_key
+                and newer_row.is_delete = 0
+                and (newer_row.measured_time > current_row.measured_time
+                     or (newer_row.measured_time = current_row.measured_time
+                         and newer_row.storage_ledger_id > current_row.storage_ledger_id))
+          )
+        limit 1
+    </select>
+
+    <select id="selectCapacitySummary" resultType="map">
+        select coalesce(sum(current_row.used_bytes), 0) as latest_used_bytes,
+               coalesce(sum(current_row.available_bytes), 0) as latest_available_bytes,
+               date_format(max(current_row.measured_time), '%Y-%m-%d %H:%i:%s') as latest_measured_time
+        from ry_rental.ry_rental_platform_storage_quota_ledger current_row
+        where current_row.is_delete = 0
+          and not exists (
+              select 1
+              from ry_rental.ry_rental_platform_storage_quota_ledger newer_row
+              where newer_row.scope_type = current_row.scope_type
+                and newer_row.scope_key = current_row.scope_key
+                and newer_row.is_delete = 0
+                and (newer_row.measured_time > current_row.measured_time
+                     or (newer_row.measured_time = current_row.measured_time
+                         and newer_row.storage_ledger_id > current_row.storage_ledger_id))
+          )
+    </select>
+
+    <select id="selectCurrentDatabaseUsedBytes" resultType="long">
+        select coalesce(sum(data_length + index_length), 0)
+        from information_schema.tables
+        where table_schema = database()
+    </select>
+
+    <insert id="insertCapacityLedger">
+        insert into ry_rental.ry_rental_platform_storage_quota_ledger
+        (scope_type, scope_key, scope_name, capacity_bytes, used_bytes, available_bytes,
+         changed_bytes, change_type, snapshot_source, measured_time,
+         create_by, create_time, update_by, update_time, is_delete)
+        values (#{scopeType}, #{scopeKey}, #{scopeName}, #{capacityBytes}, #{usedBytes}, #{availableBytes},
+                #{changedBytes}, #{changeType}, #{snapshotSource}, #{measuredTime},
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+</mapper>

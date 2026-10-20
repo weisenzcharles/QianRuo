@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantOrderMediaMapper">
+    <resultMap id="merchantOrderMedia" type="com.ruoyi.rentalbusiness.model.MerchantOrderMediaVO">
+        <id property="mediaId" column="media_id" />
+        <result property="orderId" column="order_id" />
+        <result property="snId" column="sn_id" />
+        <result property="orderNo" column="order_no" />
+        <result property="mediaType" column="media_type" />
+        <result property="detectedSn" column="detected_sn" />
+        <result property="matchStatus" column="match_status" />
+        <result property="fileUrl" column="file_key" />
+        <result property="fileName" column="file_name" />
+        <result property="fileSize" column="file_size" />
+        <result property="mimeType" column="mime_type" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <sql id="columns">
+        m.media_id, m.order_id, m.sn_id, o.order_no, m.media_type, m.detected_sn,
+        m.match_status, m.file_key, m.file_name, m.file_size, m.mime_type, m.create_time
+    </sql>
+
+    <select id="selectByOrder" resultMap="merchantOrderMedia">
+        select <include refid="columns" />
+          from ry_business.ry_rental_media_asset m
+          left join ry_business.ry_rental_order o on o.order_id = m.order_id
+         where m.tenant_id = #{tenantId}
+           and m.member_id = #{memberId}
+           and m.order_id = #{orderId}
+           and m.is_delete = 0
+         order by m.create_time desc, m.media_id desc
+    </select>
+
+    <select id="selectLatest" resultMap="merchantOrderMedia">
+        select <include refid="columns" />
+          from ry_business.ry_rental_media_asset m
+          left join ry_business.ry_rental_order o on o.order_id = m.order_id
+         where m.tenant_id = #{tenantId}
+           and m.member_id = #{memberId}
+           and m.order_id = #{orderId}
+           and m.media_type = #{mediaType}
+           and m.is_delete = 0
+         order by m.create_time desc, m.media_id desc
+         limit 1
+    </select>
+
+    <select id="selectById" resultMap="merchantOrderMedia">
+        select <include refid="columns" />
+          from ry_business.ry_rental_media_asset m
+          left join ry_business.ry_rental_order o on o.order_id = m.order_id
+         where m.tenant_id = #{tenantId}
+           and m.member_id = #{memberId}
+           and m.media_id = #{mediaId}
+           and m.is_delete = 0
+         limit 1
+    </select>
+
+    <select id="selectUnmatched" resultMap="merchantOrderMedia">
+        select <include refid="columns" />
+          from ry_business.ry_rental_media_asset m
+          left join ry_business.ry_rental_order o on o.order_id = m.order_id
+         where m.tenant_id = #{tenantId}
+           and m.member_id = #{memberId}
+           and m.media_type = #{mediaType}
+           and m.match_status in
+        <foreach collection="matchStatuses" item="matchStatus" open="(" separator="," close=")">
+            #{matchStatus}
+        </foreach>
+           and m.is_delete = 0
+         order by m.create_time desc, m.media_id desc
+    </select>
+
+    <insert id="insert">
+        <selectKey keyProperty="command.mediaId" resultType="long" order="AFTER">
+            select last_insert_id()
+        </selectKey>
+        insert into ry_business.ry_rental_media_asset
+            (tenant_id, member_id, order_id, media_type, file_key, file_name,
+             file_size, mime_type, match_status, uploaded_by_type, create_by,
+             create_time, update_by, update_time, remark, is_delete)
+        values
+            (#{tenantId}, #{memberId}, #{orderId}, #{command.mediaTypeCode}, #{command.fileUrl},
+             #{command.fileName}, #{command.fileSize}, #{command.mimeType}, 0, 1,
+             #{operatorId}, now(), #{operatorId}, now(), #{command.remark}, 0)
+    </insert>
+
+    <update id="updateMatch">
+        update ry_business.ry_rental_media_asset
+           set order_id = #{orderId}, unit_id = #{unitId}, sn_id = #{snId}, detected_sn = #{detectedSn},
+               match_status = #{matchStatus}, update_by = #{operatorId}, update_time = now()
+         where tenant_id = #{tenantId}
+           and member_id = #{memberId}
+           and media_id = #{mediaId}
+           and is_delete = 0
+    </update>
+
+    <select id="selectOpenOrderBySnCode" resultType="map">
+        select candidate.orderId, candidate.orderNo, candidate.warehouseId,
+               candidate.unitId, candidate.snId, candidate.snCode
+          from (
+                select o.order_id as orderId, o.order_no as orderNo, o.warehouse_id as warehouseId,
+                       inventory_unit.unit_id as unitId, null as snId,
+                       inventory_unit.serial_number as snCode, o.lease_start_date as leaseStartDate
+                  from ry_business.ry_rental_order o
+                  inner join ry_business.ry_rental_merchant_inventory_unit inventory_unit
+                     on inventory_unit.tenant_id = o.tenant_id
+                    and inventory_unit.member_id = o.member_id
+                    and inventory_unit.is_delete = 0
+                    and inventory_unit.serial_number = #{detectedSn}
+                 where o.tenant_id = #{tenantId}
+                   and o.member_id = #{memberId}
+                   and o.is_delete = 0
+                   and json_search(
+                         coalesce(o.package_details_json, json_object()),
+                         'one', cast(inventory_unit.unit_id as char), null,
+                         '$.items[*].unitIds[*]'
+                       ) is not null
+                   and o.order_status in
+                <foreach collection="openOrderStatuses" item="orderStatus" open="(" separator="," close=")">
+                    #{orderStatus}
+                </foreach>
+                union all
+                select o.order_id as orderId, o.order_no as orderNo, o.warehouse_id as warehouseId,
+                       null as unitId, oi.sn_id as snId, s.sn_code as snCode,
+                       o.lease_start_date as leaseStartDate
+                  from ry_business.ry_rental_order o
+                  inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+                  inner join ry_business.ry_rental_asset_sn s on s.sn_id = oi.sn_id
+                 where o.tenant_id = #{tenantId}
+                   and o.member_id = #{memberId}
+                   and o.is_delete = 0
+                   and oi.tenant_id = #{tenantId}
+                   and oi.member_id = #{memberId}
+                   and oi.is_delete = 0
+                   and s.tenant_id = #{tenantId}
+                   and s.member_id = #{memberId}
+                   and s.is_delete = 0
+                   and s.sn_code = #{detectedSn}
+                   and o.order_status in
+                <foreach collection="openOrderStatuses" item="orderStatus" open="(" separator="," close=")">
+                    #{orderStatus}
+                </foreach>
+               ) candidate
+         order by candidate.leaseStartDate desc, candidate.orderId desc
+         limit 1
+    </select>
+
+    <select id="selectOpenOrderTarget" resultType="map">
+        select o.order_id as orderId, o.order_no as orderNo, o.warehouse_id as warehouseId,
+               oi.sn_id as snId, s.sn_code as snCode
+          from ry_business.ry_rental_order o
+          inner join ry_business.ry_rental_order_item oi on oi.order_id = o.order_id
+          inner join ry_business.ry_rental_asset_sn s on s.sn_id = oi.sn_id
+         where o.tenant_id = #{tenantId}
+           and o.member_id = #{memberId}
+           and o.order_id = #{orderId}
+           and oi.sn_id = #{snId}
+           and o.is_delete = 0
+           and oi.is_delete = 0
+           and s.tenant_id = #{tenantId}
+           and s.member_id = #{memberId}
+           and s.is_delete = 0
+           and o.order_status in
+        <foreach collection="openOrderStatuses" item="orderStatus" open="(" separator="," close=")">
+            #{orderStatus}
+        </foreach>
+         limit 1
+    </select>
+</mapper>

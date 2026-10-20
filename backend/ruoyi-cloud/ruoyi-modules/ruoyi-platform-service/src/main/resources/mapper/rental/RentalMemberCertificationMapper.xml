@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalMemberCertificationMapper">
+
+    <resultMap id="CertificationResult" type="com.ruoyi.system.domain.rental.RentalMemberCertification">
+        <id property="certificationId" column="certification_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="versionNo" column="version_no" />
+        <result property="certificationType" column="certification_type" />
+        <result property="certificationStatus" column="certification_status" />
+        <result property="legalSubjectName" column="legal_subject_name" />
+        <result property="licenseNo" column="license_no" />
+        <result property="registeredCapital" column="registered_capital" />
+        <result property="businessScope" column="business_scope" />
+        <result property="licenseAddress" column="license_address" />
+        <result property="licenseValidFrom" column="license_valid_from" />
+        <result property="licenseValidTo" column="license_valid_to" />
+        <result property="licenseLongTerm" column="license_long_term" />
+        <result property="legalRepresentativeName" column="legal_representative_name" />
+        <result property="legalRepresentativeIdNo" column="legal_representative_id_no" />
+        <result property="submittedBy" column="submitted_by" />
+        <result property="submittedTime" column="submitted_time" />
+        <result property="reviewedBy" column="reviewed_by" />
+        <result property="reviewedTime" column="reviewed_time" />
+        <result property="reviewRemark" column="review_remark" />
+        <result property="supplementMaterialTypes" column="supplement_material_types" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <resultMap id="MaterialResult" type="com.ruoyi.system.domain.rental.RentalCertificationMaterial">
+        <id property="materialId" column="material_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="certificationId" column="certification_id" />
+        <result property="materialType" column="material_type" />
+        <result property="materialName" column="material_name" />
+        <result property="fileId" column="file_id" />
+        <result property="fileUrl" column="file_url" />
+        <result property="materialStatus" column="material_status" />
+        <result property="reviewRemark" column="review_remark" />
+        <result property="sortNo" column="sort_no" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <resultMap id="QualificationResult" type="com.ruoyi.system.domain.rental.RentalMemberQualification">
+        <id property="qualificationId" column="qualification_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="qualificationCode" column="qualification_code" />
+        <result property="qualificationStatus" column="qualification_status" />
+        <result property="certificationId" column="certification_id" />
+        <result property="effectiveFrom" column="effective_from" />
+        <result property="effectiveTo" column="effective_to" />
+        <result property="reviewedBy" column="reviewed_by" />
+        <result property="reviewedTime" column="reviewed_time" />
+        <result property="reviewRemark" column="review_remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <resultMap id="QualificationHistoryResult" type="com.ruoyi.system.domain.rental.RentalMemberQualificationHistory">
+        <id property="historyId" column="history_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="qualificationId" column="qualification_id" />
+        <result property="qualificationCode" column="qualification_code" />
+        <result property="previousStatus" column="previous_status" />
+        <result property="qualificationStatus" column="qualification_status" />
+        <result property="certificationId" column="certification_id" />
+        <result property="reason" column="reason" />
+        <result property="operatorName" column="operator_name" />
+        <result property="operatedTime" column="operated_time" />
+    </resultMap>
+
+    <resultMap id="MembershipHistoryResult" type="com.ruoyi.system.domain.rental.RentalMemberMembershipHistory">
+        <id property="historyId" column="history_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="previousType" column="previous_type" />
+        <result property="membershipType" column="membership_type" />
+        <result property="reason" column="reason" />
+        <result property="operatorName" column="operator_name" />
+        <result property="operatedTime" column="operated_time" />
+    </resultMap>
+
+    <select id="selectLatestCertification" parameterType="Long" resultMap="CertificationResult">
+        SELECT * FROM `ry_rental`.`ry_rental_member_certification`
+        WHERE member_id = #{memberId} AND is_delete = 0
+        ORDER BY version_no DESC, certification_id DESC LIMIT 1
+    </select>
+
+    <select id="selectCertificationHistory" parameterType="Long" resultMap="CertificationResult">
+        SELECT * FROM `ry_rental`.`ry_rental_member_certification`
+        WHERE member_id = #{memberId} AND is_delete = 0
+        ORDER BY version_no DESC, certification_id DESC
+    </select>
+
+    <select id="selectMaterials" parameterType="Long" resultMap="MaterialResult">
+        SELECT * FROM `ry_rental`.`ry_rental_certification_material`
+        WHERE certification_id = #{certificationId} AND is_delete = 0
+        ORDER BY sort_no ASC, material_id ASC
+    </select>
+
+    <insert id="insertCertification" parameterType="com.ruoyi.system.domain.rental.RentalMemberCertification"
+            useGeneratedKeys="true" keyProperty="certificationId">
+        INSERT INTO `ry_rental`.`ry_rental_member_certification`
+        (tenant_id, member_id, version_no, certification_type, certification_status, legal_subject_name, license_no,
+         registered_capital, business_scope, license_address, license_valid_from, license_valid_to, license_long_term,
+         legal_representative_name, legal_representative_id_no, submitted_by, submitted_time, reviewed_by,
+         reviewed_time, review_remark, supplement_material_types, create_by, create_time, remark)
+        VALUES
+        (#{tenantId}, #{memberId}, #{versionNo}, #{certificationType}, #{certificationStatus}, #{legalSubjectName}, #{licenseNo},
+         #{registeredCapital}, #{businessScope}, #{licenseAddress}, #{licenseValidFrom}, #{licenseValidTo}, #{licenseLongTerm},
+         #{legalRepresentativeName}, #{legalRepresentativeIdNo}, #{submittedBy}, #{submittedTime}, #{reviewedBy},
+         #{reviewedTime}, #{reviewRemark}, #{supplementMaterialTypes}, #{createBy}, SYSDATE(), #{remark})
+    </insert>
+
+    <insert id="insertMaterial" parameterType="com.ruoyi.system.domain.rental.RentalCertificationMaterial"
+            useGeneratedKeys="true" keyProperty="materialId">
+        INSERT INTO `ry_rental`.`ry_rental_certification_material`
+        (tenant_id, member_id, certification_id, material_type, material_name, file_id, file_url, material_status,
+         review_remark, sort_no, create_by, create_time, remark)
+        VALUES
+        (#{tenantId}, #{memberId}, #{certificationId}, #{materialType}, #{materialName}, #{fileId}, #{fileUrl}, #{materialStatus},
+         #{reviewRemark}, #{sortNo}, #{createBy}, SYSDATE(), #{remark})
+    </insert>
+
+    <update id="updateCertificationReview" parameterType="com.ruoyi.system.domain.rental.RentalMemberCertification">
+        UPDATE `ry_rental`.`ry_rental_member_certification`
+        SET certification_status = #{certificationStatus}, reviewed_by = #{reviewedBy}, reviewed_time = #{reviewedTime},
+            review_remark = #{reviewRemark}, update_by = #{updateBy}, update_time = SYSDATE()
+        WHERE certification_id = #{certificationId} AND member_id = #{memberId}
+          AND certification_status = 0 AND is_delete = 0
+    </update>
+
+    <update id="updateCertificationSupplement" parameterType="com.ruoyi.system.domain.rental.RentalMemberCertification">
+        UPDATE `ry_rental`.`ry_rental_member_certification`
+        SET certification_status = 4, reviewed_by = #{reviewedBy}, reviewed_time = #{reviewedTime},
+            review_remark = #{reviewRemark}, supplement_material_types = #{supplementMaterialTypes},
+            update_by = #{updateBy}, update_time = SYSDATE()
+        WHERE certification_id = #{certificationId} AND member_id = #{memberId}
+          AND certification_status = 0 AND is_delete = 0
+    </update>
+
+    <select id="selectQualifications" parameterType="Long" resultMap="QualificationResult">
+        SELECT * FROM `ry_rental`.`ry_rental_member_qualification`
+        WHERE member_id = #{memberId} AND is_delete = 0
+        ORDER BY qualification_id ASC
+    </select>
+
+    <select id="selectQualification" resultMap="QualificationResult">
+        SELECT * FROM `ry_rental`.`ry_rental_member_qualification`
+        WHERE member_id = #{memberId} AND qualification_code = #{qualificationCode} AND is_delete = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insertQualification" parameterType="com.ruoyi.system.domain.rental.RentalMemberQualification"
+            useGeneratedKeys="true" keyProperty="qualificationId">
+        INSERT INTO `ry_rental`.`ry_rental_member_qualification`
+        (tenant_id, member_id, qualification_code, qualification_status, certification_id, effective_from, effective_to,
+         reviewed_by, reviewed_time, review_remark, create_by, create_time, remark)
+        VALUES
+        (#{tenantId}, #{memberId}, #{qualificationCode}, #{qualificationStatus}, #{certificationId}, #{effectiveFrom}, #{effectiveTo},
+         #{reviewedBy}, #{reviewedTime}, #{reviewRemark}, #{createBy}, SYSDATE(), #{remark})
+    </insert>
+
+    <update id="updateQualification" parameterType="com.ruoyi.system.domain.rental.RentalMemberQualification">
+        UPDATE `ry_rental`.`ry_rental_member_qualification`
+        SET qualification_status = #{qualificationStatus}, certification_id = #{certificationId}, effective_from = #{effectiveFrom},
+            effective_to = #{effectiveTo}, reviewed_by = #{reviewedBy}, reviewed_time = #{reviewedTime},
+            review_remark = #{reviewRemark}, update_by = #{updateBy}, update_time = SYSDATE()
+        WHERE qualification_id = #{qualificationId} AND member_id = #{memberId} AND is_delete = 0
+    </update>
+
+    <insert id="insertQualificationHistory" parameterType="com.ruoyi.system.domain.rental.RentalMemberQualificationHistory"
+            useGeneratedKeys="true" keyProperty="historyId">
+        INSERT INTO `ry_rental`.`ry_rental_member_qualification_history`
+        (tenant_id, member_id, qualification_id, qualification_code, previous_status, qualification_status,
+         certification_id, reason, operator_name, operated_time, create_by, create_time)
+        VALUES
+        (#{tenantId}, #{memberId}, #{qualificationId}, #{qualificationCode}, #{previousStatus}, #{qualificationStatus},
+         #{certificationId}, #{reason}, #{operatorName}, COALESCE(#{operatedTime}, SYSDATE()), #{createBy}, SYSDATE())
+    </insert>
+
+    <select id="selectQualificationHistory" parameterType="Long" resultMap="QualificationHistoryResult">
+        SELECT * FROM `ry_rental`.`ry_rental_member_qualification_history`
+        WHERE member_id = #{memberId} AND is_delete = 0
+        ORDER BY operated_time DESC, history_id DESC
+    </select>
+
+    <insert id="insertMembershipHistory" parameterType="com.ruoyi.system.domain.rental.RentalMemberMembershipHistory"
+            useGeneratedKeys="true" keyProperty="historyId">
+        INSERT INTO `ry_rental`.`ry_rental_member_membership_history`
+        (tenant_id, member_id, previous_type, membership_type, reason, operator_name, operated_time, create_by, create_time)
+        VALUES
+        (#{tenantId}, #{memberId}, #{previousType}, #{membershipType}, #{reason}, #{operatorName},
+         COALESCE(#{operatedTime}, SYSDATE()), #{createBy}, SYSDATE())
+    </insert>
+
+    <select id="selectMembershipHistory" parameterType="Long" resultMap="MembershipHistoryResult">
+        SELECT * FROM `ry_rental`.`ry_rental_member_membership_history`
+        WHERE member_id = #{memberId} AND is_delete = 0
+        ORDER BY operated_time DESC, history_id DESC
+    </select>
+</mapper>

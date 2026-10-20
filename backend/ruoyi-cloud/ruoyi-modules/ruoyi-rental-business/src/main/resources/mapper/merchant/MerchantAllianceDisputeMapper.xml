@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantAllianceDisputeMapper">
+    <select id="selectAllianceOrder" resultType="map">
+        select alliance_id as allianceId, alliance_order_id as allianceOrderId, source_member_id as sourceMemberId,
+               target_member_id as targetMemberId, alliance_order_status as allianceOrderStatus
+        from ry_business.ry_rental_order_alliance
+        where tenant_id = #{tenantId} and alliance_order_id = #{allianceOrderId}
+          and (source_member_id = #{memberId} or target_member_id = #{memberId})
+          and is_delete = 0
+    </select>
+
+    <insert id="insertDispute">
+        insert into ry_business.ry_rental_order_alliance_dispute
+            (tenant_id, alliance_order_id, initiator_member_id, respondent_member_id, dispute_type,
+             dispute_status, claim_amount, description, idempotency_key, create_by, create_time,
+             update_by, update_time, mediation_deadline, is_delete)
+        values (#{tenantId}, #{allianceOrderId}, #{initiatorMemberId}, #{respondentMemberId}, #{disputeType},
+                0, #{claimAmount}, #{description}, #{idempotencyKey}, #{operatorId}, now(),
+                #{operatorId}, now(), date_add(now(), interval 90 day), 0)
+    </insert>
+
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <select id="selectByIdempotencyKey" resultType="map">
+        select dispute_id as disputeId, dispute_status as disputeStatus
+        from ry_business.ry_rental_order_alliance_dispute
+        where tenant_id = #{tenantId} and idempotency_key = #{idempotencyKey} and is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectList" resultType="map">
+        select d.dispute_id as disputeId, d.alliance_order_id as allianceOrderId,
+               d.initiator_member_id as initiatorMemberId, d.respondent_member_id as respondentMemberId,
+               d.dispute_type as disputeType, d.dispute_status as disputeStatus,
+               d.claim_amount as claimAmount, d.awarded_amount as awardedAmount,
+               d.frozen_amount as frozenAmount, d.description, d.resolution,
+               d.mediation_deadline as mediationDeadline,
+               d.create_time as createTime, d.update_time as updateTime,
+               o.order_no as orderNo
+        from ry_business.ry_rental_order_alliance_dispute d
+        left join ry_business.ry_rental_order_alliance a on a.alliance_order_id = d.alliance_order_id
+          and a.tenant_id = d.tenant_id and a.is_delete = 0
+        left join ry_business.ry_rental_order o on o.order_id = a.source_order_id
+          and o.tenant_id = a.tenant_id and o.member_id = a.source_member_id and o.is_delete = 0
+        where d.tenant_id = #{tenantId}
+          and (d.initiator_member_id = #{memberId} or d.respondent_member_id = #{memberId})
+          and d.is_delete = 0
+        <if test="disputeStatus != null">and d.dispute_status = #{disputeStatus}</if>
+        order by d.create_time desc, d.dispute_id desc
+    </select>
+
+    <select id="selectById" resultType="map">
+        select d.dispute_id as disputeId, d.alliance_order_id as allianceOrderId, a.alliance_id as allianceId,
+               o.order_no as orderNo,
+               d.initiator_member_id as initiatorMemberId, d.respondent_member_id as respondentMemberId,
+               d.dispute_type as disputeType, d.dispute_status as disputeStatus,
+               d.claim_amount as claimAmount, d.awarded_amount as awardedAmount,
+               d.frozen_amount as frozenAmount, d.description, d.resolution,
+               d.mediation_deadline as mediationDeadline,
+               d.create_time as createTime, d.update_time as updateTime
+        from ry_business.ry_rental_order_alliance_dispute d
+        left join ry_business.ry_rental_order_alliance a on a.alliance_order_id = d.alliance_order_id
+            and a.tenant_id = d.tenant_id and a.is_delete = 0
+        left join ry_business.ry_rental_order o on o.order_id = a.source_order_id
+            and o.tenant_id = a.tenant_id and o.member_id = a.source_member_id and o.is_delete = 0
+        where d.tenant_id = #{tenantId} and d.dispute_id = #{disputeId}
+          and (d.initiator_member_id = #{memberId} or d.respondent_member_id = #{memberId})
+          and d.is_delete = 0
+    </select>
+
+    <select id="selectForUpdate" resultType="map">
+        select d.dispute_id as disputeId, d.alliance_order_id as allianceOrderId, a.alliance_id as allianceId,
+               d.initiator_member_id as initiatorMemberId, d.respondent_member_id as respondentMemberId,
+               d.dispute_type as disputeType, d.dispute_status as disputeStatus,
+               d.claim_amount as claimAmount, d.awarded_amount as awardedAmount,
+               d.frozen_amount as frozenAmount, d.description, d.resolution,
+               d.mediation_deadline as mediationDeadline
+        from ry_business.ry_rental_order_alliance_dispute d
+        left join ry_business.ry_rental_order_alliance a on a.alliance_order_id = d.alliance_order_id
+            and a.tenant_id = d.tenant_id and a.is_delete = 0
+        where d.tenant_id = #{tenantId} and d.dispute_id = #{disputeId} and d.is_delete = 0
+        for update
+    </select>
+
+    <select id="selectForPlatform" resultType="map">
+        select d.tenant_id as tenantId, d.dispute_id as disputeId, d.alliance_order_id as allianceOrderId,
+               a.alliance_id as allianceId, d.initiator_member_id as initiatorMemberId,
+               d.respondent_member_id as respondentMemberId, d.dispute_type as disputeType,
+               d.dispute_status as disputeStatus, d.claim_amount as claimAmount,
+               d.awarded_amount as awardedAmount, d.frozen_amount as frozenAmount, d.description, d.resolution,
+               d.mediation_deadline as mediationDeadline
+        from ry_business.ry_rental_order_alliance_dispute d
+        left join ry_business.ry_rental_order_alliance a on a.alliance_order_id = d.alliance_order_id
+            and a.tenant_id = d.tenant_id and a.is_delete = 0
+        where d.dispute_id = #{disputeId} and d.is_delete = 0
+        for update
+    </select>
+
+    <insert id="insertEvidence">
+        insert into ry_business.ry_rental_order_alliance_dispute_evidence
+            (tenant_id, dispute_id, member_id, evidence_type, file_url, file_name, content,
+             evidence_status, create_by, create_time, is_delete)
+        values (#{tenantId}, #{disputeId}, #{memberId}, #{evidenceType}, #{fileUrl}, #{fileName}, #{content},
+                1, #{operatorId}, now(), 0)
+    </insert>
+
+    <select id="selectEvidence" resultType="map">
+        select evidence_id as evidenceId, member_id as memberId, evidence_type as evidenceType,
+               file_url as fileUrl, file_name as fileName, content, evidence_status as evidenceStatus,
+               create_time as createTime
+        from ry_business.ry_rental_order_alliance_dispute_evidence
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId} and is_delete = 0
+        order by create_time asc, evidence_id asc
+    </select>
+
+    <select id="selectMediation" resultType="map">
+        select mediation_id as mediationId, round_no as roundNo, mediator_user_id as mediatorUserId,
+               proposal_amount as proposalAmount, proposal_content as proposalContent,
+               mediation_status as mediationStatus, initiator_confirmed as initiatorConfirmed,
+               respondent_confirmed as respondentConfirmed, create_time as createTime,
+               update_time as updateTime
+        from ry_business.ry_rental_order_alliance_mediation
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId} and is_delete = 0
+          and mediation_id = (
+              select latest.mediation_id
+              from ry_business.ry_rental_order_alliance_mediation latest
+              where latest.tenant_id = #{tenantId} and latest.dispute_id = #{disputeId}
+                and latest.is_delete = 0
+              order by latest.round_no desc, latest.mediation_id desc
+              limit 1
+          )
+        for update
+    </select>
+
+    <select id="selectLatestMediation" resultType="map">
+        select mediation_id as mediationId, round_no as roundNo, mediator_user_id as mediatorUserId,
+               proposal_amount as proposalAmount, proposal_content as proposalContent,
+               mediation_status as mediationStatus, initiator_confirmed as initiatorConfirmed,
+               respondent_confirmed as respondentConfirmed, create_time as createTime,
+               update_time as updateTime
+        from ry_business.ry_rental_order_alliance_mediation
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId} and is_delete = 0
+        order by round_no desc, mediation_id desc limit 1
+    </select>
+
+    <insert id="insertMediation">
+        insert into ry_business.ry_rental_order_alliance_mediation
+            (tenant_id, dispute_id, round_no, mediator_user_id, proposal_amount, proposal_content,
+             mediation_status, initiator_confirmed, respondent_confirmed, create_by, create_time,
+             update_by, update_time, is_delete)
+        values (#{tenantId}, #{disputeId}, #{roundNo}, #{mediatorUserId}, #{proposalAmount}, #{proposalContent},
+                1, 0, 0, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <update id="updateDisputeForMediation">
+        update ry_business.ry_rental_order_alliance_dispute
+        set dispute_status = #{toStatus}, resolution = #{resolution}, awarded_amount = #{awardedAmount},
+            update_time = now()
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId}
+          and dispute_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="confirmMediation">
+        update ry_business.ry_rental_order_alliance_mediation m
+        set
+        <choose>
+            <when test="memberRole == 'initiator'">
+                initiator_confirmed = 1,
+                initiator_confirmed_time = now(),
+            </when>
+            <otherwise>
+                respondent_confirmed = 1,
+                respondent_confirmed_time = now(),
+            </otherwise>
+        </choose>
+        update_time = now()
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId}
+          and mediation_status = #{mediationStatus} and is_delete = 0
+          and <choose><when test="memberRole == 'initiator'">initiator_confirmed = 0</when><otherwise>respondent_confirmed = 0</otherwise></choose>
+    </update>
+
+    <update id="rejectMediation">
+        update ry_business.ry_rental_order_alliance_mediation
+        set mediation_status = if(#{memberRole} = 'initiator', 3, 4), update_time = now()
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId}
+          and mediation_status = #{mediationStatus} and is_delete = 0
+    </update>
+
+    <update id="completeMediation">
+        update ry_business.ry_rental_order_alliance_mediation
+        set mediation_status = 2, update_time = now()
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId}
+          and mediation_status = #{mediationStatus} and initiator_confirmed = 1
+          and respondent_confirmed = 1 and is_delete = 0
+    </update>
+
+    <update id="updateFrozenAmount">
+        update ry_business.ry_rental_order_alliance_dispute
+        set frozen_amount = #{frozenAmount}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId} and is_delete = 0
+    </update>
+
+    <update id="markRejected">
+        update ry_business.ry_rental_order_alliance_dispute
+        set dispute_status = 5, resolution = #{resolution}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId}
+          and dispute_status = 0 and is_delete = 0
+    </update>
+
+    <select id="selectExpiredForRelease" resultType="map">
+        select d.tenant_id as tenantId, d.dispute_id as disputeId, a.alliance_id as allianceId,
+               d.respondent_member_id as respondentMemberId, d.frozen_amount as frozenAmount
+        from ry_business.ry_rental_order_alliance_dispute d
+        left join ry_business.ry_rental_order_alliance a on a.alliance_order_id = d.alliance_order_id
+            and a.tenant_id = d.tenant_id and a.is_delete = 0
+        where d.mediation_deadline is not null
+          and d.mediation_deadline &lt;= now()
+          and d.dispute_status in (0, 1, 2, 3)
+          and d.is_delete = 0
+        order by d.mediation_deadline asc, d.dispute_id asc
+        limit 500
+    </select>
+
+    <update id="closeExpired">
+        update ry_business.ry_rental_order_alliance_dispute
+        set dispute_status = 6, resolution = #{resolution}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and dispute_id = #{disputeId}
+          and mediation_deadline is not null and mediation_deadline &lt;= now()
+          and dispute_status in (0, 1, 2, 3) and is_delete = 0
+    </update>
+</mapper>

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformMemberRiskMapper">
+    <resultMap id="memberRiskScope" type="com.ruoyi.system.model.rental.PlatformMemberRiskScope">
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+    </resultMap>
+
+    <resultMap id="creditRecord" type="com.ruoyi.system.model.rental.PlatformMemberCreditRecordVO">
+        <result property="recordNo" column="record_no" />
+        <result property="eventType" column="event_type" />
+        <result property="scoreBefore" column="score_before" />
+        <result property="scoreChange" column="score_change" />
+        <result property="scoreAfter" column="score_after" />
+        <result property="reason" column="reason" />
+        <result property="sourceNo" column="source_no" />
+        <result property="reversalOfRecordNo" column="reversal_of_record_no" />
+        <result property="reversalRecordNo" column="reversal_record_no" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <resultMap id="blacklistRecord" type="com.ruoyi.system.model.rental.PlatformMemberBlacklistRecordVO">
+        <result property="recordNo" column="record_no" />
+        <result property="reasonType" column="reason_type" />
+        <result property="blacklistStatus" column="blacklist_status" />
+        <result property="reason" column="reason" />
+        <result property="effectiveTime" column="effective_time" />
+        <result property="expiresTime" column="expires_time" />
+        <result property="releasedTime" column="released_time" />
+        <result property="releaseRemark" column="release_remark" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectMemberScope" resultMap="memberRiskScope">
+        SELECT tenant_id, member_id
+        FROM ry_rental.ry_rental_member
+        WHERE member_id = #{memberId} AND is_delete = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insertCreditAccountIfAbsent">
+        INSERT INTO ry_rental.ry_rental_member_credit_account
+            (tenant_id, member_id, credit_score, credit_level, create_by, create_time, is_delete)
+        VALUES (#{tenantId}, #{memberId}, 100, 1, #{operatorId}, NOW(), 0)
+        ON DUPLICATE KEY UPDATE is_delete = 0, update_by = VALUES(create_by), update_time = NOW()
+    </insert>
+
+    <select id="selectCreditAccountForUpdate" resultType="map">
+        SELECT credit_score AS creditScore, credit_level AS creditLevel
+        FROM ry_rental.ry_rental_member_credit_account
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId} AND is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <update id="updateCreditAccount">
+        UPDATE ry_rental.ry_rental_member_credit_account
+        SET credit_score = #{score}, credit_level = #{level}, update_by = #{operatorId}, update_time = NOW()
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId} AND is_delete = 0
+    </update>
+
+    <insert id="insertCreditRecord">
+        INSERT INTO ry_rental.ry_rental_member_credit_record
+            (tenant_id, member_id, record_no, event_type, score_before, score_change, score_after,
+             reason, source_no, reversal_of_record_no, create_by, create_time, update_by, update_time, is_delete)
+        VALUES (#{tenantId}, #{memberId}, #{recordNo}, #{eventType}, #{scoreBefore}, #{scoreChange}, #{scoreAfter},
+                #{reason}, #{sourceNo}, #{reversalOfRecordNo}, #{operatorId}, NOW(), #{operatorId}, NOW(), 0)
+    </insert>
+
+    <select id="selectCreditRecordForUpdate" resultType="map">
+        SELECT record_no AS recordNo, event_type AS eventType, score_before AS scoreBefore,
+               score_change AS scoreChange, score_after AS scoreAfter,
+               source_no AS sourceNo, reversal_of_record_no AS reversalOfRecordNo
+        FROM ry_rental.ry_rental_member_credit_record
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId}
+          AND record_no = #{recordNo} AND is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <select id="countCreditReversal" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_member_credit_record
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId}
+          AND reversal_of_record_no = #{recordNo} AND is_delete = 0
+    </select>
+
+    <select id="selectCreditRecords" resultMap="creditRecord">
+        SELECT record_no, event_type, score_before, score_change, score_after, reason, source_no,
+               reversal_of_record_no,
+               (SELECT reversal.record_no
+                FROM ry_rental.ry_rental_member_credit_record reversal
+                WHERE reversal.tenant_id = credit.tenant_id
+                  AND reversal.member_id = credit.member_id
+                  AND reversal.reversal_of_record_no = credit.record_no
+                  AND reversal.is_delete = 0
+                ORDER BY reversal.credit_record_id ASC
+                LIMIT 1) AS reversal_record_no,
+               DATE_FORMAT(credit.create_time, '%Y-%m-%d %H:%i:%s') AS create_time
+        FROM ry_rental.ry_rental_member_credit_record credit
+        WHERE credit.tenant_id = #{tenantId} AND credit.member_id = #{memberId} AND credit.is_delete = 0
+        ORDER BY create_time DESC, credit_record_id DESC
+        LIMIT 100
+    </select>
+
+    <select id="selectBlacklistRecords" resultMap="blacklistRecord">
+        SELECT record_no, reason_type, blacklist_status, reason,
+               DATE_FORMAT(effective_time, '%Y-%m-%d %H:%i:%s') AS effective_time,
+               DATE_FORMAT(expires_time, '%Y-%m-%d %H:%i:%s') AS expires_time,
+               DATE_FORMAT(released_time, '%Y-%m-%d %H:%i:%s') AS released_time,
+               release_remark,
+               DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s') AS create_time
+        FROM ry_rental.ry_rental_member_blacklist_record
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId} AND is_delete = 0
+        ORDER BY blacklist_status ASC, create_time DESC, blacklist_record_id DESC
+        LIMIT 100
+    </select>
+
+    <select id="countActiveBlacklist" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_member_blacklist_record
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId}
+          AND blacklist_status = 1 AND is_delete = 0
+          AND (expires_time IS NULL OR expires_time > NOW())
+    </select>
+
+    <insert id="insertBlacklistRecord">
+        INSERT INTO ry_rental.ry_rental_member_blacklist_record
+            (tenant_id, member_id, record_no, reason_type, blacklist_status, reason,
+             effective_time, expires_time, create_by, create_time, update_by, update_time, is_delete)
+        VALUES (#{tenantId}, #{memberId}, #{recordNo}, #{reasonType}, 1, #{reason},
+                NOW(), #{expiresTime}, #{operatorId}, NOW(), #{operatorId}, NOW(), 0)
+    </insert>
+
+    <select id="selectBlacklistForUpdate" resultType="map">
+        SELECT blacklist_record_id AS recordId, blacklist_status AS blacklistStatus
+        FROM ry_rental.ry_rental_member_blacklist_record
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId}
+          AND record_no = #{recordNo} AND is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <update id="releaseBlacklist">
+        UPDATE ry_rental.ry_rental_member_blacklist_record
+        SET blacklist_status = 2, released_by = #{operatorId}, released_time = NOW(),
+            release_remark = #{remark}, update_by = #{operatorId}, update_time = NOW()
+        WHERE blacklist_record_id = #{recordId} AND blacklist_status = 1 AND is_delete = 0
+    </update>
+</mapper>

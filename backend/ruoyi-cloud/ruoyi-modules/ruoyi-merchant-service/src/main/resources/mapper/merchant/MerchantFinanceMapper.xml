@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantFinanceMapper">
+    <resultMap id="ledger" type="com.ruoyi.merchant.model.MerchantFinanceLedgerVO">
+        <result property="ledgerNo" column="ledger_no" />
+        <result property="accountType" column="account_type" />
+        <result property="direction" column="direction" />
+        <result property="bizType" column="biz_type" />
+        <result property="amount" column="amount" />
+        <result property="balanceAfter" column="balance_after" />
+        <result property="refType" column="ref_type" />
+        <result property="referenceNo" column="reference_no" />
+        <result property="payChannel" column="pay_channel" />
+        <result property="payOrderNo" column="pay_order_no" />
+        <result property="invoiceStatus" column="invoice_status" />
+        <result property="ledgerStatus" column="ledger_status" />
+        <result property="originalLedgerNo" column="original_ledger_no" />
+        <result property="createTime" column="create_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="ledgerColumns">
+        l.ledger_no, l.account_type, l.direction, l.biz_type, l.amount, l.balance_after,
+        l.ref_type, null as reference_no, l.pay_channel, l.pay_order_no,
+        l.invoice_status, l.ledger_status, original.ledger_no as original_ledger_no,
+        date_format(l.create_time, '%Y-%m-%d %H:%i:%s') as create_time, l.remark
+    </sql>
+
+    <select id="selectOverview" resultType="map">
+        select
+            coalesce((select a.available_amount
+                      from ry_rental.ry_rental_finance_account a
+                      where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+                        and a.account_type = 1 and a.is_delete = 0
+                      limit 1), 0) as availableBalance,
+            coalesce((select a.available_amount
+                      from ry_rental.ry_rental_finance_account a
+                      where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+                        and a.account_type = 1 and a.is_delete = 0
+                      limit 1), 0) as valueAddedBalance,
+            coalesce((select a.available_amount
+                      from ry_rental.ry_rental_finance_account a
+                      where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+                        and a.account_type = 3 and a.is_delete = 0
+                      limit 1), 0) as rentalSettlementBalance,
+            coalesce((select a.available_amount
+                      from ry_rental.ry_rental_finance_account a
+                      where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+                        and a.account_type = 2 and a.is_delete = 0
+                      limit 1), 0) as performanceDepositAvailable,
+            coalesce((select a.frozen_amount
+                      from ry_rental.ry_rental_finance_account a
+                      where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+                        and a.account_type = 2 and a.is_delete = 0
+                      limit 1), 0) as performanceDepositFrozen,
+            coalesce((select sum(a.frozen_amount)
+                      from ry_rental.ry_rental_finance_account a
+                      where a.tenant_id = #{tenantId} and a.member_id = #{memberId} and a.is_delete = 0), 0) as performanceDepositFrozen,
+            coalesce(sum(case when l.ledger_status = 1 and l.direction = 1
+                                   and l.create_time &gt;= #{monthStart} then l.amount else 0 end), 0) as monthIncome,
+            coalesce(sum(case when l.ledger_status = 1 and l.direction = 2
+                                   and l.create_time &gt;= #{monthStart} then l.amount else 0 end), 0) as monthExpense,
+            coalesce((select sum(a.frozen_amount)
+                      from ry_rental.ry_rental_finance_account a
+                      where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+                        and a.is_delete = 0), 0) as frozenAmount,
+            coalesce(sum(case when l.invoice_status = 0 then 1 else 0 end), 0) as pendingInvoiceCount,
+            coalesce(sum(case when l.ledger_status in (2, 3) then 1 else 0 end), 0) as abnormalLedgerCount,
+            (select count(1) from ry_rental.ry_rental_finance_withdrawal w
+             where w.tenant_id = #{tenantId} and w.member_id = #{memberId}
+               and w.withdrawal_status = 0 and w.is_delete = 0) as pendingWithdrawalCount
+        from ry_rental.ry_rental_finance_ledger l
+        where l.tenant_id = #{tenantId} and l.member_id = #{memberId} and l.is_delete = 0
+    </select>
+
+    <select id="selectAccounts" resultType="map">
+        select 'value_added' as accountType, '增值服务余额' as accountName,
+               coalesce(a.available_amount, 0) as availableAmount,
+               coalesce(a.frozen_amount, 0) as frozenAmount,
+               '支付宝充值和增值服务资金独立核算' as description
+        from ry_rental.ry_rental_member m
+        left join ry_rental.ry_rental_finance_account a
+          on a.tenant_id = m.tenant_id and a.member_id = m.member_id
+         and a.account_type = 1 and a.is_delete = 0
+        where m.tenant_id = #{tenantId} and m.member_id = #{memberId} and m.is_delete = 0
+        union all
+        select 'performance_deposit', '履约保证金',
+               coalesce(sum(a.available_amount), 0), coalesce(sum(a.frozen_amount), 0),
+               '联盟履约保证金独立核算，冻结和解冻均保留保证金流水'
+        from ry_rental.ry_rental_finance_account a
+        where a.tenant_id = #{tenantId} and a.member_id = #{memberId}
+          and a.account_type = 2 and a.is_delete = 0
+        union all
+        select 'rental_settlement', '租金 / 分账资金',
+               coalesce(a.available_amount, 0), coalesce(a.frozen_amount, 0),
+               '订单租金和联盟结算确认后进入该分户，仅该分户允许提现'
+        from ry_rental.ry_rental_member m
+        left join ry_rental.ry_rental_finance_account a
+          on a.tenant_id = m.tenant_id and a.member_id = m.member_id
+         and a.account_type = 3 and a.is_delete = 0
+        where m.tenant_id = #{tenantId} and m.member_id = #{memberId} and m.is_delete = 0
+    </select>
+
+    <sql id="ledgerWhere">
+        l.tenant_id = #{tenantId} and l.member_id = #{memberId} and l.is_delete = 0
+        <if test="query.ledgerNo != null and query.ledgerNo != ''">
+            and l.ledger_no like concat('%', #{query.ledgerNo}, '%')
+        </if>
+        <if test="query.accountType != null">and l.account_type = #{query.accountType}</if>
+        <if test="query.direction != null">and l.direction = #{query.direction}</if>
+        <if test="query.bizType != null and query.bizType != ''">and l.biz_type = #{query.bizType}</if>
+        <if test="query.ledgerStatus != null">and l.ledger_status = #{query.ledgerStatus}</if>
+        <if test="query.invoiceStatus != null">and l.invoice_status = #{query.invoiceStatus}</if>
+        <if test="query.beginTime != null and query.beginTime != ''">and l.create_time &gt;= #{query.beginTime}</if>
+        <if test="query.endTime != null and query.endTime != ''">and l.create_time &lt;= #{query.endTime}</if>
+        <choose>
+            <when test="query.scene == 'revenue'">
+                and l.direction = 1
+            </when>
+            <when test="query.scene == 'shipping'">
+                and (lower(l.biz_type) like '%express%' or lower(l.biz_type) like '%shipping%'
+                     or lower(l.biz_type) like '%delivery%' or l.biz_type like '%快递%' or l.biz_type like '%物流%')
+            </when>
+            <when test="query.scene == 'withdrawal'">
+                and (lower(l.biz_type) like '%withdraw%' or l.biz_type like '%提现%')
+            </when>
+            <when test="query.scene == 'invoice'">
+                and l.invoice_status is not null
+            </when>
+            <when test="query.scene == 'book'">
+                and l.ref_type is not null and l.ref_type != ''
+            </when>
+        </choose>
+    </sql>
+
+    <select id="selectLedger" resultMap="ledger">
+        select <include refid="ledgerColumns" />
+        from ry_rental.ry_rental_finance_ledger l
+        left join ry_rental.ry_rental_finance_ledger original on original.ledger_id = l.original_ledger_id
+        where <include refid="ledgerWhere" />
+        order by l.create_time desc, l.ledger_id desc
+    </select>
+
+    <select id="selectLedgerByNo" resultMap="ledger">
+        select <include refid="ledgerColumns" />
+        from ry_rental.ry_rental_finance_ledger l
+        left join ry_rental.ry_rental_finance_ledger original on original.ledger_id = l.original_ledger_id
+        where l.tenant_id = #{tenantId} and l.member_id = #{memberId}
+          and l.ledger_no = #{ledgerNo} and l.is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectRecentLedger" resultMap="ledger">
+        select <include refid="ledgerColumns" />
+        from ry_rental.ry_rental_finance_ledger l
+        left join ry_rental.ry_rental_finance_ledger original on original.ledger_id = l.original_ledger_id
+        where l.tenant_id = #{tenantId} and l.member_id = #{memberId} and l.is_delete = 0
+        order by l.create_time desc, l.ledger_id desc
+        limit 5
+    </select>
+</mapper>

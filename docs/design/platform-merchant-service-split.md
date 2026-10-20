@@ -1,0 +1,105 @@
+# 平台端与商户端微服务拆分任务
+
+本文按照 `backend/ruoyi-cloud/AGENTS.md` 执行。拆分期间不得新增平台、商户共用 Controller 或根据终端类型切换数据边界的 Service。
+
+## 目标结构
+
+```text
+ruoyi-api/
+├── ruoyi-api-platform
+└── ruoyi-api-merchant
+
+ruoyi-modules/
+├── platform-service
+└── ruoyi-merchant-service
+```
+
+网关最终只允许：
+
+```text
+/admin/**    -> platform-service
+/merchant/** -> merchant-service
+```
+
+## 任务状态
+
+### 任务 1：建立独立构建边界（已完成）
+
+- 新增 `ruoyi-api-merchant` Maven 模块。
+- 新增独立可执行 `ruoyi-merchant-service` Maven 模块。
+- 商户服务使用独立服务名 `merchant-service` 和端口 `9210`，避免与代码生成服务冲突。
+- 增加商户服务入口边界过滤器及基础测试。
+- 当前阶段不切换网关生产路由，避免尚未迁移接口时中断商户端。
+
+### 任务 2：迁移商户身份与个人中心（已完成）
+
+- 已定义独立的商户登录 DTO、VO 和 Feign 契约，商户 API 不再依赖 `SysUser`、`LoginUser`。
+- 已将 `/merchant/user/getInfo`、`/merchant/user/profile/**`、`/merchant/context/**` 迁入商户服务。
+- 已建立商户账号、绑定、仓库范围及登录权限的独立 Mapper 和 SQL。
+- 认证服务已改为调用 `merchant-service` 的 `/internal/merchant/**` 最小内部 API。
+- 已删除 `ruoyi-system` 中商户身份、个人中心、上下文 Controller 及登录装配 Service。
+- 网关已继续将全部 `/merchant/**` 路径切至 `merchant-service`，不再回落到平台系统服务。
+
+### 任务 3：迁移商户菜单与角色（已完成）
+
+- 新建独立 `MerchantMenuController`、`MerchantRoleController` 及应用服务。
+- 迁移商户菜单、角色、用户角色、角色菜单、用户菜单 Mapper 和 SQL。
+- 权限码全部改为 `merchant:*`，禁止继续使用 `system:*`。
+- 删除 `MerchantNamespaceFilter` 中 `/menu`、`/role` 平台 Controller 别名。
+- 网关已将 `/merchant/menu/**`、`/merchant/role/**` 固定路由到 `merchant-service`。
+- 商户菜单模板只读，商户管理员通过角色维护本商户的菜单授权；所有角色、用户授权查询均强制追加可信 `tenant_id + member_id`。
+- 修改角色权限、状态或用户角色关系后立即失效受影响商户用户会话，重新登录后加载最新权限。
+
+### 任务 4：清理平台能力与商户前端（已完成）
+
+- 商户前端删除平台用户、部门、岗位、日志、任务调度和代码生成页面及 API。
+- 参数、字典、通知按表所有权决定迁入商户服务或改为最小只读内部 API。
+- 修复上传、下载绕过 Axios 命名空间重写的问题。
+- 商户端不得再包含 `/system/**`、`/schedule/**`、`/code/gen/**` 调用。
+- 参数、字典、通知判定为平台所有能力，商户端不再代理；商户界面需要的固定状态选项封装为本地业务常量。
+- 商户账户和角色页面已迁入 `views/merchant/**`，商户 API 已迁入 `api/merchant/**`。
+- 商户注册页面及 `/auth/register` 调用已删除；公开注册资料由商户服务提交平台审核，注册成功后立即通过内部契约创建商户账号，审核前仅开放默认只读预览。
+- 请求拦截器对平台、调度和代码生成路径直接拒绝，不再进行隐式路径改写；上传和下载统一携带商户客户端标识。
+- 新增幂等数据库迁移修正已有 Nacos 配置，确保动态路由与代码路由都将 `/merchant/**` 指向 `merchant-service`。
+
+### 任务 5：平台服务收口（已完成）
+
+- Maven 模块、制品、Spring 注册名、日志目录、Docker Compose 和 Kubernetes 工作负载统一为 `platform-service`。
+- 平台 API 契约模块迁移为 `ruoyi-api-platform`，Feign 服务发现固定调用 `platform-service`。
+- 平台公开接口从 `/system/**` 迁移到 `/admin/**`，网关增加固定路由；两个平台前端请求层禁止旧系统路径和商户路径。
+- 平台权限码从 `system:*`、`rental:*` 迁移到 `admin:*`，后端注解、前端按钮、初始化 SQL 与历史数据保持一致。
+- 平台权限和菜单 Service 已删除商户终端业务分支；平台服务不暴露 `/merchant/**`，商户菜单、角色的运行数据只保留在 `ry_rental` 独立表。
+- `V20260724_004__platform_service_namespace.sql` 幂等迁移已有 Nacos Data ID、网关路由、Sentinel 资源、权限码及平台表中的商户权限副本。
+
+### 任务 6：部署与越权验证（已完成）
+
+- `platform-service-dev.yml` 与 `merchant-service-dev.yml` 使用独立 Nacos Data ID，Docker 镜像、Compose 服务和 Kubernetes Deployment 完全分离。
+- 网关固定互斥路由到两个不同服务名，并根据 JWT 中的可信终端类型拒绝跨端 Token；业务服务入口过滤器继续执行第二层校验。
+- 平台与商户登录 Token 分别存入 `login_tokens:admin:*`、`login_tokens:merchant:*`，不再共享会话缓存前缀。
+- 部署时通过一次性数据库授权任务幂等创建 `qianruo_platform`、`qianruo_merchant` 账号；平台账号仅访问治理所需库，商户账号只能访问 `ry_rental`，业务容器不再使用 root。
+- MyBatis 隔离契约测试覆盖查询/导出、修改、删除、角色菜单和用户批量授权，强制要求 `tenant_id + member_id` 条件。
+- 网关与双服务测试覆盖商户 Token 访问 `/admin/**`、平台 Token 访问 `/merchant/**`、伪造或缺失终端标识等拒绝场景。
+
+### 任务 7：商户业务审计日志管理（已完成）
+
+- 商户请求级日志由通用 `@Log` 链路保留在平台 `sys_oper_log`；`merchant-service` 通过 `MerchantBusinessAuditRecorder` 和内部 Feign 契约写入商户业务审计表。
+- 商户业务日志统一写入 `ry_rental.ry_rental_audit_log` 事实表，只记录新增、修改、删除、登录、密码、权限、库存、批量、文件和协议等业务动作，保存变更前后的脱敏 JSON 快照；历史重复表 `ry_rental_merchant_business_audit_log` 已停用，平台请求级日志仍保留在 `sys_oper_log`。
+- `merchant-service` 直接写入统一业务审计表；`rental-business` 与认证中心通过内部 Feign 审计契约写入同一张表。业务写入成功后记录，删除操作在软删除完成后记录，避免出现页面可见日志但业务实际未落库的假记录。业务写入口使用严格审计和 `rollbackFor = Exception.class` 事务，审计服务连续失败时业务回滚；登录在会话建立后使用非阻断审计。认证中心必须显式注册 `RemoteMerchantBusinessAuditFallbackFactory`，避免认证审计契约缺少 fallback 导致登录日志丢失。
+- 商户页面按业务模块展示操作时间、操作人、模块、操作类型、描述、IP 和详情，不展示请求方式、请求地址、控制器方法和耗时。
+- 商户端查询与导出只从可信登录态读取 `tenant_id + member_id`，请求 DTO 不包含归属字段，Mapper 隔离契约覆盖写入和查询。
+- 权限使用 `merchant:operlog:list`、`merchant:operlog:export`；商户管理员按平台当前有效菜单实时获得全部商户权限，既有角色菜单快照由 `V20260814_004__sync_merchant_admin_menu_permissions.sql` 补齐，其他用户通过商户角色菜单授权。资源池和 SN 菜单由 `V20260814_005__restore_merchant_master_data_menus.sql` 恢复，商品发布菜单继续停用。
+- 商户前端使用本地操作类型和状态常量，不调用平台字典或平台日志接口；日志只读，不提供删除和清空入口。
+- 历史 `ry_rental_merchant_oper_log` 仅保留为停用的请求级兼容表，`V20260814_003__retire_legacy_merchant_request_log.sql` 以软删除方式停用活动行；商户页面、接口和 Mapper 均不得读取该表。
+
+### 任务 8：商户用户管理（已完成）
+
+- 商户端新增“用户管理/账号管理”页面，支持当前商户用户查询、资料与状态修改、角色分配和重置密码。
+- 用户接口统一使用 `/merchant/user/manage/**`，从可信登录上下文读取 `tenant_id + member_id`，只允许管理当前商户已绑定的用户。
+- 平台“商户角色”页面只管理 `ry_rental_merchant_role_template` 和 `ry_rental_merchant_role_template_menu` 两张全局模板表，不允许按商户筛选，也不接收商户归属参数。模板只定义所有商户可用的角色名称、权限字符和菜单上限。
+- 商户注册审核通过或商户端角色列表首次访问时，系统将启用的全局模板幂等复制为当前商户的 `ry_rental_merchant_role` 和 `ry_rental_merchant_role_menu`；商户管理员后续只修改本商户运行角色权限。
+- 用户权限通过当前商户角色的菜单权限生效；账号页面负责角色分配，角色菜单权限继续由商户角色权限页面维护。
+- 重置密码时写入随机临时口令哈希、设置 `must_change_password=1` 并使旧商户登录态失效；用户应通过手机号验证码登录后自行设置密码。
+
+## 当前迁移约束
+
+任务 1 至任务 7 已全部完成。平台与商户已在构建、服务发现、路由、接口、权限、会话缓存、数据库账号、操作审计和数据访问测试层形成独立边界，可以进入第 2 阶段业务模块开发。

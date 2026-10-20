@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformAfterSalesMapper">
+    <resultMap id="platformAfterSales" type="com.ruoyi.system.api.model.PlatformAfterSalesView">
+        <id property="caseId" column="case_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="orderId" column="order_id" />
+        <result property="caseNo" column="case_no" />
+        <result property="orderNo" column="order_no" />
+        <result property="merchantName" column="merchant_name" />
+        <result property="merchantCode" column="merchant_code" />
+        <result property="caseType" column="case_type" />
+        <result property="caseStatus" column="case_status" />
+        <result property="problemDesc" column="problem_desc" />
+        <result property="lostItemsJson" column="lost_items_json" />
+        <result property="compensationAmount" column="compensation_amount" />
+        <result property="platformTicketNo" column="platform_ticket_no" />
+        <result property="customerContacted" column="customer_contacted" />
+        <result property="createTime" column="create_time" />
+        <result property="finishTime" column="finish_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="caseColumns">
+        c.case_id, c.tenant_id, c.member_id, c.order_id, c.case_no, o.order_no,
+        coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchant_name,
+        m.member_code as merchant_code, c.case_type, c.case_status, c.problem_desc,
+        c.lost_items_json, c.compensation_amount, c.platform_ticket_no, c.customer_contacted,
+        c.create_time, c.finish_time, c.remark
+    </sql>
+
+    <!-- 订单详情只读查询运行在业务库账号下，不跨库读取商户控制面。 -->
+    <sql id="caseBusinessColumns">
+        c.case_id, c.tenant_id, c.member_id, c.order_id, c.case_no, o.order_no,
+        null as merchant_name,
+        null as merchant_code, c.case_type, c.case_status, c.problem_desc,
+        c.lost_items_json, c.compensation_amount, c.platform_ticket_no, c.customer_contacted,
+        c.create_time, c.finish_time, c.remark
+    </sql>
+
+    <sql id="caseScope">
+        c.is_delete = 0
+        and o.is_delete = 0
+        and m.is_delete = 0
+        <if test="query != null and query.caseStatus != null">
+            and c.case_status = #{query.caseStatus}
+        </if>
+        <if test="query != null and query.keyword != null and query.keyword != ''">
+            and (c.case_no like concat('%', #{query.keyword}, '%')
+              or o.order_no like concat('%', #{query.keyword}, '%')
+              or c.problem_desc like concat('%', #{query.keyword}, '%'))
+        </if>
+        <if test="query != null and query.merchantKeyword != null and query.merchantKeyword != ''">
+            and (m.member_code like concat('%', #{query.merchantKeyword}, '%')
+              or m.nickname like concat('%', #{query.merchantKeyword}, '%')
+              or m.legal_subject_name like concat('%', #{query.merchantKeyword}, '%'))
+        </if>
+    </sql>
+
+    <sql id="caseOrderScope">
+        c.is_delete = 0
+        and o.is_delete = 0
+    </sql>
+
+    <select id="countCases" resultType="long">
+        select count(1)
+        from ry_business.ry_rental_after_sales_case c
+        inner join ry_business.ry_rental_order o on o.order_id = c.order_id
+            and o.tenant_id = c.tenant_id and o.member_id = c.member_id
+        inner join ry_rental.ry_rental_member m on m.member_id = c.member_id
+            and m.tenant_id = c.tenant_id
+        where <include refid="caseScope" />
+    </select>
+
+    <select id="selectCases" resultMap="platformAfterSales">
+        select <include refid="caseColumns" />
+        from ry_business.ry_rental_after_sales_case c
+        inner join ry_business.ry_rental_order o on o.order_id = c.order_id
+            and o.tenant_id = c.tenant_id and o.member_id = c.member_id
+        inner join ry_rental.ry_rental_member m on m.member_id = c.member_id
+            and m.tenant_id = c.tenant_id
+        where <include refid="caseScope" />
+        order by c.create_time desc, c.case_id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectCase" resultMap="platformAfterSales">
+        select <include refid="caseColumns" />
+        from ry_business.ry_rental_after_sales_case c
+        inner join ry_business.ry_rental_order o on o.order_id = c.order_id
+            and o.tenant_id = c.tenant_id and o.member_id = c.member_id
+        inner join ry_rental.ry_rental_member m on m.member_id = c.member_id
+            and m.tenant_id = c.tenant_id
+        where c.case_id = #{caseId}
+          and <include refid="caseScope" />
+        limit 1
+    </select>
+
+    <select id="selectCaseForUpdate" resultMap="platformAfterSales">
+        select <include refid="caseColumns" />
+        from ry_business.ry_rental_after_sales_case c
+        inner join ry_business.ry_rental_order o on o.order_id = c.order_id
+            and o.tenant_id = c.tenant_id and o.member_id = c.member_id
+        inner join ry_rental.ry_rental_member m on m.member_id = c.member_id
+            and m.tenant_id = c.tenant_id
+        where c.case_id = #{caseId}
+          and <include refid="caseScope" />
+        limit 1
+        for update
+    </select>
+
+    <select id="selectCasesByOrder" resultMap="platformAfterSales">
+        select <include refid="caseBusinessColumns" />
+        from ry_business.ry_rental_after_sales_case c
+        inner join ry_business.ry_rental_order o on o.order_id = c.order_id
+            and o.tenant_id = c.tenant_id and o.member_id = c.member_id
+        where c.tenant_id = #{tenantId}
+          and c.member_id = #{memberId}
+          and c.order_id = #{orderId}
+          and <include refid="caseOrderScope" />
+        order by c.create_time desc, c.case_id desc
+    </select>
+
+    <select id="selectEvents" resultType="com.ruoyi.system.api.model.PlatformAfterSalesEventView">
+        select event_type as eventType, from_status as fromStatus, to_status as toStatus,
+               content, operator_name as operatorName, create_time as createTime
+        from ry_business.ry_rental_after_sales_event
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and case_id = #{caseId} and is_delete = 0
+        order by create_time asc, event_id asc
+    </select>
+
+    <select id="selectEvidence" resultType="com.ruoyi.system.api.model.PlatformAfterSalesEvidenceView">
+        select evidence_type as evidenceType, file_url as fileUrl, file_name as fileName,
+               file_mime as fileMime, description, operator_name as operatorName,
+               create_time as createTime
+        from ry_business.ry_rental_after_sales_evidence
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and case_id = #{caseId} and is_delete = 0
+        order by create_time asc, evidence_id asc
+    </select>
+
+    <update id="updateCaseStatus">
+        update ry_business.ry_rental_after_sales_case
+        set case_status = #{toStatus},
+            finish_time = case when #{toStatus} = 1 then now() else finish_time end,
+            update_by = #{operatorId}, update_time = now(),
+            remark = coalesce(#{remark}, remark)
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and case_id = #{caseId} and case_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <insert id="insertEvent">
+        insert into ry_business.ry_rental_after_sales_event
+            (tenant_id, member_id, case_id, event_type, from_status, to_status, content,
+             operator_name, create_by, create_time, update_by, update_time, is_delete)
+        values
+            (#{tenantId}, #{memberId}, #{caseId}, #{eventType}, #{fromStatus}, #{toStatus}, #{content},
+             #{operatorName}, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <insert id="insertEvidence">
+        insert into ry_business.ry_rental_after_sales_evidence
+            (tenant_id, member_id, case_id, evidence_type, file_url, file_name, file_mime,
+             description, operator_name, create_by, create_time, update_by, update_time, is_delete)
+        values
+            (#{tenantId}, #{memberId}, #{caseId}, #{evidenceType}, #{fileUrl}, #{fileName}, #{fileMime},
+             #{description}, #{operatorName}, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <select id="countProcessingByOrder" resultType="int">
+        select count(1)
+        from ry_business.ry_rental_after_sales_case
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and order_id = #{orderId} and case_status = 0 and is_delete = 0
+    </select>
+
+    <update id="updateOrderStatus">
+        update ry_business.ry_rental_order
+        set order_status = #{toStatus}, version = version + 1,
+            update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and order_id = #{orderId} and order_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <insert id="insertOrderEditLog">
+        insert into ry_business.ry_rental_order_edit_log
+            (tenant_id, member_id, order_id, field_name, before_value, after_value,
+             before_display_value, after_display_value, change_reason,
+             operator_id, operator_name, operator_ip, create_time, is_delete)
+        values
+            (#{tenantId}, #{memberId}, #{orderId}, #{fieldName}, #{beforeValue}, #{afterValue},
+             #{beforeDisplayValue}, #{afterDisplayValue}, #{changeReason},
+             #{operatorId}, #{operatorName}, null, now(), 0)
+    </insert>
+</mapper>

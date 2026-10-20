@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformOrderMapper">
+    <resultMap id="platformOrderView" type="com.ruoyi.system.api.model.PlatformOrderView">
+        <id property="orderId" column="order_id" />
+        <result property="orderNo" column="order_no" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="sourceShopName" column="source_shop_name" />
+        <result property="customerName" column="customer_name" />
+        <result property="customerPhone" column="customer_phone" />
+        <result property="recipientName" column="recipient_name" />
+        <result property="recipientPhone" column="recipient_phone" />
+        <result property="leaseStartDate" column="lease_start_date" />
+        <result property="leaseEndDate" column="lease_end_date" />
+        <result property="rentAmount" column="rent_amount" />
+        <result property="depositAmount" column="deposit_amount" />
+        <result property="orderStatus" column="order_status" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <sql id="platformOrderScope">
+        o.is_delete = 0
+        <if test="memberIds != null and memberIds.size() > 0">
+            and o.member_id in
+            <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+                #{memberId}
+            </foreach>
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (o.order_no like concat('%', #{keyword}, '%')
+                 or o.external_order_no like concat('%', #{keyword}, '%')
+                 or o.customer_name like concat('%', #{keyword}, '%')
+                 or o.customer_phone like concat('%', #{keyword}, '%')
+                 or o.recipient_name like concat('%', #{keyword}, '%')
+                 or o.recipient_phone like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="orderStatus != null">and o.order_status = #{orderStatus}</if>
+        <if test="beginTime != null and beginTime != ''">
+            and o.create_time &gt;= concat(#{beginTime}, ' 00:00:00')
+        </if>
+        <if test="endTime != null and endTime != ''">
+            and o.create_time &lt; date_add(concat(#{endTime}, ' 00:00:00'), interval 1 day)
+        </if>
+    </sql>
+
+    <select id="countPlatformOrders" resultType="long">
+        select count(1)
+        from ry_business.ry_rental_order o
+        where <include refid="platformOrderScope" />
+    </select>
+
+    <select id="selectPlatformOrders" resultMap="platformOrderView">
+        select o.order_id, o.order_no, o.tenant_id, o.member_id,
+               o.shop_name as source_shop_name, o.customer_name, o.customer_phone,
+               o.recipient_name, o.recipient_phone,
+               date_format(o.lease_start_date, '%Y-%m-%d') as lease_start_date,
+               date_format(o.lease_end_date, '%Y-%m-%d') as lease_end_date,
+               o.rent_amount, o.deposit_amount, o.order_status,
+               date_format(o.create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from ry_business.ry_rental_order o
+        where <include refid="platformOrderScope" />
+        order by o.create_time desc, o.order_id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectPlatformOrderDetail" resultType="com.ruoyi.rentalbusiness.domain.MerchantOrderRow">
+        select o.tenant_id as tenantId, o.member_id as memberId,
+               o.order_id as orderId, o.order_no as orderNo, o.external_order_no as externalOrderNo,
+               o.shop_name as shopName, o.customer_name as customerName,
+               o.customer_phone as customerPhone, o.recipient_name as recipientName,
+               o.recipient_phone as recipientPhone, o.recipient_address as recipientAddress,
+               o.lease_start_date as leaseStartDate, o.lease_end_date as leaseEndDate,
+               o.warehouse_id as warehouseId, o.return_warehouse_id as returnWarehouseId,
+               o.ship_due_time as shipDueTime, o.return_due_time as returnDueTime,
+               o.delivery_method as deliveryMethod, o.return_delivery_method as returnDeliveryMethod,
+               o.delivery_amount as deliveryAmount, o.insurance_amount as insuranceAmount,
+               o.lease_days as leaseDays, o.arrival_date as arrivalDate, o.create_time as createTime,
+               o.rent_amount as rentAmount, o.deposit_amount as depositAmount,
+               o.order_status as orderStatus, o.pay_status as payStatus,
+               o.time_effect_status as timeEffectStatus, o.priority_flag as priorityFlag,
+               o.weather_risk_flag as weatherRiskFlag, o.remark as remark,
+               o.remark as customerNote, o.package_details_json as packageDetailsJson,
+               oi.order_item_id as orderItemId, oi.product_id as productId,
+               oi.package_id as packageId, oi.sn_id as snId,
+               oi.accessory_item_ids as accessoryItemIds, oi.quantity as quantity,
+               product.product_name as productName, product.model_name as modelName,
+               product.product_code as productCode,
+               JSON_UNQUOTE(JSON_EXTRACT(o.package_details_json, '$.packageName')) as packageName,
+               w.warehouse_name as warehouseName, return_warehouse.warehouse_name as returnWarehouseName,
+               w.city as warehouseCity,
+               (select l.carrier
+                  from ry_business.ry_rental_logistics_order l
+                 where l.order_id = o.order_id and l.tenant_id = o.tenant_id
+                   and l.member_id = o.member_id and l.direction = 1 and l.is_delete = 0
+                 order by l.create_time desc, l.logistics_id desc limit 1) as shippingCarrier,
+               (select l.tracking_no
+                  from ry_business.ry_rental_logistics_order l
+                 where l.order_id = o.order_id and l.tenant_id = o.tenant_id
+                   and l.member_id = o.member_id and l.direction = 1 and l.is_delete = 0
+                 order by l.create_time desc, l.logistics_id desc limit 1) as shippingTrackingNo,
+               (select l.carrier
+                  from ry_business.ry_rental_logistics_order l
+                 where l.order_id = o.order_id and l.tenant_id = o.tenant_id
+                   and l.member_id = o.member_id and l.direction = 2 and l.is_delete = 0
+                 order by l.create_time desc, l.logistics_id desc limit 1) as returnCarrier,
+               (select l.tracking_no
+                  from ry_business.ry_rental_logistics_order l
+                 where l.order_id = o.order_id and l.tenant_id = o.tenant_id
+                   and l.member_id = o.member_id and l.direction = 2 and l.is_delete = 0
+                 order by l.create_time desc, l.logistics_id desc limit 1) as returnTrackingNo
+        from ry_business.ry_rental_order o
+        left join ry_business.ry_rental_order_item oi
+          on oi.order_id = o.order_id and oi.tenant_id = o.tenant_id
+         and oi.member_id = o.member_id and oi.is_delete = 0
+         and oi.order_item_id = (
+             select min(first_item.order_item_id)
+             from ry_business.ry_rental_order_item first_item
+             where first_item.order_id = o.order_id
+               and first_item.tenant_id = o.tenant_id
+               and first_item.member_id = o.member_id
+               and first_item.is_delete = 0
+         )
+        left join ry_business.ry_rental_product product
+          on product.product_id = oi.product_id and product.tenant_id = o.tenant_id
+         and product.member_id = o.member_id and product.is_delete = 0
+        left join ry_business.ry_rental_warehouse w
+          on w.warehouse_id = o.warehouse_id and w.tenant_id = o.tenant_id
+         and w.member_id = o.member_id and w.is_delete = 0
+        left join ry_business.ry_rental_warehouse return_warehouse
+          on return_warehouse.warehouse_id = o.return_warehouse_id
+         and return_warehouse.tenant_id = o.tenant_id
+         and return_warehouse.member_id = o.member_id
+         and return_warehouse.is_delete = 0
+        where o.order_id = #{orderId} and o.is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectPlatformOrderNotes"
+            resultType="com.ruoyi.rentalbusiness.model.MerchantOrderNoteVO">
+        select n.note_content as noteContent, n.note_type as noteType,
+               '商户操作人' as operatorName,
+               date_format(n.create_time, '%Y-%m-%d %H:%i:%s') as createTime
+        from ry_business.ry_rental_order_note n
+        where n.order_id = #{orderId} and n.is_delete = 0
+        order by n.create_time desc, n.note_id desc
+    </select>
+
+    <select id="selectPlatformOrderItems"
+            resultType="com.ruoyi.system.api.model.PlatformOrderItemView">
+        select oi.order_item_id as orderItemId,
+               oi.quantity,
+               oi.item_status as itemStatus,
+               p.product_type as productType,
+               p.product_name as itemName,
+               p.product_code as itemCode,
+               p.model_name as modelName,
+               u.serial_number as serialNumber,
+               u.unit_code as inventoryCode
+        from ry_business.ry_rental_order_item oi
+        left join ry_business.ry_rental_product p
+          on p.product_id = oi.product_id
+         and p.tenant_id = oi.tenant_id
+         and p.member_id = oi.member_id
+         and p.is_delete = 0
+        left join ry_business.ry_rental_merchant_inventory_unit u
+          on u.unit_id = oi.sn_id
+         and u.tenant_id = oi.tenant_id
+         and u.member_id = oi.member_id
+         and u.is_delete = 0
+        where oi.order_id = #{orderId}
+          and oi.is_delete = 0
+        order by oi.order_item_id
+    </select>
+
+    <select id="selectPlatformOrderReturnInspection"
+            resultType="com.ruoyi.system.api.model.PlatformOrderReturnInspectionView">
+        select inspection_result as result,
+               case_type as caseType,
+               problem_desc as problemDesc,
+               lost_items_json as lostItemsJson,
+               compensation_amount as compensationAmount,
+               customer_contacted as customerContacted,
+               remark,
+               date_format(create_time, '%Y-%m-%d %H:%i:%s') as inspectedTime
+        from ry_business.ry_rental_order_return_inspection
+        where order_id = #{orderId}
+          and is_delete = 0
+        order by create_time desc, inspection_id desc
+        limit 1
+    </select>
+
+    <select id="selectPlatformOrderEditLogs"
+            resultType="com.ruoyi.rentalbusiness.model.MerchantOrderEditLogVO">
+        select l.field_name as fieldName,
+               l.before_display_value as beforeDisplayValue,
+               l.after_display_value as afterDisplayValue,
+               l.change_reason as changeReason,
+               l.operator_name as operatorName,
+               l.operator_ip as operatorIp,
+               date_format(l.create_time, '%Y-%m-%d %H:%i:%s') as createTime
+        from ry_business.ry_rental_order_edit_log l
+        where l.order_id = #{orderId} and l.is_delete = 0
+        order by l.create_time desc, l.log_id desc
+    </select>
+</mapper>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformAllianceDisputeMapper">
+    <sql id="disputeColumns">
+        d.dispute_id as disputeId, d.alliance_order_id as allianceOrderId,
+        d.initiator_member_id as initiatorMemberId, d.respondent_member_id as respondentMemberId,
+        d.dispute_type as disputeType, d.dispute_status as disputeStatus,
+        d.claim_amount as claimAmount, d.awarded_amount as awardedAmount,
+        d.frozen_amount as frozenAmount, d.description, d.resolution,
+        d.mediation_deadline as mediationDeadline,
+        d.create_time as createTime, d.update_time as updateTime,
+        o.order_no as orderNo
+    </sql>
+
+    <select id="count" resultType="long">
+        select count(1) from ry_business.ry_rental_order_alliance_dispute d
+        where d.is_delete = 0
+        <if test="status != null">and d.dispute_status = #{status}</if>
+    </select>
+
+    <select id="select" resultType="com.ruoyi.system.api.model.PlatformAllianceDisputeView">
+        select <include refid="disputeColumns"/>
+        from ry_business.ry_rental_order_alliance_dispute d
+        left join ry_business.ry_rental_order_alliance a on a.alliance_order_id = d.alliance_order_id
+            and a.tenant_id = d.tenant_id and a.is_delete = 0
+        left join ry_business.ry_rental_order o on o.order_id = a.source_order_id
+            and o.tenant_id = a.tenant_id and o.member_id = a.source_member_id and o.is_delete = 0
+        where d.is_delete = 0
+        <if test="status != null">and d.dispute_status = #{status}</if>
+        order by d.create_time desc, d.dispute_id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectById" resultType="com.ruoyi.system.api.model.PlatformAllianceDisputeView">
+        select <include refid="disputeColumns"/>
+        from ry_business.ry_rental_order_alliance_dispute d
+        left join ry_business.ry_rental_order_alliance a on a.alliance_order_id = d.alliance_order_id
+            and a.tenant_id = d.tenant_id and a.is_delete = 0
+        left join ry_business.ry_rental_order o on o.order_id = a.source_order_id
+            and o.tenant_id = a.tenant_id and o.member_id = a.source_member_id and o.is_delete = 0
+        where d.dispute_id = #{disputeId} and d.is_delete = 0
+    </select>
+
+    <select id="selectEvidence" resultType="map">
+        select evidence_id as evidenceId, member_id as memberId, evidence_type as evidenceType,
+               file_url as fileUrl, file_name as fileName, content, evidence_status as evidenceStatus,
+               create_time as createTime
+        from ry_business.ry_rental_order_alliance_dispute_evidence
+        where dispute_id = #{disputeId} and is_delete = 0
+        order by create_time asc, evidence_id asc
+    </select>
+
+    <select id="selectMediation" resultType="map">
+        select mediation_id as mediationId, round_no as roundNo, mediator_user_id as mediatorUserId,
+               proposal_amount as proposalAmount, proposal_content as proposalContent,
+               mediation_status as mediationStatus, initiator_confirmed as initiatorConfirmed,
+               respondent_confirmed as respondentConfirmed, create_time as createTime,
+               update_time as updateTime
+        from ry_business.ry_rental_order_alliance_mediation
+        where dispute_id = #{disputeId} and is_delete = 0
+        order by round_no desc, mediation_id desc limit 1
+    </select>
+</mapper>

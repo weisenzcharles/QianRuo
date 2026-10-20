@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformInvoiceApplicationMapper">
+
+    <sql id="applicationColumns">
+        a.application_no,
+        a.member_id,
+        m.member_code,
+        COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code) AS merchant_name,
+        a.application_type,
+        CASE a.application_type WHEN 1 THEN '开票' WHEN 2 THEN '补票' WHEN 3 THEN '红冲' ELSE '未知类型' END AS application_type_name,
+        a.application_status,
+        CASE a.application_status WHEN 0 THEN '待审核' WHEN 1 THEN '已驳回' WHEN 2 THEN '待开具'
+             WHEN 3 THEN '已开具' WHEN 4 THEN '已红冲' WHEN 9 THEN '已取消' ELSE '未知状态' END AS application_status_name,
+        l.ledger_no,
+        a.amount,
+        a.invoice_type,
+        a.invoice_title,
+        a.tax_no,
+        a.invoice_email,
+        original.application_no AS original_application_no,
+        ir.invoice_no,
+        ir.invoice_code,
+        ir.file_url AS invoice_file_url,
+        a.review_remark,
+        DATE_FORMAT(a.review_time, '%Y-%m-%d %H:%i:%s') AS review_time,
+        DATE_FORMAT(a.create_time, '%Y-%m-%d %H:%i:%s') AS create_time
+    </sql>
+
+    <resultMap id="application" type="com.ruoyi.system.model.rental.PlatformInvoiceApplicationVO">
+        <result property="applicationNo" column="application_no" />
+        <result property="memberCode" column="member_code" />
+        <result property="merchantName" column="merchant_name" />
+        <result property="applicationType" column="application_type" />
+        <result property="applicationTypeName" column="application_type_name" />
+        <result property="applicationStatus" column="application_status" />
+        <result property="applicationStatusName" column="application_status_name" />
+        <result property="ledgerNo" column="ledger_no" />
+        <result property="amount" column="amount" />
+        <result property="invoiceType" column="invoice_type" />
+        <result property="invoiceTitle" column="invoice_title" />
+        <result property="taxNo" column="tax_no" />
+        <result property="invoiceEmail" column="invoice_email" />
+        <result property="originalApplicationNo" column="original_application_no" />
+        <result property="invoiceNo" column="invoice_no" />
+        <result property="invoiceCode" column="invoice_code" />
+        <result property="invoiceFileUrl" column="invoice_file_url" />
+        <result property="reviewRemark" column="review_remark" />
+        <result property="reviewTime" column="review_time" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectList" resultMap="application">
+        SELECT <include refid="applicationColumns" />
+        FROM ry_rental.ry_rental_invoice_application a
+        INNER JOIN ry_rental.ry_rental_finance_ledger l ON l.ledger_id = a.ledger_id AND l.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_member m
+          ON m.tenant_id = a.tenant_id AND m.member_id = a.member_id AND m.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_application original
+          ON original.invoice_application_id = a.original_application_id AND original.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_record ir
+          ON ir.invoice_application_id = a.invoice_application_id AND ir.is_delete = 0
+        <where>
+            a.is_delete = 0
+            <if test="query.applicationNo != null and query.applicationNo != ''">
+                AND a.application_no LIKE CONCAT('%', #{query.applicationNo}, '%')
+            </if>
+            <if test="query.merchantKeyword != null and query.merchantKeyword != ''">
+                AND (m.member_code LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.nickname LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.legal_subject_name LIKE CONCAT('%', #{query.merchantKeyword}, '%'))
+            </if>
+            <if test="query.applicationStatus != null">AND a.application_status = #{query.applicationStatus}</if>
+            <if test="query.applicationType != null">AND a.application_type = #{query.applicationType}</if>
+            <if test="query.beginTime != null and query.beginTime != ''">AND a.create_time &gt;= #{query.beginTime}</if>
+            <if test="query.endTime != null and query.endTime != ''">AND a.create_time &lt;= #{query.endTime}</if>
+        </where>
+        ORDER BY a.create_time DESC, a.invoice_application_id DESC
+    </select>
+
+    <select id="selectByNo" resultMap="application">
+        SELECT <include refid="applicationColumns" />
+        FROM ry_rental.ry_rental_invoice_application a
+        INNER JOIN ry_rental.ry_rental_finance_ledger l ON l.ledger_id = a.ledger_id AND l.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_member m
+          ON m.tenant_id = a.tenant_id AND m.member_id = a.member_id AND m.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_application original
+          ON original.invoice_application_id = a.original_application_id AND original.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_record ir
+          ON ir.invoice_application_id = a.invoice_application_id AND ir.is_delete = 0
+        WHERE a.application_no = #{applicationNo} AND a.is_delete = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectApplicationForUpdate" resultType="map">
+        SELECT a.invoice_application_id AS applicationId, a.tenant_id AS tenantId, a.member_id AS memberId,
+               a.ledger_id AS ledgerId, a.application_no AS applicationNo, a.idempotency_key AS idempotencyKey,
+               a.application_type AS applicationType, a.application_status AS applicationStatus,
+               a.invoice_type AS invoiceType, a.invoice_title AS invoiceTitle, a.tax_no AS taxNo,
+               a.invoice_email AS invoiceEmail, a.amount, a.ref_type AS refType, a.ref_id AS refId,
+               a.original_application_id AS originalApplicationId,
+               a.original_invoice_record_id AS originalInvoiceRecordId,
+               a.review_remark AS reviewRemark,
+               l.ledger_no AS ledgerNo, l.invoice_status AS invoiceStatus,
+               ir.invoice_record_id AS invoiceRecordId, ir.record_status AS invoiceRecordStatus,
+               original_ir.invoice_no AS originalInvoiceNo
+        FROM ry_rental.ry_rental_invoice_application a
+        INNER JOIN ry_rental.ry_rental_finance_ledger l ON l.ledger_id = a.ledger_id AND l.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_record ir
+          ON ir.invoice_application_id = a.invoice_application_id AND ir.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_record original_ir
+          ON original_ir.invoice_record_id = a.original_invoice_record_id AND original_ir.is_delete = 0
+        WHERE a.application_no = #{applicationNo} AND a.is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <select id="selectLedgerForUpdate" resultType="map">
+        SELECT ledger_id AS ledgerId, tenant_id AS tenantId, member_id AS memberId,
+               ledger_no AS ledgerNo, ref_type AS refType, ref_id AS refId,
+               invoice_status AS invoiceStatus
+        FROM ry_rental.ry_rental_finance_ledger
+        WHERE ledger_id = #{ledgerId} AND is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <select id="selectValidInvoice" resultType="map">
+        SELECT ir.invoice_record_id AS invoiceRecordId, ir.invoice_application_id AS applicationId,
+               ir.invoice_no AS invoiceNo, ir.ledger_id AS ledgerId
+        FROM ry_rental.ry_rental_invoice_record ir
+        INNER JOIN ry_rental.ry_rental_invoice_application ia
+          ON ia.invoice_application_id = ir.invoice_application_id AND ia.is_delete = 0
+        WHERE ir.tenant_id = #{tenantId} AND ir.member_id = #{memberId}
+          AND ir.record_status = 1 AND ir.is_delete = 0
+          AND (ir.ledger_id = #{ledgerId}
+            OR (ia.ref_type = #{refType} AND ia.ref_id = #{refId}
+                AND #{refType} IS NOT NULL AND #{refId} IS NOT NULL))
+        ORDER BY ir.invoice_record_id DESC
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <select id="selectInvoiceByIdForUpdate" resultType="map">
+        SELECT invoice_record_id AS invoiceRecordId, tenant_id AS tenantId, member_id AS memberId,
+               invoice_application_id AS applicationId, ledger_id AS ledgerId,
+               invoice_no AS invoiceNo, record_status AS recordStatus
+        FROM ry_rental.ry_rental_invoice_record
+        WHERE invoice_record_id = #{invoiceRecordId} AND is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <select id="selectByIdempotencyKey" resultMap="application">
+        SELECT <include refid="applicationColumns" />
+        FROM ry_rental.ry_rental_invoice_application a
+        INNER JOIN ry_rental.ry_rental_finance_ledger l ON l.ledger_id = a.ledger_id AND l.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_member m
+          ON m.tenant_id = a.tenant_id AND m.member_id = a.member_id AND m.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_application original
+          ON original.invoice_application_id = a.original_application_id AND original.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_invoice_record ir
+          ON ir.invoice_application_id = a.invoice_application_id AND ir.is_delete = 0
+        WHERE a.tenant_id = #{tenantId} AND a.member_id = #{memberId}
+          AND a.idempotency_key = #{idempotencyKey} AND a.is_delete = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insertApplication">
+        INSERT INTO ry_rental.ry_rental_invoice_application
+            (tenant_id, member_id, ledger_id, application_no, idempotency_key, application_type,
+             application_status, invoice_type, invoice_title, tax_no, invoice_email, amount,
+             ref_type, ref_id, original_application_id, original_invoice_record_id,
+             review_remark, create_by, create_time, update_by, update_time, is_delete)
+        VALUES
+            (#{tenantId}, #{memberId}, #{ledgerId}, #{applicationNo}, #{idempotencyKey}, #{applicationType},
+            #{applicationStatus}, #{invoiceType}, #{invoiceTitle}, #{taxNo}, #{invoiceEmail}, #{amount},
+            #{refType}, #{refId}, #{originalApplicationId}, #{originalInvoiceRecordId},
+            #{reviewRemark}, #{operatorId}, NOW(), #{operatorId}, NOW(), 0)
+    </insert>
+
+    <update id="updateApplicationStatus">
+        UPDATE ry_rental.ry_rental_invoice_application
+        SET application_status = #{applicationStatus}, review_remark = #{reviewRemark},
+            reviewer_id = #{reviewerId}, review_time = NOW(), update_by = #{reviewerId}, update_time = NOW()
+        WHERE invoice_application_id = #{applicationId} AND is_delete = 0
+    </update>
+
+    <insert id="insertInvoiceRecord">
+        INSERT INTO ry_rental.ry_rental_invoice_record
+            (tenant_id, member_id, invoice_application_id, ledger_id, invoice_no, invoice_code, file_url,
+             record_status, issued_time, create_by, create_time, update_by, update_time, is_delete)
+        VALUES
+            (#{tenantId}, #{memberId}, #{applicationId}, #{ledgerId}, #{invoiceNo}, #{invoiceCode}, #{fileUrl},
+             1, NOW(), #{operatorId}, NOW(), #{operatorId}, NOW(), 0)
+    </insert>
+
+    <insert id="insertRedFlushRecord">
+        INSERT INTO ry_rental.ry_rental_invoice_red_flush
+            (tenant_id, member_id, original_invoice_record_id, invoice_application_id, red_flush_no,
+             reason, red_flush_status, reviewer_id, review_time, create_by, create_time, update_by, update_time, is_delete)
+        VALUES
+            (#{tenantId}, #{memberId}, #{originalInvoiceRecordId}, #{applicationId}, #{redFlushNo},
+             #{reason}, 1, #{reviewerId}, NOW(), #{reviewerId}, NOW(), #{reviewerId}, NOW(), 0)
+    </insert>
+
+    <update id="updateInvoiceRecordStatus">
+        UPDATE ry_rental.ry_rental_invoice_record
+        SET record_status = #{recordStatus}, update_by = #{operatorId}, update_time = NOW()
+        WHERE invoice_record_id = #{invoiceRecordId} AND record_status = 1 AND is_delete = 0
+    </update>
+
+    <update id="updateLedgerInvoiceStatus">
+        UPDATE ry_rental.ry_rental_finance_ledger
+        SET invoice_status = #{invoiceStatus}
+        WHERE ledger_id = #{ledgerId} AND is_delete = 0
+    </update>
+</mapper>

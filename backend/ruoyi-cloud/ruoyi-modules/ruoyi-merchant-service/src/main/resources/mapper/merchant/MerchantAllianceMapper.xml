@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantAllianceMapper">
+    <resultMap id="merchantAllianceOptionMap" type="com.ruoyi.merchant.api.model.MerchantAllianceOption">
+        <result property="allianceId" column="alliance_id" />
+        <result property="memberId" column="member_id" />
+        <result property="merchantName" column="merchant_name" />
+        <result property="shareStockEnabled" column="share_stock_enabled" />
+        <result property="acceptOrderLimit" column="accept_order_limit" />
+        <result property="currentAcceptOrderCount" column="current_accept_order_count" />
+        <result property="memberStatus" column="member_status" />
+        <result property="joinTime" column="join_time" />
+        <result property="exitTime" column="exit_time" />
+    </resultMap>
+
+    <select id="selectOptions" resultMap="merchantAllianceOptionMap">
+        select distinct current_member.alliance_id as alliance_id, other_member.member_id as member_id,
+               coalesce(nullif(other_member_profile.nickname, ''),
+                        nullif(other_member_profile.legal_subject_name, ''),
+                        other_member_profile.member_code) as merchant_name,
+               other_member.share_stock_enabled as share_stock_enabled,
+               other_member.accept_order_limit as accept_order_limit,
+               other_member.current_accept_order_count as current_accept_order_count
+        from `ry_rental`.`ry_rental_alliance_member` current_member
+        inner join `ry_rental`.`ry_rental_alliance_member` other_member
+            on other_member.alliance_id = current_member.alliance_id
+           and other_member.tenant_id = current_member.tenant_id
+           and other_member.member_id &lt;&gt; current_member.member_id
+           and other_member.member_status = 1
+           and other_member.is_delete = 0
+        inner join `ry_rental`.`ry_rental_alliance` alliance
+            on alliance.alliance_id = current_member.alliance_id
+           and alliance.tenant_id = current_member.tenant_id
+           and alliance.alliance_status = 1
+           and alliance.is_delete = 0
+        inner join `ry_rental`.`ry_rental_member` other_member_profile
+            on other_member_profile.member_id = other_member.member_id
+           and other_member_profile.tenant_id = other_member.tenant_id
+           and other_member_profile.status = 0
+           and other_member_profile.is_delete = 0
+        where current_member.tenant_id = #{tenantId}
+          and current_member.member_id = #{memberId}
+          and current_member.member_status = 1
+          and current_member.is_delete = 0
+        order by merchant_name, other_member.member_id
+    </select>
+
+    <select id="selectMemberOptions" resultMap="merchantAllianceOptionMap">
+        select m.member_id as member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchant_name,
+               null as share_stock_enabled,
+               null as accept_order_limit
+        from ry_rental.ry_rental_member m
+        where m.tenant_id = #{tenantId}
+          and m.member_id &lt;&gt; #{memberId}
+          and m.status = 0
+          and m.is_delete = 0
+          and not exists (
+              select 1
+              from ry_rental.ry_rental_alliance_member am
+              inner join ry_rental.ry_rental_alliance a on a.alliance_id = am.alliance_id
+                 and a.tenant_id = am.tenant_id and a.alliance_status = 1 and a.is_delete = 0
+              where am.tenant_id = m.tenant_id and am.member_id = m.member_id
+                and am.member_status = 1 and am.is_delete = 0
+          )
+        order by merchant_name, m.member_id
+    </select>
+
+    <select id="selectCurrent" resultType="map">
+        select a.alliance_id as allianceId, a.alliance_name as allianceName,
+               a.owner_member_id as ownerMemberId, a.alliance_status as allianceStatus,
+               a.max_member_count as maxMemberCount, a.join_mode as joinMode
+        from ry_rental.ry_rental_alliance_member am
+        inner join ry_rental.ry_rental_alliance a on a.alliance_id = am.alliance_id
+          and a.tenant_id = am.tenant_id and a.alliance_status = 1 and a.is_delete = 0
+        where am.tenant_id = #{tenantId} and am.member_id = #{memberId}
+          and am.member_status = 1 and am.is_delete = 0
+        order by a.alliance_id desc limit 1
+    </select>
+
+    <select id="selectMembers" resultMap="merchantAllianceOptionMap">
+        select am.member_id as member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchant_name,
+               am.share_stock_enabled as share_stock_enabled,
+               am.accept_order_limit as accept_order_limit,
+               am.current_accept_order_count as current_accept_order_count
+        from ry_rental.ry_rental_alliance_member am
+        inner join ry_rental.ry_rental_member m on m.member_id = am.member_id
+          and m.tenant_id = am.tenant_id and m.status = 0 and m.is_delete = 0
+        where am.tenant_id = #{tenantId} and am.alliance_id = (
+            select alliance_id from ry_rental.ry_rental_alliance_member
+            where tenant_id = #{tenantId} and member_id = #{memberId} and member_status = 1 and is_delete = 0
+            order by id desc limit 1
+        ) and am.member_status = 1 and am.is_delete = 0
+        order by am.member_id
+    </select>
+
+    <insert id="insertAlliance">
+        insert into ry_rental.ry_rental_alliance
+            (tenant_id, alliance_name, owner_member_id, alliance_status, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{name}, #{memberId}, 1, #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectLatestAllianceId" resultType="long">
+        select alliance_id from ry_rental.ry_rental_alliance
+        where tenant_id = #{tenantId} and owner_member_id = #{memberId} and is_delete = 0
+        order by alliance_id desc limit 1
+    </select>
+
+    <insert id="insertMember">
+        insert into ry_rental.ry_rental_alliance_member
+            (tenant_id, alliance_id, member_id, accept_order_limit, share_stock_enabled, member_status, join_time, is_delete)
+        select #{tenantId}, #{allianceId}, m.member_id, 0, 1, 1, now(), 0
+        from ry_rental.ry_rental_member m
+        where m.tenant_id = #{tenantId} and m.member_id = #{memberId} and m.status = 0 and m.is_delete = 0
+    </insert>
+
+    <update id="updateMember">
+        update ry_rental.ry_rental_alliance_member am
+        inner join ry_rental.ry_rental_alliance a on a.alliance_id = am.alliance_id
+        set am.share_stock_enabled = coalesce(#{shareStockEnabled}, am.share_stock_enabled),
+            am.accept_order_limit = coalesce(#{acceptOrderLimit}, am.accept_order_limit)
+        where am.tenant_id = #{tenantId} and am.alliance_id = #{allianceId}
+          and am.member_id = #{memberId} and am.member_status = 1 and am.is_delete = 0
+          and a.owner_member_id = #{ownerMemberId} and a.is_delete = 0
+    </update>
+
+    <update id="removeMember">
+        update ry_rental.ry_rental_alliance_member am
+        inner join ry_rental.ry_rental_alliance a on a.alliance_id = am.alliance_id
+        set am.member_status = 3, am.exit_time = now(), am.is_delete = 1
+        where am.tenant_id = #{tenantId} and am.alliance_id = #{allianceId}
+          and am.member_id = #{memberId} and am.member_id &lt;&gt; a.owner_member_id
+          and a.owner_member_id = #{ownerMemberId} and am.is_delete = 0
+    </update>
+
+    <select id="selectSharedMemberIds" resultType="long">
+        select distinct am.member_id
+        from ry_rental.ry_rental_alliance_member current_member
+        inner join ry_rental.ry_rental_alliance_member am on am.alliance_id = current_member.alliance_id
+          and am.tenant_id = current_member.tenant_id and am.member_id &lt;&gt; current_member.member_id
+          and am.member_status = 1 and am.share_stock_enabled = 1 and am.is_delete = 0
+        inner join ry_rental.ry_rental_alliance a on a.alliance_id = current_member.alliance_id
+          and a.tenant_id = current_member.tenant_id and a.alliance_status = 1 and a.is_delete = 0
+        where current_member.tenant_id = #{tenantId} and current_member.member_id = #{memberId}
+          and current_member.member_status = 1 and current_member.is_delete = 0
+    </select>
+
+    <select id="selectSharedMembers" resultMap="merchantAllianceOptionMap">
+        select distinct am.alliance_id as alliance_id, am.member_id as member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchant_name
+        from ry_rental.ry_rental_alliance_member current_member
+        inner join ry_rental.ry_rental_alliance_member am on am.alliance_id = current_member.alliance_id
+          and am.tenant_id = current_member.tenant_id and am.member_id &lt;&gt; current_member.member_id
+          and am.member_status = 1 and am.share_stock_enabled = 1 and am.is_delete = 0
+        inner join ry_rental.ry_rental_alliance a on a.alliance_id = current_member.alliance_id
+          and a.tenant_id = current_member.tenant_id and a.alliance_status = 1 and a.is_delete = 0
+        inner join ry_rental.ry_rental_member m on m.member_id = am.member_id
+          and m.tenant_id = am.tenant_id and m.status = 0 and m.is_delete = 0
+        where current_member.tenant_id = #{tenantId} and current_member.member_id = #{memberId}
+          and current_member.member_status = 1 and current_member.is_delete = 0
+    </select>
+
+    <select id="selectAdminAlliances" resultType="map">
+        select a.alliance_id as allianceId, a.tenant_id as tenantId, a.alliance_name as allianceName,
+               a.owner_member_id as ownerMemberId, a.alliance_status as allianceStatus,
+               a.create_time as createTime, count(am.id) as memberCount,
+               coalesce(nullif(owner.nickname, ''), nullif(owner.legal_subject_name, ''), owner.member_code) as ownerMerchantName
+        from ry_rental.ry_rental_alliance a
+        left join ry_rental.ry_rental_alliance_member am on am.alliance_id = a.alliance_id
+          and am.tenant_id = a.tenant_id and am.member_status = 1 and am.is_delete = 0
+        left join ry_rental.ry_rental_member owner on owner.member_id = a.owner_member_id
+          and owner.tenant_id = a.tenant_id and owner.is_delete = 0
+        where a.is_delete = 0
+          <if test="status != null">and a.alliance_status = #{status}</if>
+          <if test="keyword != null and keyword != ''">
+            and (a.alliance_name like concat('%', #{keyword}, '%')
+              or owner.nickname like concat('%', #{keyword}, '%')
+              or owner.legal_subject_name like concat('%', #{keyword}, '%')
+              or owner.member_code like concat('%', #{keyword}, '%'))
+          </if>
+        group by a.alliance_id, a.tenant_id, a.alliance_name, a.owner_member_id, a.alliance_status,
+                 a.create_time, owner.nickname, owner.legal_subject_name, owner.member_code
+        order by a.create_time desc, a.alliance_id desc
+    </select>
+
+    <select id="selectAdminMembers" resultMap="merchantAllianceOptionMap">
+        select am.alliance_id as alliance_id, am.member_id as member_id,
+               coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code) as merchant_name,
+               am.share_stock_enabled as share_stock_enabled, am.accept_order_limit as accept_order_limit,
+               am.current_accept_order_count as current_accept_order_count,
+               am.member_status as member_status,
+               am.join_time as join_time, am.exit_time as exit_time
+        from ry_rental.ry_rental_alliance_member am
+        inner join ry_rental.ry_rental_member m on m.member_id = am.member_id
+          and m.tenant_id = am.tenant_id and m.is_delete = 0
+        where am.alliance_id = #{allianceId} and am.member_status in (1, 2, 3)
+          and am.is_delete = case when am.member_status = 1 then 0 else 1 end
+        order by am.member_id
+    </select>
+
+    <update id="updateAdminAllianceStatus">
+        update ry_rental.ry_rental_alliance
+        set alliance_status = #{status}, update_time = now()
+        where alliance_id = #{allianceId} and is_delete = 0
+    </update>
+
+    <update id="updateAdminMemberStatus">
+        update ry_rental.ry_rental_alliance_member
+        set member_status = #{status},
+            exit_time = case when #{status} = 3 then now() else exit_time end,
+            is_delete = case when #{status} = 1 then 0 else 1 end
+        where alliance_id = #{allianceId} and member_id = #{memberId}
+          and (is_delete = 0 or #{status} = 1)
+          and not (member_status = 3 and #{status} = 1)
+    </update>
+
+    <insert id="insertOrderSlot">
+        insert ignore into ry_rental.ry_rental_alliance_order_slot
+            (tenant_id, alliance_id, member_id, alliance_order_id, slot_status,
+             create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{allianceId}, #{memberId}, #{allianceOrderId}, 1,
+                #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <select id="existsActiveOrderSlot" resultType="boolean">
+        select exists(select 1 from ry_rental.ry_rental_alliance_order_slot
+          where tenant_id = #{tenantId} and member_id = #{memberId}
+            and alliance_order_id = #{allianceOrderId} and slot_status = 1 and is_delete = 0)
+    </select>
+
+    <update id="incrementOrderSlot">
+        update ry_rental.ry_rental_alliance_member
+        set current_accept_order_count = current_accept_order_count + 1
+        where tenant_id = #{tenantId} and alliance_id = #{allianceId} and member_id = #{memberId}
+          and member_status = 1 and is_delete = 0
+          and (accept_order_limit = 0 or current_accept_order_count &lt; accept_order_limit)
+    </update>
+
+    <update id="releaseOrderSlot">
+        update ry_rental.ry_rental_alliance_order_slot
+        set slot_status = 2, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and alliance_order_id = #{allianceOrderId} and slot_status = 1 and is_delete = 0
+    </update>
+
+    <update id="decrementOrderSlot">
+        update ry_rental.ry_rental_alliance_member
+        set current_accept_order_count = greatest(current_accept_order_count - 1, 0)
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+    </update>
+</mapper>

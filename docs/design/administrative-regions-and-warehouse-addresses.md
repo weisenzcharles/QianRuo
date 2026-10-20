@@ -1,0 +1,48 @@
+# 行政区划数据与仓库地址设计
+
+## 数据来源
+
+行政区划数据以高德提供的 `AMap_adcode_citycode.xlsx` 为准，导入迁移脚本为 `V20260814_007__import_amap_region_dictionary.sql`。表格中的 `adcode` 写入 `ry_business.ry_rental_region.region_code`，`citycode` 写入 `city_code`；原有 `V20260812_001__region_dictionary.sql` 的街道级遗留数据不会物理删除，而是在新迁移中统一标记为 `is_delete = 1`。
+
+部署时执行迁移，运行时只查询本地 `ry_business.ry_rental_region`，不依赖外部网络。新表字段如下：
+
+| 字段 | 含义 |
+| --- | --- |
+| `region_code` | 高德六位 `adcode`，作为行政区划唯一编号 |
+| `parent_code` | 根据 `adcode` 推导的上级行政区划编码，省级为 `0` |
+| `region_level` | 省、市、区县分别为 `1`、`2`、`3` |
+| `region_name` | 行政区划名称 |
+| `city_code` | 高德 `citycode`，无对应城市编码时为空 |
+| `sort_no` | 同一父级下的稳定排序值 |
+| `is_delete` | 软删除标记，`0` 为有效，`1` 为历史或停用数据 |
+
+源文件中的“中国”根节点 `100000` 不作为仓库省市区选择项。高德数据对直辖市和部分直辖县级行政区划没有单独提供市级父节点，迁移会补充 `110100`、`120100`、`310100`、`500100`、`500200`、`469000`、`659000`、`429000`、`419000` 九个虚拟节点，保证省、市、区县级联关系完整。
+
+## 查询接口
+
+`GET /merchant/region/children?parentCode=0` 查询省级节点；传入省或市行政区划编码查询下一级节点。接口返回 `code`、`name`、`level` 和 `cityCode`，仅返回有效节点，按排序值和编码稳定排序。现有前端只依赖 `code/name`，新增 `cityCode` 不影响现有级联逻辑。
+
+## 仓库表单
+
+商户端仓库新增和编辑使用省、市、区县级联选择，选项全部来自数据库。保存时仍将名称写入仓库的 `province`、`city`、`district` 字段，保证现有订单、搜索和导出字段兼容；编辑时根据已保存名称恢复下级选项并正常回显。
+
+## 订单收件人地址快照
+
+订单中的收件人地址不能只依赖订单主表的当前文本。每次新增或编辑订单时，`rental-business`
+通过公共类 `RegionAddressParser` 解析 `recipient_address`，并向
+`ry_business.ry_rental_order_recipient_history` 追加历史快照。快照通过
+`tenant_id + member_id + order_no` 与订单关联，保存客户姓名、客户电话、客户昵称、收件人姓名、收件人电话、完整地址、备注、行政区划
+`adcode`、行政区划名称、解析状态和高德 `citycode`。保存前先与订单当前 `used = 1` 快照比较，
+信息未变化时不新增记录；发生变化时将旧快照置为 `used = 0`，新快照置为 `used = 1`。订单
+列表和详情只查询当前 `used = 1` 的未删除快照，因此地址修改可追溯，天气和物流不需要重新猜测历史地址。
+
+解析规则固定为“省 -> 市 -> 区县”层级匹配：同级候选按名称长度降序选择，识别到下级后按
+`parent_code` 回溯上级；直辖市使用迁移脚本补齐的虚拟市级节点。`region_code` 是行政区划
+`adcode`，`city_code` 是导入数据中的高德 `citycode` 快照，两者不能混用。高德天气接口的
+`city` 参数只传区县或市级 `adcode`。地址无法完整识别时仍保存原始订单，快照标记 `failed` 或
+`partial`，不会阻断录单，但天气调用会返回“待查询”并保留失败原因。
+
+对应迁移为 `V20260814_008__order_recipient_history_global_config.sql` 和
+`V20260815_001__order_recipient_history_used.sql`，表使用
+`is_delete` 软删除，`order_no` 和 `amap_city_code` 建索引，操作人字段使用商户用户
+`BIGINT` 唯一编号字段。

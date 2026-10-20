@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantLogisticsRouteMapper">
+    <resultMap id="merchantLogisticsListRecord" type="com.ruoyi.rentalbusiness.domain.MerchantLogisticsListRecord">
+        <id property="logisticsId" column="logistics_id" />
+        <result property="orderId" column="order_id" />
+        <result property="warehouseId" column="warehouse_id" />
+        <result property="orderNo" column="order_no" />
+        <result property="direction" column="direction" />
+        <result property="carrier" column="carrier" />
+        <result property="trackingNo" column="tracking_no" />
+        <result property="sourceType" column="source_type" />
+        <result property="pickupTime" column="pickup_time" />
+        <result property="estimatedArriveTime" column="estimated_arrive_time" />
+        <result property="routeStatus" column="route_status" />
+        <result property="abnormalFlag" column="abnormal_flag" />
+        <result property="routeAvailable" column="route_available" />
+        <result property="routeProvider" column="route_provider" />
+        <result property="routeMessage" column="route_message" />
+        <result property="routeQueryTime" column="route_query_time" />
+        <result property="lastRouteTime" column="last_route_time" />
+        <result property="warehouseName" column="warehouse_name" />
+        <result property="feeAmount" column="fee_amount" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <select id="selectMerchantLogisticsList" resultMap="merchantLogisticsListRecord">
+        select l.logistics_id, l.order_id,
+               coalesce(l.warehouse_id,
+                   case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end) as warehouse_id,
+               o.order_no, l.direction, l.carrier, l.tracking_no, l.source_type,
+               l.pickup_time, l.estimated_arrive_time, l.route_status, l.abnormal_flag,
+               l.route_available, l.route_provider, l.route_message, l.route_query_time,
+               (select max(route.route_time)
+                  from ry_business.ry_rental_logistics_route route
+                 where route.logistics_id = l.logistics_id
+                   and route.is_delete = 0) as last_route_time,
+               w.warehouse_name, l.fee_amount, l.update_time
+          from ry_business.ry_rental_logistics_order l
+          inner join ry_business.ry_rental_order o
+            on o.tenant_id = l.tenant_id
+           and o.member_id = l.member_id
+           and o.order_id = l.order_id
+           and o.is_delete = 0
+          left join ry_business.ry_rental_warehouse w
+            on w.tenant_id = l.tenant_id
+           and w.member_id = l.member_id
+           and w.warehouse_id = coalesce(l.warehouse_id,
+               case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end)
+           and w.is_delete = 0
+         where l.tenant_id = #{tenantId}
+           and l.member_id = #{memberId}
+           and l.is_delete = 0
+           <if test="query.keyword != null and query.keyword != ''">
+           and (o.order_no like concat('%', #{query.keyword}, '%')
+                or l.carrier like concat('%', #{query.keyword}, '%')
+                or l.tracking_no like concat('%', #{query.keyword}, '%'))
+           </if>
+           <if test="query.direction != null">
+           and l.direction = #{query.direction}
+           </if>
+           <if test="query.routeStatus != null">
+           and l.route_status = #{query.routeStatus}
+           </if>
+           <if test="query.abnormalOnly">
+           and l.abnormal_flag = 1
+           </if>
+           <if test="!query.allWarehouseAccess">
+             <choose>
+               <when test="query.warehouseIds != null and query.warehouseIds.size() > 0">
+                 and coalesce(l.warehouse_id,
+                     case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end) in
+                 <foreach collection="query.warehouseIds" item="warehouseId" open="(" separator="," close=")">
+                   #{warehouseId}
+                 </foreach>
+               </when>
+               <otherwise>
+                 and 1 = 0
+               </otherwise>
+             </choose>
+           </if>
+         order by l.abnormal_flag desc,
+                  l.route_query_time is null desc,
+                  l.update_time desc,
+                  l.logistics_id desc
+    </select>
+
+    <select id="selectOrderIdByOrderNo" resultType="java.lang.Long">
+        select order_id
+          from ry_business.ry_rental_order
+         where tenant_id = #{tenantId}
+           and member_id = #{memberId}
+           and order_no = #{orderNo}
+           and is_delete = 0
+         limit 1
+    </select>
+
+    <resultMap id="logisticsOrderTrackingRecord" type="com.ruoyi.rentalbusiness.domain.LogisticsOrderTrackingRecord">
+        <id property="logisticsId" column="logistics_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="orderId" column="order_id" />
+        <result property="direction" column="direction" />
+        <result property="orderNo" column="order_no" />
+        <result property="carrier" column="carrier" />
+        <result property="trackingNo" column="tracking_no" />
+        <result property="routeStatus" column="route_status" />
+        <result property="abnormalFlag" column="abnormal_flag" />
+        <result property="routeAvailable" column="route_available" />
+        <result property="routeProvider" column="route_provider" />
+        <result property="routeMessage" column="route_message" />
+        <result property="routeQueryTime" column="route_query_time" />
+        <result property="recipientPhone" column="recipient_phone" />
+        <result property="destinationAddress" column="destination_address" />
+    </resultMap>
+
+    <resultMap id="logisticsRouteRecord" type="com.ruoyi.rentalbusiness.domain.LogisticsRouteRecord">
+        <id property="routeId" column="route_id" />
+        <result property="logisticsId" column="logistics_id" />
+        <result property="trackingNo" column="tracking_no" />
+        <result property="routeStatus" column="route_status" />
+        <result property="routeDesc" column="route_desc" />
+        <result property="routeTime" column="route_time" />
+        <result property="province" column="province" />
+        <result property="city" column="city" />
+        <result property="rawJson" column="raw_json" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectCurrentLogistics" resultMap="logisticsOrderTrackingRecord">
+        select current_logistics.logistics_id, current_logistics.tenant_id, current_logistics.member_id,
+               current_logistics.order_id, current_logistics.direction, current_logistics.order_no,
+               current_logistics.carrier, current_logistics.tracking_no, current_logistics.route_status,
+               current_logistics.abnormal_flag, current_logistics.route_available,
+               current_logistics.route_provider, current_logistics.route_message,
+               current_logistics.route_query_time, current_logistics.recipient_phone,
+               current_logistics.destination_address
+        from (
+            /* 原订单列表会优先展示已接受子订单的物流，轨迹查询必须使用同一条记录。 */
+            select child_logistics.logistics_id, child_logistics.tenant_id, child_logistics.member_id,
+                   child_logistics.order_id, child_logistics.direction, child_order.order_no,
+                   child_logistics.carrier, child_logistics.tracking_no, child_logistics.route_status,
+                   child_logistics.abnormal_flag, child_logistics.route_available,
+                   child_logistics.route_provider, child_logistics.route_message,
+                   child_logistics.route_query_time, child_order.recipient_phone,
+                   case when child_logistics.direction = 2 then child_warehouse.address
+                        else child_order.recipient_address end as destination_address,
+                   0 as priority,
+                   child_logistics.create_time
+            from ry_business.ry_rental_logistics_order child_logistics
+            inner join ry_business.ry_rental_order_alliance alliance_link
+              on alliance_link.tenant_id = #{tenantId}
+             and alliance_link.source_member_id = #{memberId}
+             and alliance_link.source_order_id = #{orderId}
+             and alliance_link.child_order_id = child_logistics.order_id
+             and alliance_link.target_member_id = child_logistics.member_id
+             and alliance_link.child_order_id is not null
+             and alliance_link.is_delete = 0
+            inner join ry_business.ry_rental_order child_order
+              on child_order.tenant_id = child_logistics.tenant_id
+             and child_order.member_id = child_logistics.member_id
+             and child_order.order_id = child_logistics.order_id
+             and child_order.is_delete = 0
+            left join ry_business.ry_rental_warehouse child_warehouse
+              on child_warehouse.tenant_id = child_logistics.tenant_id
+             and child_warehouse.member_id = child_logistics.member_id
+             and child_warehouse.warehouse_id = coalesce(child_logistics.warehouse_id,
+                 case when child_logistics.direction = 2 then child_order.return_warehouse_id
+                      else child_order.warehouse_id end)
+             and child_warehouse.is_delete = 0
+            where child_logistics.tenant_id = #{tenantId}
+              and child_logistics.direction = #{direction}
+              and child_logistics.is_delete = 0
+            union all
+            select own_logistics.logistics_id, own_logistics.tenant_id, own_logistics.member_id,
+                   own_logistics.order_id, own_logistics.direction, own_order.order_no,
+                   own_logistics.carrier, own_logistics.tracking_no, own_logistics.route_status,
+                   own_logistics.abnormal_flag, own_logistics.route_available,
+                   own_logistics.route_provider, own_logistics.route_message,
+                   own_logistics.route_query_time, own_order.recipient_phone,
+                   case when own_logistics.direction = 2 then own_warehouse.address
+                        else own_order.recipient_address end as destination_address,
+                   1 as priority,
+                   own_logistics.create_time
+            from ry_business.ry_rental_logistics_order own_logistics
+            inner join ry_business.ry_rental_order own_order
+              on own_order.tenant_id = own_logistics.tenant_id
+             and own_order.member_id = own_logistics.member_id
+             and own_order.order_id = own_logistics.order_id
+             and own_order.is_delete = 0
+            left join ry_business.ry_rental_warehouse own_warehouse
+              on own_warehouse.tenant_id = own_logistics.tenant_id
+             and own_warehouse.member_id = own_logistics.member_id
+             and own_warehouse.warehouse_id = coalesce(own_logistics.warehouse_id,
+                 case when own_logistics.direction = 2 then own_order.return_warehouse_id
+                      else own_order.warehouse_id end)
+             and own_warehouse.is_delete = 0
+            where own_logistics.tenant_id = #{tenantId}
+              and own_logistics.member_id = #{memberId}
+              and own_logistics.order_id = #{orderId}
+              and own_logistics.direction = #{direction}
+              and own_logistics.is_delete = 0
+        ) current_logistics
+        order by current_logistics.priority, current_logistics.create_time desc,
+                 current_logistics.logistics_id desc
+        limit 1
+    </select>
+
+    <select id="selectCachedRoutes" resultMap="logisticsRouteRecord">
+        select r.route_id, r.logistics_id, r.tracking_no, r.route_status, r.route_desc,
+               r.route_time, r.province, r.city, r.raw_json, r.create_time
+        from ry_business.ry_rental_logistics_route r
+        inner join ry_business.ry_rental_logistics_order l
+          on l.logistics_id = r.logistics_id
+         and l.tenant_id = #{tenantId}
+         and l.member_id = #{memberId}
+         and l.is_delete = 0
+        where r.logistics_id = #{logisticsId}
+          and r.is_delete = 0
+        order by r.route_time desc, r.route_id desc
+    </select>
+
+    <select id="selectRefreshTargets" resultMap="logisticsOrderTrackingRecord">
+        select l.logistics_id, l.tenant_id, l.member_id, l.order_id, l.direction,
+               o.order_no, l.carrier, l.tracking_no, l.route_status, l.abnormal_flag,
+               l.route_available, l.route_provider, l.route_message, l.route_query_time,
+               o.recipient_phone,
+               case when l.direction = 2 then w.address else o.recipient_address end as destination_address
+        from ry_business.ry_rental_logistics_order l
+        inner join ry_business.ry_rental_order o
+          on o.tenant_id = l.tenant_id and o.member_id = l.member_id
+         and o.order_id = l.order_id and o.is_delete = 0
+        left join ry_business.ry_rental_warehouse w
+          on w.tenant_id = l.tenant_id and w.member_id = l.member_id
+         and w.warehouse_id = coalesce(l.warehouse_id,
+             case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end)
+         and w.is_delete = 0
+        where l.is_delete = 0
+          and l.direction in (1, 2)
+          and l.tracking_no is not null
+          and trim(l.tracking_no) &lt;&gt; ''
+          and coalesce(l.route_status, 0) not in (2, 4)
+          and (l.route_query_time is null
+               or l.route_query_time &lt;= date_sub(now(), interval 6 hour))
+        order by l.route_query_time is not null, l.route_query_time, l.logistics_id
+        limit #{limit}
+    </select>
+
+    <select id="selectLogisticsForRefresh" resultMap="logisticsOrderTrackingRecord">
+        select l.logistics_id, l.tenant_id, l.member_id, l.order_id, l.direction,
+               o.order_no, l.carrier, l.tracking_no, l.route_status, l.abnormal_flag,
+               l.route_available, l.route_provider, l.route_message, l.route_query_time,
+               o.recipient_phone,
+               case when l.direction = 2 then w.address else o.recipient_address end as destination_address
+        from ry_business.ry_rental_logistics_order l
+        inner join ry_business.ry_rental_order o
+          on o.tenant_id = l.tenant_id and o.member_id = l.member_id
+         and o.order_id = l.order_id and o.is_delete = 0
+        left join ry_business.ry_rental_warehouse w
+          on w.tenant_id = l.tenant_id and w.member_id = l.member_id
+         and w.warehouse_id = coalesce(l.warehouse_id,
+             case when l.direction = 2 then o.return_warehouse_id else o.warehouse_id end)
+         and w.is_delete = 0
+        where l.logistics_id = #{logisticsId}
+          and l.is_delete = 0
+        limit 1
+    </select>
+
+    <update id="deleteActiveRoutes">
+        update ry_business.ry_rental_logistics_route r
+        inner join ry_business.ry_rental_logistics_order l
+          on l.logistics_id = r.logistics_id
+        set r.is_delete = 1
+        where r.logistics_id = #{logisticsId}
+          and r.is_delete = 0
+          and l.tenant_id = #{tenantId}
+          and l.member_id = #{memberId}
+          and l.is_delete = 0
+    </update>
+
+    <insert id="insertRouteNodes">
+        insert into ry_business.ry_rental_logistics_route
+            (logistics_id, tracking_no, route_status, route_desc, route_time, province, city, raw_json,
+             create_time, is_delete)
+        values
+        <foreach collection="nodes" item="node" separator=",">
+            (#{node.logisticsId}, #{node.trackingNo}, #{node.routeStatus}, #{node.routeDesc},
+             #{node.routeTime}, #{node.province}, #{node.city}, nullif(trim(#{node.rawJson}), ''), now(), 0)
+        </foreach>
+    </insert>
+
+    <update id="updateRouteSnapshot">
+        update ry_business.ry_rental_logistics_order
+        set route_status = coalesce(#{routeStatus}, 0),
+            abnormal_flag = coalesce(#{abnormalFlag}, 0),
+            route_available = coalesce(#{routeAvailable}, 0),
+            route_provider = #{routeProvider},
+            route_message = #{routeMessage},
+            estimated_arrive_time = case
+                when #{estimatedArriveTime} is not null then #{estimatedArriveTime}
+                when coalesce(#{routeStatus}, 0) in (2, 4) then null
+                else estimated_arrive_time
+            end,
+            route_query_time = now(),
+            update_by = #{operatorId},
+            update_time = now()
+        where logistics_id = #{logisticsId}
+          and tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and is_delete = 0
+    </update>
+
+    <update id="resetRouteSnapshot">
+        update ry_business.ry_rental_logistics_order
+        set route_status = 0,
+            abnormal_flag = 0,
+            route_available = 0,
+            route_provider = null,
+            route_message = null,
+            estimated_arrive_time = null,
+            route_query_time = null,
+            update_by = #{operatorId},
+            update_time = now()
+        where logistics_id = #{logisticsId}
+          and tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and is_delete = 0
+    </update>
+
+    <insert id="insertProviderCallLog">
+        insert into ry_business.ry_rental_logistics_call_log
+            (tenant_id, member_id, order_id, logistics_id, direction, provider, carrier,
+             tracking_no_masked, tracking_no_hash, available, provider_status, route_status,
+             response_message, duration_ms, error_type, create_by, create_time, is_delete)
+        values
+            (#{record.tenantId}, #{record.memberId}, #{record.orderId}, #{record.logisticsId},
+             #{record.direction}, #{record.provider}, #{record.carrier}, #{record.trackingNoMasked},
+             #{record.trackingNoHash}, coalesce(#{record.available}, 0), #{record.providerStatus},
+             #{record.routeStatus}, #{record.responseMessage}, #{record.durationMs}, #{record.errorType},
+             #{record.operatorId}, now(), 0)
+    </insert>
+</mapper>

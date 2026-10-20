@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalUserWarehouseScopeMapper">
+
+    <select id="selectWarehouseIds" resultType="Long">
+        select warehouse_id
+        from `ry_rental`.`ry_rental_user_warehouse_scope`
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and merchant_user_id = #{merchantUserId}
+          and is_delete = 0
+        order by warehouse_id
+    </select>
+
+    <insert id="batchInsert">
+        insert into `ry_rental`.`ry_rental_user_warehouse_scope`(
+            tenant_id, member_id, merchant_user_id, warehouse_id, create_by, create_time, is_delete
+        ) values
+        <foreach collection="warehouseIds" item="warehouseId" separator=",">
+            (#{tenantId}, #{memberId}, #{merchantUserId}, #{warehouseId}, #{createBy}, sysdate(), 0)
+        </foreach>
+        on duplicate key update is_delete = 0, create_by = values(create_by), create_time = values(create_time)
+    </insert>
+
+    <update id="deleteByUser">
+        update `ry_rental`.`ry_rental_user_warehouse_scope` set is_delete = 1 where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and merchant_user_id = #{merchantUserId}
+    </update>
+
+</mapper>

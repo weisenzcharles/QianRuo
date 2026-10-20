@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.RentalCompensationRuleMapper">
+    <resultMap id="ruleResult" type="com.ruoyi.system.domain.rental.RentalCompensationRule">
+        <id property="ruleId" column="rule_id" />
+        <result property="ruleName" column="rule_name" />
+        <result property="disputeType" column="dispute_type" />
+        <result property="maxAmount" column="max_amount" />
+        <result property="priority" column="priority" />
+        <result property="status" column="status" />
+        <result property="isDelete" column="is_delete" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+    <select id="selectList" resultMap="ruleResult">
+        select rule_id, rule_name, dispute_type, max_amount, priority, status, is_delete,
+               create_by, create_time, update_by, update_time, remark
+        from ry_rental.ry_rental_compensation_rule
+        where is_delete = 0 order by priority asc, create_time desc, rule_id desc
+    </select>
+    <select id="selectById" resultMap="ruleResult">
+        select rule_id, rule_name, dispute_type, max_amount, priority, status, is_delete,
+               create_by, create_time, update_by, update_time, remark
+        from ry_rental.ry_rental_compensation_rule where rule_id = #{ruleId} and is_delete = 0
+    </select>
+    <select id="selectApplicable" resultMap="ruleResult">
+        select rule_id, rule_name, dispute_type, max_amount, priority, status, is_delete,
+               create_by, create_time, update_by, update_time, remark
+        from ry_rental.ry_rental_compensation_rule
+        where is_delete = 0 and status = 0 and (dispute_type = #{disputeType} or dispute_type = 0)
+        order by case when dispute_type = #{disputeType} then 0 else 1 end, priority asc, rule_id desc limit 1
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="ruleId">
+        insert into ry_rental.ry_rental_compensation_rule
+        (rule_name, dispute_type, max_amount, priority, status, create_by, create_time, remark, is_delete)
+        values (#{ruleName}, #{disputeType}, #{maxAmount}, #{priority}, #{status}, #{createBy}, sysdate(), #{remark}, 0)
+    </insert>
+    <update id="update">
+        update ry_rental.ry_rental_compensation_rule
+        set rule_name = #{ruleName}, dispute_type = #{disputeType}, max_amount = #{maxAmount},
+            priority = #{priority}, status = #{status}, update_by = #{updateBy}, update_time = sysdate(), remark = #{remark}
+        where rule_id = #{ruleId} and is_delete = 0
+    </update>
+    <update id="delete">
+        update ry_rental.ry_rental_compensation_rule
+        set is_delete = 1, remove_by = #{operator}, remove_time = sysdate(), update_by = #{operator}, update_time = sysdate()
+        where rule_id = #{ruleId} and is_delete = 0
+    </update>
+</mapper>

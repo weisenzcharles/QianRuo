@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantPaymentMapper">
+    <resultMap id="payment" type="com.ruoyi.merchant.model.MerchantPaymentRecord">
+        <id property="paymentId" column="payment_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="memberId" column="member_id" />
+        <result property="paymentNo" column="payment_no" />
+        <result property="bizType" column="biz_type" />
+        <result property="bizId" column="biz_id" />
+        <result property="bizNo" column="biz_no" />
+        <result property="subject" column="subject" />
+        <result property="amount" column="amount" />
+        <result property="paymentStatus" column="payment_status" />
+        <result property="alipayTradeNo" column="alipay_trade_no" />
+        <result property="notifyId" column="notify_id" />
+        <result property="paidTime" column="paid_time" />
+        <result property="expireTime" column="expire_time" />
+    </resultMap>
+
+    <insert id="insertPaymentOrder">
+        insert into ry_rental.ry_rental_payment_order
+            (tenant_id, member_id, payment_no, biz_type, biz_id, biz_no, subject, amount,
+             payment_status, expire_time, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{paymentNo}, #{bizType}, #{bizId}, #{bizNo}, #{subject}, #{amount},
+                #{pendingStatus}, #{expireTime}, #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <select id="selectByPaymentNoForUpdate" resultMap="payment">
+        select payment_id, tenant_id, member_id, payment_no, biz_type, biz_id, biz_no, subject, amount,
+               payment_status, alipay_trade_no, notify_id, paid_time, expire_time
+        from ry_rental.ry_rental_payment_order
+        where payment_no = #{paymentNo} and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <select id="selectByPaymentNo" resultMap="payment">
+        select payment_id, tenant_id, member_id, payment_no, biz_type, biz_id, biz_no, subject, amount,
+               payment_status, alipay_trade_no, notify_id, paid_time, expire_time
+        from ry_rental.ry_rental_payment_order
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and payment_no = #{paymentNo} and is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectLatestByBusinessForUpdate" resultMap="payment">
+        select payment_id, tenant_id, member_id, payment_no, biz_type, biz_id, biz_no, subject, amount,
+               payment_status, alipay_trade_no, notify_id, paid_time, expire_time
+        from ry_rental.ry_rental_payment_order
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and biz_type = #{bizType} and biz_id = #{bizId} and is_delete = 0
+        order by payment_id desc
+        limit 1 for update
+    </select>
+
+    <select id="countFinanceLedgerByNoForUpdate" resultType="int">
+        select count(1)
+        from ry_rental.ry_rental_finance_ledger
+        where tenant_id = #{tenantId}
+          and member_id = #{memberId}
+          and ledger_no = #{ledgerNo}
+          and is_delete = 0
+        for update
+    </select>
+
+    <update id="closeExpiredPayment">
+        update ry_rental.ry_rental_payment_order
+        set payment_status = #{closedStatus}, update_time = now()
+        where payment_id = #{paymentId} and payment_status = #{unpaidStatus} and is_delete = 0
+    </update>
+
+    <update id="markPaid">
+        update ry_rental.ry_rental_payment_order
+        set payment_status = #{paidStatus},
+            alipay_trade_no = #{alipayTradeNo},
+            notify_id = #{notifyId},
+            paid_time = now(),
+            update_time = now()
+        where payment_id = #{paymentId} and payment_status = #{pendingStatus} and is_delete = 0
+    </update>
+
+    <select id="selectAvailableBalanceForUpdate" resultType="java.math.BigDecimal">
+        select coalesce(sum(case when direction = #{incomeCode} then amount
+                                 when direction = #{expenseCode} then -amount
+                                 when direction = #{unfreezeCode} then amount
+                                 when direction = #{reverseCode} then -amount
+                                 else 0 end), 0)
+        from ry_rental.ry_rental_finance_ledger
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and account_type = #{accountType}
+          and ledger_status = #{successStatus} and is_delete = 0
+    </select>
+
+    <insert id="insertFinanceLedger">
+        insert into ry_rental.ry_rental_finance_ledger
+            (tenant_id, member_id, account_type, ledger_no, direction, biz_type, amount, balance_after,
+             ref_type, ref_id, pay_channel, pay_order_no, ledger_status, create_by, create_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{accountType}, #{ledgerNo}, #{direction}, #{bizType}, #{amount}, #{balanceAfter},
+                #{refType}, #{refId}, #{payChannel}, #{payOrderNo}, #{ledgerStatus}, #{operatorId}, now(), #{remark}, 0)
+    </insert>
+
+    <insert id="upsertAccountBalance">
+        insert into ry_rental.ry_rental_finance_account
+            (tenant_id, member_id, account_type, available_amount, frozen_amount, account_status,
+             version, create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{accountType}, #{amount}, 0.00, 1,
+                0, #{operatorId}, now(), #{operatorId}, now(), 0)
+        on duplicate key update
+            available_amount = available_amount + #{amount},
+            account_status = 1,
+            version = version + 1,
+            update_by = #{operatorId},
+            update_time = now()
+    </insert>
+</mapper>

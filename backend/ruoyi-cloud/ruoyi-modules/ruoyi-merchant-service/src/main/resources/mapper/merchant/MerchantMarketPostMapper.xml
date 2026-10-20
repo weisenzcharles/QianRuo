@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantMarketPostMapper">
+    <sql id="postColumns">
+        post_id, post_no, board_type, category, brand, model_name, memory_spec,
+        condition_level, quantity, price_range_code, city, service_tags,
+        recent_30d_turnover, idle_qty, rented_qty, long_idle_qty, post_status,
+        down_rank_flag,
+        date_format(create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+        date_format(update_time, '%Y-%m-%d %H:%i:%s') as update_time, remark
+    </sql>
+
+    <sql id="publicPostColumns">
+        p.post_id, p.member_id, p.post_no, p.board_type,
+        coalesce(nullif(m.nickname, ''), nullif(m.legal_subject_name, ''), m.member_code, '未知商户') as publisher_name,
+        p.category, p.brand, p.model_name, p.memory_spec, p.condition_level, p.quantity,
+        p.price_range_code, p.city, p.service_tags, p.recent_30d_turnover,
+        p.idle_qty, p.rented_qty, p.long_idle_qty, p.post_status, p.down_rank_flag,
+        date_format(p.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+        date_format(p.update_time, '%Y-%m-%d %H:%i:%s') as update_time, p.remark
+    </sql>
+
+    <select id="selectList" resultType="com.ruoyi.merchant.model.MerchantMarketPostRecord">
+        select <include refid="postColumns" />
+        from ry_rental.ry_rental_market_post
+        where tenant_id = #{tenantId} and member_id = #{memberId} and is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (post_no like concat('%', #{keyword}, '%')
+              or brand like concat('%', #{keyword}, '%')
+              or model_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="boardType != null">and board_type = #{boardType}</if>
+        <if test="postStatus != null">and post_status = #{postStatus}</if>
+        <if test="city != null and city != ''">and city like concat('%', #{city}, '%')</if>
+        order by create_time desc, post_id desc
+    </select>
+
+    <select id="selectByPostNo" resultType="com.ruoyi.merchant.model.MerchantMarketPostRecord">
+        select <include refid="postColumns" />
+        from ry_rental.ry_rental_market_post
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and post_no = #{postNo} and is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectPublicList" resultType="com.ruoyi.merchant.model.MerchantMarketPostRecord">
+        select <include refid="publicPostColumns" />
+        from ry_rental.ry_rental_market_post p
+        inner join ry_rental.ry_rental_member m on m.member_id = p.member_id and m.is_delete = 0
+        where p.member_id &lt;&gt; #{memberId} and p.post_status = 1 and p.is_delete = 0
+        <if test="keyword != null and keyword != ''">
+            and (p.post_no like concat('%', #{keyword}, '%')
+              or p.brand like concat('%', #{keyword}, '%')
+              or p.model_name like concat('%', #{keyword}, '%')
+              or m.nickname like concat('%', #{keyword}, '%')
+              or m.legal_subject_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="boardType != null">and p.board_type = #{boardType}</if>
+        <if test="city != null and city != ''">and p.city like concat('%', #{city}, '%')</if>
+        order by p.down_rank_flag asc, p.recent_30d_turnover desc, p.create_time desc, p.post_id desc
+    </select>
+
+    <select id="selectPublicByPostNo" resultType="com.ruoyi.merchant.model.MerchantMarketPostRecord">
+        select <include refid="publicPostColumns" />
+        from ry_rental.ry_rental_market_post p
+        inner join ry_rental.ry_rental_member m on m.member_id = p.member_id and m.is_delete = 0
+        where p.post_no = #{postNo} and p.post_status = 1 and p.is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectByPostNoForUpdate" resultType="com.ruoyi.merchant.model.MerchantMarketPostRecord">
+        select <include refid="postColumns" />
+        from ry_rental.ry_rental_market_post
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and post_no = #{postNo} and is_delete = 0
+        limit 1 for update
+    </select>
+
+    <insert id="insert">
+        insert into ry_rental.ry_rental_market_post
+            (tenant_id, member_id, board_type, post_no, category, brand, model_name, memory_spec,
+             condition_level, quantity, price_range_code, city, service_tags,
+             recent_30d_turnover, idle_qty, rented_qty, long_idle_qty, post_status,
+             down_rank_flag, create_by, create_time, update_by, update_time, remark, is_delete)
+        values (#{tenantId}, #{memberId}, #{boardType}, #{postNo}, #{category}, #{brand}, #{modelName}, #{memorySpec},
+                #{conditionLevel}, #{quantity}, #{priceRangeCode}, #{city}, #{serviceTags},
+                0, 0, 0, 0, 0, 0, #{operatorId}, now(), #{operatorId}, now(), #{remark}, 0)
+    </insert>
+
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <select id="selectInventoryUnitIds" resultType="long">
+        select unit_id
+        from ry_rental.ry_rental_market_post_inventory
+        where post_id = #{postId} and is_delete = 0
+        order by post_inventory_id
+    </select>
+
+    <update id="removeInventoryBindings">
+        update ry_rental.ry_rental_market_post_inventory
+        set is_delete = 1, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and post_id = #{postId} and is_delete = 0
+    </update>
+
+    <insert id="insertInventoryBinding">
+        insert into ry_rental.ry_rental_market_post_inventory
+            (tenant_id, member_id, post_id, unit_id, unit_code, serial_number,
+             create_by, create_time, update_by, update_time, is_delete)
+        values (#{tenantId}, #{memberId}, #{postId}, #{unitId}, #{unitCode}, #{serialNumber},
+                #{operatorId}, now(), #{operatorId}, now(), 0)
+    </insert>
+
+    <update id="updateDraft">
+        update ry_rental.ry_rental_market_post
+        set board_type = #{boardType}, category = #{category}, brand = #{brand}, model_name = #{modelName},
+            memory_spec = #{memorySpec}, condition_level = #{conditionLevel}, quantity = #{quantity},
+            price_range_code = #{priceRangeCode}, city = #{city}, service_tags = #{serviceTags},
+            update_by = #{operatorId}, update_time = now(), remark = #{remark}
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and post_no = #{postNo} and is_delete = 0
+          and post_status in (0, 3)
+    </update>
+
+    <update id="updateStatus">
+        update ry_rental.ry_rental_market_post
+        set post_status = #{postStatus}, update_by = #{operatorId}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and post_no = #{postNo} and is_delete = 0
+    </update>
+
+    <select id="selectMessages" resultType="com.ruoyi.merchant.model.MerchantMarketMessageRecord">
+        select msg.message_id, p.post_no,
+               coalesce(nullif(sender.nickname, ''), nullif(sender.legal_subject_name, ''), sender.member_code, '未知商户') as from_merchant_name,
+               coalesce(nullif(receiver.nickname, ''), nullif(receiver.legal_subject_name, ''), receiver.member_code, '未知商户') as to_merchant_name,
+               msg.message_content, msg.read_flag, msg.risk_flag,
+               date_format(msg.create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from ry_rental.ry_rental_market_message msg
+        inner join ry_rental.ry_rental_market_post p on p.post_id = msg.post_id and p.is_delete = 0
+        left join ry_rental.ry_rental_member sender on sender.member_id = msg.from_member_id and sender.is_delete = 0
+        left join ry_rental.ry_rental_member receiver on receiver.member_id = msg.to_member_id and receiver.is_delete = 0
+        where msg.is_delete = 0
+          and (msg.from_member_id = #{memberId} or msg.to_member_id = #{memberId})
+        <if test="readFlag != null">and msg.read_flag = #{readFlag}</if>
+        <if test="keyword != null and keyword != ''">
+            and (p.post_no like concat('%', #{keyword}, '%')
+              or msg.message_content like concat('%', #{keyword}, '%')
+              or sender.nickname like concat('%', #{keyword}, '%')
+              or receiver.nickname like concat('%', #{keyword}, '%'))
+        </if>
+        order by msg.create_time desc, msg.message_id desc
+    </select>
+
+    <insert id="insertMessage">
+        insert into ry_rental.ry_rental_market_message
+            (tenant_id, post_id, from_member_id, to_member_id, message_content, read_flag, risk_flag, create_time, is_delete)
+        values (#{tenantId}, #{postId}, #{fromMemberId}, #{toMemberId}, #{content}, 0, 0, now(), 0)
+    </insert>
+
+    <update id="markMessageRead">
+        update ry_rental.ry_rental_market_message
+        set read_flag = 1
+        where message_id = #{messageId} and to_member_id = #{memberId} and is_delete = 0
+    </update>
+
+    <select id="selectReports" resultType="com.ruoyi.merchant.model.MerchantMarketReportRecord">
+        select r.report_id, p.post_no,
+               coalesce(nullif(reported.nickname, ''), nullif(reported.legal_subject_name, ''), reported.member_code, '未知商户') as reported_merchant_name,
+               r.report_type, cast(r.evidence_json as char) as evidence, r.report_status, r.review_result,
+               date_format(r.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(r.review_time, '%Y-%m-%d %H:%i:%s') as review_time
+        from ry_rental.ry_rental_market_report r
+        inner join ry_rental.ry_rental_market_post p on p.post_id = r.post_id
+        left join ry_rental.ry_rental_member reported on reported.member_id = r.reported_member_id and reported.is_delete = 0
+        where r.reporter_member_id = #{memberId} and r.is_delete = 0
+        order by r.create_time desc, r.report_id desc
+    </select>
+
+    <select id="selectPendingReport" resultType="com.ruoyi.merchant.model.MerchantMarketReportRecord">
+        select report_id, report_type, report_status
+        from ry_rental.ry_rental_market_report
+        where post_id = #{postId} and reporter_member_id = #{reporterMemberId}
+          and report_type = #{reportType} and report_status = 0 and is_delete = 0
+        limit 1
+    </select>
+
+    <insert id="insertReport">
+        insert into ry_rental.ry_rental_market_report
+            (tenant_id, post_id, reporter_member_id, reported_member_id, report_type, evidence_json,
+             report_status, create_time, is_delete)
+        values (#{tenantId}, #{postId}, #{reporterMemberId}, #{reportedMemberId}, #{reportType},
+                #{evidenceJson}, 0, now(), 0)
+    </insert>
+</mapper>

@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformFinanceMapper">
+
+    <sql id="ledgerColumns">
+        l.ledger_no,
+        l.member_id,
+        COALESCE(m.member_code, '平台') AS member_code,
+        COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code, '平台') AS merchant_name,
+        l.account_type,
+        l.direction,
+        l.biz_type,
+        l.amount,
+        l.balance_after,
+        l.ref_type,
+        l.pay_channel,
+        l.pay_order_no,
+        l.invoice_status,
+        l.ledger_status,
+        original_ledger.ledger_no AS original_ledger_no,
+        DATE_FORMAT(l.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+        l.remark
+    </sql>
+
+    <select id="selectSummary" resultType="map">
+        SELECT
+            COALESCE(SUM(CASE WHEN l.direction = 1 AND l.ledger_status = 1 THEN l.amount ELSE 0 END), 0) AS totalIncome,
+            COALESCE(SUM(CASE WHEN l.direction = 2 AND l.ledger_status = 1 THEN l.amount ELSE 0 END), 0) AS totalExpense,
+            COALESCE(SUM(CASE
+                WHEN l.direction = 1 AND l.ledger_status = 1 THEN l.amount
+                WHEN l.direction = 2 AND l.ledger_status = 1 THEN -l.amount
+                WHEN l.direction = 4 AND l.ledger_status = 1 THEN l.amount
+                WHEN l.direction = 5 AND l.ledger_status = 1 THEN -l.amount
+                ELSE 0 END), 0) AS netAmount,
+            COALESCE((SELECT SUM(a.frozen_amount)
+                FROM `ry_rental`.`ry_rental_finance_account` a
+                WHERE a.is_delete = 0), 0) AS frozenAmount,
+            COALESCE(SUM(CASE WHEN l.direction = 1 AND l.ledger_status = 1 AND l.create_time &gt;= #{monthStart} THEN l.amount ELSE 0 END), 0) AS monthIncome,
+            COALESCE(SUM(CASE WHEN l.direction = 2 AND l.ledger_status = 1 AND l.create_time &gt;= #{monthStart} THEN l.amount ELSE 0 END), 0) AS monthExpense,
+            COALESCE(SUM(CASE WHEN l.invoice_status = 0 THEN 1 ELSE 0 END), 0) AS pendingInvoiceCount,
+            COALESCE(SUM(CASE WHEN l.ledger_status IN (2, 3) THEN 1 ELSE 0 END), 0) AS abnormalLedgerCount,
+            (SELECT COUNT(1) FROM `ry_rental`.`ry_rental_member` m WHERE m.is_delete = 0) AS merchantCount,
+            (SELECT COUNT(1) FROM `ry_rental`.`ry_rental_payment_order` p WHERE p.is_delete = 0) AS paymentOrderCount,
+            (SELECT COUNT(1) FROM `ry_rental`.`ry_rental_payment_order` p WHERE p.is_delete = 0 AND p.payment_status = 0) AS unpaidPaymentCount,
+            (SELECT COALESCE(SUM(CASE WHEN p.payment_status = 1 THEN p.amount ELSE 0 END), 0)
+               FROM `ry_rental`.`ry_rental_payment_order` p WHERE p.is_delete = 0) AS paidPaymentAmount,
+            (SELECT COALESCE(SUM(CASE WHEN p.payment_status = 0 THEN p.amount ELSE 0 END), 0)
+               FROM `ry_rental`.`ry_rental_payment_order` p WHERE p.is_delete = 0) AS unpaidPaymentAmount
+        FROM `ry_rental`.`ry_rental_finance_ledger` l
+        WHERE l.is_delete = 0
+    </select>
+
+    <select id="countPendingWithdrawals" resultType="int">
+        SELECT COUNT(1)
+        FROM `ry_rental`.`ry_rental_finance_withdrawal`
+        WHERE is_delete = 0 AND withdrawal_status = 0
+    </select>
+
+    <select id="selectAccounts" resultType="com.ruoyi.system.model.rental.PlatformFinanceAccountVO">
+        SELECT
+            m.member_code,
+            COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code) AS merchant_name,
+            m.legal_subject_name,
+            COALESCE(a.value_added_available_amount, 0)
+              + COALESCE(a.rental_settlement_available_amount, 0)
+              + COALESCE(d.performance_deposit_available_amount, 0) AS available_amount,
+            COALESCE(a.value_added_frozen_amount, 0)
+              + COALESCE(a.rental_settlement_frozen_amount, 0)
+              + COALESCE(d.performance_deposit_frozen_amount, 0) AS frozen_amount,
+            COALESCE(a.value_added_available_amount, 0) AS value_added_available_amount,
+            COALESCE(d.performance_deposit_available_amount, 0) AS performance_deposit_available_amount,
+            COALESCE(d.performance_deposit_frozen_amount, 0) AS performance_deposit_frozen_amount,
+            COALESCE(a.rental_settlement_available_amount, 0) AS rental_settlement_available_amount,
+            COALESCE(a.rental_settlement_frozen_amount, 0) AS rental_settlement_frozen_amount,
+            COALESCE(l.total_income, 0) AS total_income,
+            COALESCE(l.total_expense, 0) AS total_expense,
+            COALESCE(l.pending_invoice_count, 0) AS pending_invoice_count,
+            COALESCE(l.abnormal_ledger_count, 0) AS abnormal_ledger_count
+        FROM `ry_rental`.`ry_rental_member` m
+        LEFT JOIN (
+            SELECT tenant_id, member_id,
+                   SUM(CASE WHEN account_type = 1 THEN available_amount ELSE 0 END) AS value_added_available_amount,
+                   SUM(CASE WHEN account_type = 1 THEN frozen_amount ELSE 0 END) AS value_added_frozen_amount,
+                   SUM(CASE WHEN account_type = 3 THEN available_amount ELSE 0 END) AS rental_settlement_available_amount,
+                   SUM(CASE WHEN account_type = 3 THEN frozen_amount ELSE 0 END) AS rental_settlement_frozen_amount
+            FROM `ry_rental`.`ry_rental_finance_account`
+            WHERE is_delete = 0
+            GROUP BY tenant_id, member_id
+        ) a ON a.tenant_id = m.tenant_id AND a.member_id = m.member_id
+        LEFT JOIN (
+            SELECT tenant_id, member_id,
+                   SUM(CASE WHEN direction = 1 AND ledger_status = 1 THEN amount ELSE 0 END) AS total_income,
+                   SUM(CASE WHEN direction = 2 AND ledger_status = 1 THEN amount ELSE 0 END) AS total_expense,
+                   SUM(CASE WHEN invoice_status = 0 THEN 1 ELSE 0 END) AS pending_invoice_count,
+                   SUM(CASE WHEN ledger_status IN (2, 3) THEN 1 ELSE 0 END) AS abnormal_ledger_count
+            FROM `ry_rental`.`ry_rental_finance_ledger`
+            WHERE is_delete = 0
+            GROUP BY tenant_id, member_id
+        ) l ON l.tenant_id = m.tenant_id AND l.member_id = m.member_id
+        LEFT JOIN (
+            SELECT tenant_id, member_id,
+                   SUM(CASE WHEN account_type = 2 THEN available_amount ELSE 0 END) AS performance_deposit_available_amount,
+                   SUM(CASE WHEN account_type = 2 THEN frozen_amount ELSE 0 END) AS performance_deposit_frozen_amount
+            FROM `ry_rental`.`ry_rental_finance_account`
+            WHERE is_delete = 0
+            GROUP BY tenant_id, member_id
+        ) d ON d.tenant_id = m.tenant_id AND d.member_id = m.member_id
+        <where>
+            m.is_delete = 0
+            <if test="query.merchantKeyword != null and query.merchantKeyword != ''">
+                AND (m.member_code LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.nickname LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.legal_subject_name LIKE CONCAT('%', #{query.merchantKeyword}, '%'))
+            </if>
+        </where>
+        ORDER BY m.create_time DESC, m.member_id DESC
+    </select>
+
+    <sql id="withdrawalColumns">
+        w.withdrawal_no,
+        m.member_code,
+        COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code) AS merchant_name,
+        w.amount,
+        w.fee,
+        w.actual_amount,
+        w.withdrawal_channel,
+        w.payee_name,
+        CASE
+            WHEN CHAR_LENGTH(w.payee_account) &lt;= 7 THEN '******'
+            ELSE CONCAT(LEFT(w.payee_account, 3), '****', RIGHT(w.payee_account, 4))
+        END AS payee_account,
+        w.withdrawal_status,
+        w.review_remark,
+        DATE_FORMAT(w.review_time, '%Y-%m-%d %H:%i:%s') AS review_time,
+        DATE_FORMAT(w.paid_time, '%Y-%m-%d %H:%i:%s') AS paid_time,
+        DATE_FORMAT(w.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+        w.remark
+    </sql>
+
+    <select id="selectWithdrawals" resultType="com.ruoyi.system.model.rental.PlatformFinanceWithdrawalVO">
+        SELECT
+            <include refid="withdrawalColumns" />
+        FROM `ry_rental`.`ry_rental_finance_withdrawal` w
+        LEFT JOIN `ry_rental`.`ry_rental_member` m
+          ON m.tenant_id = w.tenant_id AND m.member_id = w.member_id AND m.is_delete = 0
+        <where>
+            w.is_delete = 0
+            <if test="query.withdrawalNo != null and query.withdrawalNo != ''">
+                AND w.withdrawal_no LIKE CONCAT('%', #{query.withdrawalNo}, '%')
+            </if>
+            <if test="query.merchantKeyword != null and query.merchantKeyword != ''">
+                AND (m.member_code LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.nickname LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.legal_subject_name LIKE CONCAT('%', #{query.merchantKeyword}, '%'))
+            </if>
+            <if test="query.withdrawalStatus != null">AND w.withdrawal_status = #{query.withdrawalStatus}</if>
+            <if test="query.beginTime != null and query.beginTime != ''">AND w.create_time &gt;= #{query.beginTime}</if>
+            <if test="query.endTime != null and query.endTime != ''">AND w.create_time &lt;= #{query.endTime}</if>
+        </where>
+        ORDER BY w.create_time DESC, w.withdrawal_id DESC
+    </select>
+
+    <select id="selectWithdrawalByNo" resultType="com.ruoyi.system.model.rental.PlatformFinanceWithdrawalVO">
+        SELECT
+            <include refid="withdrawalColumns" />
+        FROM `ry_rental`.`ry_rental_finance_withdrawal` w
+        LEFT JOIN `ry_rental`.`ry_rental_member` m
+          ON m.tenant_id = w.tenant_id AND m.member_id = w.member_id AND m.is_delete = 0
+        WHERE w.is_delete = 0 AND w.withdrawal_no = #{withdrawalNo}
+        LIMIT 1
+    </select>
+
+    <select id="selectWithdrawalForUpdate" resultType="map">
+        SELECT withdrawal_id AS withdrawalId, tenant_id AS tenantId, member_id AS memberId,
+               account_id AS accountId, account_type AS accountType,
+               amount, withdrawal_channel AS withdrawalChannel,
+               withdrawal_status AS withdrawalStatus
+        FROM `ry_rental`.`ry_rental_finance_withdrawal`
+        WHERE withdrawal_no = #{withdrawalNo} AND is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <select id="selectAccountForUpdate" resultType="map">
+        SELECT account_id AS accountId, available_amount AS availableAmount,
+               frozen_amount AS frozenAmount, version, account_status AS accountStatus
+        FROM `ry_rental`.`ry_rental_finance_account`
+        WHERE tenant_id = #{tenantId} AND member_id = #{memberId}
+          AND account_type = #{accountType} AND is_delete = 0
+        LIMIT 1 FOR UPDATE
+    </select>
+
+    <update id="updateAccount">
+        UPDATE `ry_rental`.`ry_rental_finance_account`
+        SET available_amount = #{availableAmount}, frozen_amount = #{frozenAmount},
+            version = version + 1, update_by = #{operatorId}, update_time = NOW()
+        WHERE account_id = #{accountId} AND version = #{version}
+          AND account_status = 1 AND is_delete = 0
+    </update>
+
+    <update id="updateWithdrawal">
+        UPDATE `ry_rental`.`ry_rental_finance_withdrawal`
+        SET withdrawal_status = #{withdrawalStatus}, review_remark = #{reviewRemark},
+            reviewer_id = #{reviewerId}, review_time = NOW(),
+            paid_time = CASE WHEN #{withdrawalStatus} = 1 THEN NOW() ELSE NULL END,
+            update_by = #{reviewerId}, update_time = NOW()
+        WHERE withdrawal_id = #{withdrawalId} AND withdrawal_status = 0 AND is_delete = 0
+    </update>
+
+    <insert id="insertWithdrawalLedger">
+        INSERT INTO `ry_rental`.`ry_rental_finance_ledger`
+            (tenant_id, member_id, account_type, ledger_no, direction, biz_type, amount, balance_after,
+             ref_type, ref_id, pay_channel, pay_order_no, ledger_status, create_by, create_time, remark, is_delete)
+        VALUES
+            (#{tenantId}, #{memberId}, #{accountType}, #{ledgerNo}, #{direction}, 'withdrawal', #{amount}, #{balanceAfter},
+             'withdrawal', #{refId}, #{payChannel}, #{payOrderNo}, 1, #{operatorId}, NOW(), #{remark}, 0)
+    </insert>
+
+    <select id="selectLedger" resultType="com.ruoyi.system.model.rental.PlatformFinanceLedgerVO">
+        SELECT
+            <include refid="ledgerColumns" />
+        FROM `ry_rental`.`ry_rental_finance_ledger` l
+        LEFT JOIN `ry_rental`.`ry_rental_member` m
+          ON m.tenant_id = l.tenant_id AND m.member_id = l.member_id AND m.is_delete = 0
+        LEFT JOIN `ry_rental`.`ry_rental_finance_ledger` original_ledger
+          ON original_ledger.ledger_id = l.original_ledger_id AND original_ledger.is_delete = 0
+        <where>
+            l.is_delete = 0
+            <if test="query.ledgerNo != null and query.ledgerNo != ''">AND l.ledger_no LIKE CONCAT('%', #{query.ledgerNo}, '%')</if>
+            <if test="query.accountType != null">AND l.account_type = #{query.accountType}</if>
+            <if test="query.merchantKeyword != null and query.merchantKeyword != ''">
+                AND (m.member_code LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.nickname LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.legal_subject_name LIKE CONCAT('%', #{query.merchantKeyword}, '%'))
+            </if>
+            <if test="query.direction != null">AND l.direction = #{query.direction}</if>
+            <if test="query.bizType != null and query.bizType != ''">AND l.biz_type = #{query.bizType}</if>
+            <if test="query.ledgerStatus != null">AND l.ledger_status = #{query.ledgerStatus}</if>
+            <if test="query.invoiceStatus != null">AND l.invoice_status = #{query.invoiceStatus}</if>
+            <if test="query.beginTime != null and query.beginTime != ''">AND l.create_time &gt;= #{query.beginTime}</if>
+            <if test="query.endTime != null and query.endTime != ''">AND l.create_time &lt;= #{query.endTime}</if>
+            <if test="query.scene == 'value-added'">
+                AND (LOWER(COALESCE(l.biz_type, '')) LIKE '%service%'
+                  OR LOWER(COALESCE(l.biz_type, '')) LIKE '%storage%'
+                  OR LOWER(COALESCE(l.biz_type, '')) LIKE '%recharge%'
+                  OR LOWER(COALESCE(l.biz_type, '')) LIKE '%增值%'
+                  OR LOWER(COALESCE(l.ref_type, '')) LIKE '%service%')
+            </if>
+            <if test="query.scene == 'shipping'">
+                AND (LOWER(COALESCE(l.biz_type, '')) LIKE '%express%'
+                  OR LOWER(COALESCE(l.biz_type, '')) LIKE '%shipping%'
+                  OR LOWER(COALESCE(l.biz_type, '')) LIKE '%delivery%'
+                  OR LOWER(COALESCE(l.biz_type, '')) LIKE '%快递%'
+                  OR LOWER(COALESCE(l.biz_type, '')) LIKE '%物流%')
+            </if>
+            <if test="query.scene == 'withdrawal'">
+                AND (LOWER(COALESCE(l.biz_type, '')) LIKE '%withdraw%' OR LOWER(COALESCE(l.biz_type, '')) LIKE '%提现%')
+            </if>
+            <if test="query.scene == 'invoice'">AND l.invoice_status IS NOT NULL</if>
+            <if test="query.scene == 'book'">AND l.ref_type IS NOT NULL AND l.ref_type &lt;&gt; ''</if>
+        </where>
+        ORDER BY l.create_time DESC, l.ledger_id DESC
+    </select>
+
+    <select id="selectLedgerByNo" resultType="com.ruoyi.system.model.rental.PlatformFinanceLedgerVO">
+        SELECT
+            <include refid="ledgerColumns" />
+        FROM `ry_rental`.`ry_rental_finance_ledger` l
+        LEFT JOIN `ry_rental`.`ry_rental_member` m
+          ON m.tenant_id = l.tenant_id AND m.member_id = l.member_id AND m.is_delete = 0
+        LEFT JOIN `ry_rental`.`ry_rental_finance_ledger` original_ledger
+          ON original_ledger.ledger_id = l.original_ledger_id AND original_ledger.is_delete = 0
+        WHERE l.is_delete = 0 AND l.ledger_no = #{ledgerNo}
+    </select>
+
+    <select id="selectPaymentOrders" resultType="com.ruoyi.system.model.rental.PlatformPaymentOrderVO">
+        SELECT
+            p.payment_no,
+            COALESCE(m.member_code, '平台') AS member_code,
+            COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code, '平台') AS merchant_name,
+            p.biz_type,
+            p.biz_no,
+            p.subject,
+            p.amount,
+            p.payment_status,
+            p.alipay_trade_no,
+            DATE_FORMAT(p.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+            DATE_FORMAT(p.expire_time, '%Y-%m-%d %H:%i:%s') AS expire_time,
+            DATE_FORMAT(p.paid_time, '%Y-%m-%d %H:%i:%s') AS paid_time,
+            p.remark
+        FROM `ry_rental`.`ry_rental_payment_order` p
+        LEFT JOIN `ry_rental`.`ry_rental_member` m
+          ON m.tenant_id = p.tenant_id AND m.member_id = p.member_id AND m.is_delete = 0
+        <where>
+            p.is_delete = 0
+            <if test="query.paymentNo != null and query.paymentNo != ''">AND p.payment_no LIKE CONCAT('%', #{query.paymentNo}, '%')</if>
+            <if test="query.merchantKeyword != null and query.merchantKeyword != ''">
+                AND (m.member_code LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.nickname LIKE CONCAT('%', #{query.merchantKeyword}, '%')
+                  OR m.legal_subject_name LIKE CONCAT('%', #{query.merchantKeyword}, '%'))
+            </if>
+            <if test="query.bizType != null and query.bizType != ''">AND p.biz_type = #{query.bizType}</if>
+            <if test="query.paymentStatus != null">AND p.payment_status = #{query.paymentStatus}</if>
+            <if test="query.beginTime != null and query.beginTime != ''">AND p.create_time &gt;= #{query.beginTime}</if>
+            <if test="query.endTime != null and query.endTime != ''">AND p.create_time &lt;= #{query.endTime}</if>
+        </where>
+        ORDER BY p.create_time DESC, p.payment_id DESC
+    </select>
+
+    <select id="selectPaymentOrderByNo" resultType="com.ruoyi.system.model.rental.PlatformPaymentOrderVO">
+        SELECT
+            p.payment_no,
+            COALESCE(m.member_code, '平台') AS member_code,
+            COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code, '平台') AS merchant_name,
+            p.biz_type,
+            p.biz_no,
+            p.subject,
+            p.amount,
+            p.payment_status,
+            p.alipay_trade_no,
+            DATE_FORMAT(p.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+            DATE_FORMAT(p.expire_time, '%Y-%m-%d %H:%i:%s') AS expire_time,
+            DATE_FORMAT(p.paid_time, '%Y-%m-%d %H:%i:%s') AS paid_time,
+            p.remark
+        FROM `ry_rental`.`ry_rental_payment_order` p
+        LEFT JOIN `ry_rental`.`ry_rental_member` m
+          ON m.tenant_id = p.tenant_id AND m.member_id = p.member_id AND m.is_delete = 0
+        WHERE p.is_delete = 0 AND p.payment_no = #{paymentNo}
+    </select>
+
+</mapper>

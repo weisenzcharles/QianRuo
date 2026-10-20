@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.rental.PlatformWorkbenchMapper">
+
+    <select id="countOpenRiskTasks" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_platform_operations_risk_event
+        WHERE is_delete = 0 AND event_status IN (0, 1)
+    </select>
+
+    <select id="countOpenTicketTasks" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_service_ticket
+        WHERE is_delete = 0 AND ticket_status NOT IN (5, 6, 7)
+    </select>
+
+    <select id="countPendingWithdrawalTasks" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_finance_withdrawal
+        WHERE is_delete = 0 AND withdrawal_status = 0
+    </select>
+
+    <select id="sumPendingWithdrawalAmount" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0.00)
+        FROM ry_rental.ry_rental_finance_withdrawal
+        WHERE is_delete = 0 AND withdrawal_status = 0
+    </select>
+
+    <select id="countOpenInvoiceTasks" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_invoice_application
+        WHERE is_delete = 0 AND application_status IN (0, 2)
+    </select>
+
+    <select id="countOpenMarketReportTasks" resultType="int">
+        SELECT COUNT(1)
+        FROM ry_rental.ry_rental_market_report
+        WHERE is_delete = 0 AND report_status = 0
+    </select>
+
+    <select id="selectRiskTasks" resultType="com.ruoyi.system.model.rental.PlatformWorkbenchTaskVO">
+        SELECT risk_event_id AS task_id,
+               1 AS task_type,
+               CASE WHEN risk_level &gt;= 3 THEN 3 WHEN risk_level = 2 THEN 2 ELSE 1 END AS priority,
+               event_status AS task_status,
+               subject,
+               detail,
+               CAST(risk_event_id AS CHAR) AS business_no,
+               '平台' AS merchant_name,
+               DATE_FORMAT(first_seen_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+               DATE_FORMAT(last_seen_time, '%Y-%m-%d %H:%i:%s') AS update_time
+        FROM ry_rental.ry_rental_platform_operations_risk_event
+        WHERE is_delete = 0 AND event_status IN (0, 1)
+        ORDER BY priority DESC, last_seen_time DESC, risk_event_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectTicketTasks" resultType="com.ruoyi.system.model.rental.PlatformWorkbenchTaskVO">
+        SELECT t.ticket_id AS task_id,
+               2 AS task_type,
+               t.priority,
+               CASE WHEN t.ticket_status = 0 THEN 0 ELSE 1 END AS task_status,
+               t.ticket_title AS subject,
+               t.ticket_content AS detail,
+               t.ticket_no AS business_no,
+               COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code, '平台工单') AS merchant_name,
+               DATE_FORMAT(t.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+               DATE_FORMAT(t.update_time, '%Y-%m-%d %H:%i:%s') AS update_time
+        FROM ry_rental.ry_rental_service_ticket t
+        LEFT JOIN ry_rental.ry_rental_member m
+          ON m.member_id = t.member_id AND m.is_delete = 0
+        WHERE t.is_delete = 0 AND t.ticket_status NOT IN (5, 6, 7)
+        ORDER BY t.priority DESC, t.create_time ASC, t.ticket_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectWithdrawalTasks" resultType="com.ruoyi.system.model.rental.PlatformWorkbenchTaskVO">
+        SELECT w.withdrawal_id AS task_id,
+               3 AS task_type,
+               2 AS priority,
+               0 AS task_status,
+               '提现审核' AS subject,
+               CONCAT('商户申请提现 ', FORMAT(w.amount, 2), ' 元，渠道：',
+                      CASE WHEN UPPER(w.withdrawal_channel) = 'ALIPAY' THEN '支付宝'
+                           WHEN UPPER(w.withdrawal_channel) = 'BANK_TRANSFER' THEN '银行转账'
+                           ELSE '其他渠道' END) AS detail,
+               w.withdrawal_no AS business_no,
+               COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code) AS merchant_name,
+               DATE_FORMAT(w.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+               DATE_FORMAT(w.create_time, '%Y-%m-%d %H:%i:%s') AS update_time
+        FROM ry_rental.ry_rental_finance_withdrawal w
+        LEFT JOIN ry_rental.ry_rental_member m
+          ON m.member_id = w.member_id AND m.is_delete = 0
+        WHERE w.is_delete = 0 AND w.withdrawal_status = 0
+        ORDER BY w.create_time ASC, w.withdrawal_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectInvoiceTasks" resultType="com.ruoyi.system.model.rental.PlatformWorkbenchTaskVO">
+        SELECT a.invoice_application_id AS task_id,
+               4 AS task_type,
+               2 AS priority,
+               a.application_status AS task_status,
+               CASE WHEN a.application_status = 0 THEN '发票申请审核' ELSE '发票开具' END AS subject,
+               CONCAT('申请编号：', a.application_no, '，金额：', FORMAT(a.amount, 2), ' 元') AS detail,
+               a.application_no AS business_no,
+               COALESCE(NULLIF(m.nickname, ''), NULLIF(m.legal_subject_name, ''), m.member_code, '未知商户') AS merchant_name,
+               DATE_FORMAT(a.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+               DATE_FORMAT(a.update_time, '%Y-%m-%d %H:%i:%s') AS update_time
+        FROM ry_rental.ry_rental_invoice_application a
+        LEFT JOIN ry_rental.ry_rental_member m
+          ON m.member_id = a.member_id AND m.is_delete = 0
+        WHERE a.is_delete = 0 AND a.application_status IN (0, 2)
+        ORDER BY a.application_status ASC, a.create_time ASC, a.invoice_application_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectMarketReportTasks" resultType="com.ruoyi.system.model.rental.PlatformWorkbenchTaskVO">
+        SELECT r.report_id AS task_id,
+               5 AS task_type,
+               3 AS priority,
+               r.report_status AS task_status,
+               CONCAT('市场举报：', COALESCE(p.post_no, '未知帖子')) AS subject,
+               CONCAT('举报类型：', COALESCE(NULLIF(r.report_type, ''), '其他')) AS detail,
+               p.post_no AS business_no,
+               COALESCE(NULLIF(reported.nickname, ''), NULLIF(reported.legal_subject_name, ''), reported.member_code, '未知商户') AS merchant_name,
+               DATE_FORMAT(r.create_time, '%Y-%m-%d %H:%i:%s') AS create_time,
+               DATE_FORMAT(r.create_time, '%Y-%m-%d %H:%i:%s') AS update_time
+        FROM ry_rental.ry_rental_market_report r
+        LEFT JOIN ry_rental.ry_rental_market_post p
+          ON p.post_id = r.post_id AND p.is_delete = 0
+        LEFT JOIN ry_rental.ry_rental_member reported
+          ON reported.member_id = r.reported_member_id AND reported.is_delete = 0
+        WHERE r.is_delete = 0 AND r.report_status = 0
+        ORDER BY r.create_time ASC, r.report_id ASC
+        LIMIT #{limit}
+    </select>
+</mapper>

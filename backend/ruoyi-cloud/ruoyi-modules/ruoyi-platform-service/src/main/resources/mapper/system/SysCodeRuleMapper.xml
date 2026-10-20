@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysCodeRuleMapper">
+    <resultMap id="SysCodeRuleResult" type="com.ruoyi.system.domain.SysCodeRule">
+        <id property="ruleId" column="rule_id" />
+        <result property="codeType" column="code_type" />
+        <result property="codeName" column="code_name" />
+        <result property="prefix" column="prefix_text" />
+        <result property="codeLength" column="code_length" />
+        <result property="currentValue" column="current_value" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="selectCodeRuleColumns">
+        select rule_id, code_type, code_name, prefix_text, code_length, current_value, status,
+               create_by, create_time, update_by, update_time, remark
+        from sys_code_rule
+    </sql>
+
+    <select id="selectList" resultMap="SysCodeRuleResult">
+        <include refid="selectCodeRuleColumns" />
+        where is_delete = 0
+        order by rule_id
+    </select>
+
+    <select id="selectByCodeType" resultMap="SysCodeRuleResult">
+        <include refid="selectCodeRuleColumns" />
+        where code_type = #{codeType} and is_delete = 0
+        limit 1
+    </select>
+
+    <select id="selectByCodeTypeForUpdate" resultMap="SysCodeRuleResult">
+        <include refid="selectCodeRuleColumns" />
+        where code_type = #{codeType} and is_delete = 0
+        limit 1
+        for update
+    </select>
+
+    <select id="selectMaxMemberCodeSequence" resultType="java.lang.Long">
+        select coalesce(max(cast(substring(m.member_code, char_length(#{prefix}) + 1) as unsigned)), 0)
+        from ry_rental.ry_rental_member m
+        where left(m.member_code, char_length(#{prefix})) = #{prefix}
+          and substring(m.member_code, char_length(#{prefix}) + 1) regexp '^[0-9]+$'
+    </select>
+
+    <update id="updateCurrentValue">
+        update sys_code_rule
+        set current_value = #{currentValue}, update_time = sysdate()
+        where rule_id = #{ruleId} and is_delete = 0
+    </update>
+
+    <update id="updateRule" parameterType="com.ruoyi.system.domain.SysCodeRule">
+        update sys_code_rule
+        set prefix_text = #{prefix}, code_length = #{codeLength}, status = #{status},
+            update_by = #{updateBy}, update_time = sysdate(), remark = #{remark}
+        where rule_id = #{ruleId} and is_delete = 0
+    </update>
+</mapper>

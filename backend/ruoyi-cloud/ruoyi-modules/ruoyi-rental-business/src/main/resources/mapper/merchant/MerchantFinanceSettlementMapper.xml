@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.MerchantFinanceSettlementMapper">
+    <resultMap id="settlement" type="com.ruoyi.merchant.api.model.MerchantFinanceSettlementView">
+        <result property="orderNo" column="order_no" />
+        <result property="sourceOrderNo" column="source_order_no" />
+        <result property="childOrderNo" column="child_order_no" />
+        <result property="roleName" column="role_name" />
+        <result property="settlementAmount" column="settlement_amount" />
+        <result property="expressAmount" column="express_amount" />
+        <result property="compensationAmount" column="compensation_amount" />
+        <result property="settlementStatus" column="settlement_status" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <select id="select" resultMap="settlement">
+        select coalesce(source_order.order_no, child_order.order_no) as order_no,
+               source_order.order_no as source_order_no,
+               child_order.order_no as child_order_no,
+               case when s.source_member_id = #{memberId} then '发起商户' else '接收商户' end as role_name,
+               s.settlement_amount, s.express_amount, s.compensation_amount, s.settlement_status,
+               date_format(s.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+               date_format(s.update_time, '%Y-%m-%d %H:%i:%s') as update_time, s.remark
+        from ry_business.ry_rental_order_alliance_settlement s
+        inner join ry_business.ry_rental_order_alliance a
+          on a.tenant_id = s.tenant_id and a.alliance_order_id = s.alliance_order_id and a.is_delete = 0
+        left join ry_business.ry_rental_order source_order
+          on source_order.tenant_id = a.tenant_id and source_order.member_id = a.source_member_id
+         and source_order.order_id = a.source_order_id and source_order.is_delete = 0
+        left join ry_business.ry_rental_order child_order
+          on child_order.tenant_id = a.tenant_id and child_order.member_id = a.target_member_id
+         and child_order.order_id = a.child_order_id and child_order.is_delete = 0
+        where s.tenant_id = #{tenantId} and s.is_delete = 0
+          and (s.source_member_id = #{memberId} or s.receiver_member_id = #{memberId})
+        <if test="status != null">and s.settlement_status = #{status}</if>
+        <if test="beginTime != null and beginTime != ''">and s.create_time &gt;= #{beginTime}</if>
+        <if test="endTime != null and endTime != ''">and s.create_time &lt;= #{endTime}</if>
+        order by s.create_time desc, s.settlement_id desc
+        limit 200
+    </select>
+</mapper>

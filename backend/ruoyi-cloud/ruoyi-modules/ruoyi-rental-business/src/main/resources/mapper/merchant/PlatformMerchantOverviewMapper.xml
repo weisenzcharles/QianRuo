@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.rentalbusiness.mapper.PlatformMerchantOverviewMapper">
+    <!--
+        经营统计只按 member_id 聚合；平台商户基础资料负责分页和名称展示，
+        本查询只访问 ry_business，避免平台服务跨库读取执行面表。
+    -->
+    <select id="selectStats" resultType="com.ruoyi.system.api.model.PlatformMerchantOverviewStat">
+        select requested.member_id as memberId,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_warehouse w
+                         where w.member_id = requested.member_id
+                           and w.status = 0 and w.is_delete = 0), 0) as warehouseCount,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_product p
+                         where p.member_id = requested.member_id
+                           and p.status = 0 and p.is_delete = 0
+                           and cast(p.product_type as char) in ('1', 'device')), 0) as deviceProductCount,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_merchant_accessory a
+                         where a.member_id = requested.member_id
+                           and a.status = 0 and a.is_delete = 0), 0) as accessoryCount,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_merchant_package p
+                         where p.member_id = requested.member_id
+                           and p.status = 0 and p.is_delete = 0), 0) as packageCount,
+               coalesce((select sum(i.total_quantity)
+                         from ry_business.ry_rental_merchant_inventory i
+                         where i.member_id = requested.member_id
+                           and i.status = 0 and i.is_delete = 0), 0) as totalInventoryQuantity,
+               coalesce((select sum(i.available_quantity)
+                         from ry_business.ry_rental_merchant_inventory i
+                         where i.member_id = requested.member_id
+                           and i.status = 0 and i.is_delete = 0), 0) as availableInventoryQuantity,
+               coalesce((select sum(i.reserved_quantity)
+                         from ry_business.ry_rental_merchant_inventory i
+                         where i.member_id = requested.member_id
+                           and i.status = 0 and i.is_delete = 0), 0) as reservedInventoryQuantity,
+               coalesce((select sum(i.rented_quantity)
+                         from ry_business.ry_rental_merchant_inventory i
+                         where i.member_id = requested.member_id
+                           and i.status = 0 and i.is_delete = 0), 0) as rentedInventoryQuantity,
+               coalesce((select sum(i.repairing_quantity)
+                         from ry_business.ry_rental_merchant_inventory i
+                         where i.member_id = requested.member_id
+                           and i.status = 0 and i.is_delete = 0), 0) as repairingInventoryQuantity,
+               coalesce((select sum(i.damaged_quantity)
+                         from ry_business.ry_rental_merchant_inventory i
+                         where i.member_id = requested.member_id
+                           and i.status = 0 and i.is_delete = 0), 0) as damagedInventoryQuantity,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_order o
+                         where o.member_id = requested.member_id
+                           and o.order_status in (10, 15) and o.is_delete = 0), 0) as pendingOrderCount,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_order o
+                         where o.member_id = requested.member_id
+                           and o.order_status in (20, 25, 30, 40, 45, 70)
+                           and o.is_delete = 0), 0) as activeOrderCount,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_order o
+                         where o.member_id = requested.member_id
+                           and o.order_status = 50 and o.is_delete = 0), 0) as completedOrderCount,
+               coalesce((select count(1)
+                         from ry_business.ry_rental_order o
+                         where o.member_id = requested.member_id
+                           and (o.order_status in (60, 65)
+                                or cast(o.time_effect_status as char) in ('1', 'overdue'))
+                           and o.is_delete = 0), 0) as overdueOrderCount
+        from (
+            <foreach collection="memberIds" item="memberId" separator=" union all ">
+                select #{memberId} as member_id
+            </foreach>
+        ) requested
+    </select>
+</mapper>

@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.merchant.mapper.MerchantKnowledgeMapper">
+    <sql id="articleColumns">
+        a.article_id, a.category_id, c.category_name, a.article_title as title,
+        a.source_type, a.audience_type, a.article_status as status, a.current_version_no, a.pinned,
+        case a.audience_type when 1 then '全体员工' when 2 then '指定员工组' else '未知范围' end as audience_type_name,
+        coalesce((select group_concat(distinct r.role_name order by r.role_sort, r.role_id separator '、')
+                  from ry_rental.ry_rental_knowledge_article_role ar
+                  inner join ry_rental.ry_rental_merchant_role r
+                    on r.tenant_id = ar.tenant_id and r.member_id = ar.member_id and r.role_id = ar.role_id
+                   and r.status = 0 and r.is_delete = 0
+                  where ar.article_id = a.article_id and ar.tenant_id = #{tenantId}
+                    and ar.member_id = a.member_id and ar.is_delete = 0), '') as role_names,
+        (select count(1) from ry_rental.ry_rental_knowledge_read_record rr
+         where rr.article_id = a.article_id and rr.is_delete = 0) as read_count,
+        date_format(a.create_time, '%Y-%m-%d %H:%i:%s') as create_time,
+        date_format(a.update_time, '%Y-%m-%d %H:%i:%s') as update_time
+    </sql>
+
+    <select id="selectRoleOptions" resultMap="roleOption">
+        select r.role_id, r.role_name
+        from ry_rental.ry_rental_merchant_role r
+        where r.tenant_id = #{tenantId} and r.member_id = #{memberId}
+          and r.status = 0 and r.is_delete = 0
+        order by r.role_sort asc, r.role_id asc
+    </select>
+
+    <resultMap id="roleOption" type="com.ruoyi.merchant.model.MerchantInternalNoticeRoleOptionVO">
+        <id property="roleId" column="role_id" />
+        <result property="roleName" column="role_name" />
+    </resultMap>
+
+    <select id="countValidRoles" resultType="int">
+        select count(1)
+        from ry_rental.ry_rental_merchant_role
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and status = 0 and is_delete = 0
+          and role_id in <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId}</foreach>
+    </select>
+
+    <select id="selectCategories" resultType="com.ruoyi.merchant.model.MerchantKnowledgeCategoryVO">
+        select c.category_id, c.parent_id, c.category_name, c.sort_no, c.status,
+               (case when c.member_id = 0 then 1 else 0 end) as platform_category
+        from ry_rental.ry_rental_knowledge_category c
+        where c.is_delete = 0 and (c.member_id = 0 or c.member_id = #{memberId})
+        order by platform_category desc, c.parent_id asc, c.sort_no asc, c.category_id asc
+    </select>
+
+    <select id="selectCategory" resultType="com.ruoyi.merchant.model.MerchantKnowledgeCategoryVO">
+        select c.category_id, c.parent_id, c.category_name, c.sort_no, c.status,
+               (case when c.member_id = 0 then 1 else 0 end) as platform_category
+        from ry_rental.ry_rental_knowledge_category c
+        where c.category_id = #{categoryId} and c.is_delete = 0
+          and (c.member_id = 0 or c.member_id = #{memberId})
+        limit 1
+    </select>
+
+    <select id="selectOwnCategory" resultType="com.ruoyi.merchant.model.MerchantKnowledgeCategoryVO">
+        select category_id, parent_id, category_name, sort_no, status, 0 as platform_category
+        from ry_rental.ry_rental_knowledge_category
+        where category_id = #{categoryId} and member_id = #{memberId} and is_delete = 0
+        limit 1
+    </select>
+
+    <select id="countCategoryChildren" resultType="int">
+        select count(1)
+        from ry_rental.ry_rental_knowledge_category
+        where member_id = #{memberId} and parent_id = #{categoryId} and is_delete = 0
+    </select>
+
+    <select id="countCategoryArticles" resultType="int">
+        select count(1)
+        from ry_rental.ry_rental_knowledge_article
+        where member_id = #{memberId} and category_id = #{categoryId}
+          and source_type = 2 and is_delete = 0
+    </select>
+
+    <insert id="insertCategory">
+        insert into ry_rental.ry_rental_knowledge_category
+            (member_id, parent_id, category_name, sort_no, status,
+             create_by, create_time, update_by, update_time, is_delete)
+        values (#{memberId}, #{parentId}, #{categoryName}, #{sortNo}, #{status},
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <update id="updateCategory">
+        update ry_rental.ry_rental_knowledge_category
+        set parent_id = #{parentId}, category_name = #{categoryName}, sort_no = #{sortNo},
+            status = #{status}, update_by = #{operator}, update_time = now()
+        where category_id = #{categoryId} and member_id = #{memberId} and is_delete = 0
+    </update>
+
+    <update id="deleteCategory">
+        update ry_rental.ry_rental_knowledge_category
+        set is_delete = 1, remove_by = #{operator}, update_by = #{operator}, update_time = now()
+        where category_id = #{categoryId} and member_id = #{memberId} and is_delete = 0
+    </update>
+
+    <select id="selectArticles" resultType="com.ruoyi.merchant.model.MerchantKnowledgeArticleVO">
+        select <include refid="articleColumns" />
+        from ry_rental.ry_rental_knowledge_article a
+        left join ry_rental.ry_rental_knowledge_category c
+          on c.category_id = a.category_id and c.is_delete = 0
+         and (c.member_id = 0 or c.member_id = #{memberId})
+        <where>
+            a.is_delete = 0
+            <choose>
+                <when test="query.sourceType == 1">
+                    and a.member_id is null and a.source_type = 1 and a.article_status = 1
+                </when>
+                <when test="query.sourceType == 2">
+                    and a.member_id = #{memberId} and a.source_type = 2
+                    and (a.audience_type = 1 or a.create_by = #{merchantUserId}
+                      or exists (select 1 from ry_rental.ry_rental_knowledge_article_role ar
+                                 inner join ry_rental.ry_rental_merchant_user_role ur
+                                   on ur.tenant_id = ar.tenant_id and ur.member_id = ar.member_id
+                                  and ur.role_id = ar.role_id and ur.merchant_user_id = #{merchantUserId}
+                                  and ur.is_delete = 0
+                                 where ar.article_id = a.article_id and ar.tenant_id = #{tenantId}
+                                   and ar.member_id = #{memberId} and ar.is_delete = 0)
+                      or exists (select 1 from ry_rental.ry_rental_merchant_user_role ur
+                                 inner join ry_rental.ry_rental_merchant_role r
+                                   on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id
+                                  and r.role_id = ur.role_id and r.role_key = 'merchant_admin'
+                                  and r.status = 0 and r.is_delete = 0
+                                 where ur.tenant_id = #{tenantId} and ur.member_id = #{memberId}
+                                   and ur.merchant_user_id = #{merchantUserId} and ur.is_delete = 0))
+                </when>
+                <otherwise>
+                    and ((a.member_id = #{memberId} and a.source_type = 2)
+                      or (a.member_id is null and a.source_type = 1 and a.article_status = 1))
+            </otherwise>
+            </choose>
+            <if test="query.sourceType == null">
+                and (a.member_id is null or a.audience_type = 1 or a.create_by = #{merchantUserId}
+                  or exists (select 1 from ry_rental.ry_rental_knowledge_article_role ar
+                             inner join ry_rental.ry_rental_merchant_user_role ur
+                               on ur.tenant_id = ar.tenant_id and ur.member_id = ar.member_id
+                              and ur.role_id = ar.role_id and ur.merchant_user_id = #{merchantUserId}
+                              and ur.is_delete = 0
+                             where ar.article_id = a.article_id and ar.tenant_id = #{tenantId}
+                               and ar.member_id = #{memberId} and ar.is_delete = 0)
+                  or exists (select 1 from ry_rental.ry_rental_merchant_user_role ur
+                             inner join ry_rental.ry_rental_merchant_role r
+                               on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id
+                              and r.role_id = ur.role_id and r.role_key = 'merchant_admin'
+                              and r.status = 0 and r.is_delete = 0
+                             where ur.tenant_id = #{tenantId} and ur.member_id = #{memberId}
+                               and ur.merchant_user_id = #{merchantUserId} and ur.is_delete = 0))
+            </if>
+            <if test="query.title != null and query.title != ''">
+                and a.article_title like concat('%', #{query.title}, '%')
+            </if>
+            <if test="query.categoryId != null">and a.category_id = #{query.categoryId}</if>
+            <if test="query.status != null">and a.article_status = #{query.status}</if>
+        </where>
+        order by a.pinned desc, a.update_time desc, a.article_id desc
+    </select>
+
+    <select id="selectArticle" resultType="com.ruoyi.merchant.model.MerchantKnowledgeArticleVO">
+        select <include refid="articleColumns" />
+        from ry_rental.ry_rental_knowledge_article a
+        left join ry_rental.ry_rental_knowledge_category c
+          on c.category_id = a.category_id and c.is_delete = 0
+         and (c.member_id = 0 or c.member_id = #{memberId})
+        where a.article_id = #{articleId} and a.is_delete = 0
+          and ((a.member_id = #{memberId} and a.source_type = 2)
+            or (a.member_id is null and a.source_type = 1 and a.article_status = 1))
+          and (a.member_id is null or a.audience_type = 1 or a.create_by = #{merchantUserId}
+            or exists (select 1 from ry_rental.ry_rental_knowledge_article_role ar
+                       inner join ry_rental.ry_rental_merchant_user_role ur
+                         on ur.tenant_id = ar.tenant_id and ur.member_id = ar.member_id
+                        and ur.role_id = ar.role_id and ur.merchant_user_id = #{merchantUserId}
+                        and ur.is_delete = 0
+                       where ar.article_id = a.article_id and ar.tenant_id = #{tenantId}
+                         and ar.member_id = #{memberId} and ar.is_delete = 0)
+            or exists (select 1 from ry_rental.ry_rental_merchant_user_role ur
+                       inner join ry_rental.ry_rental_merchant_role r
+                         on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id
+                        and r.role_id = ur.role_id and r.role_key = 'merchant_admin'
+                        and r.status = 0 and r.is_delete = 0
+                       where ur.tenant_id = #{tenantId} and ur.member_id = #{memberId}
+                         and ur.merchant_user_id = #{merchantUserId} and ur.is_delete = 0))
+        limit 1
+    </select>
+
+    <select id="selectOwnArticleForUpdate" resultType="com.ruoyi.merchant.model.MerchantKnowledgeArticleVO">
+        select <include refid="articleColumns" />
+        from ry_rental.ry_rental_knowledge_article a
+        left join ry_rental.ry_rental_knowledge_category c
+          on c.category_id = a.category_id and c.is_delete = 0
+         and (c.member_id = 0 or c.member_id = #{memberId})
+        where a.article_id = #{articleId} and a.member_id = #{memberId}
+          and a.source_type = 2 and a.is_delete = 0
+        limit 1 for update
+    </select>
+
+    <select id="selectVersions" resultType="com.ruoyi.merchant.model.MerchantKnowledgeVersionVO">
+        select v.version_id, v.version_no, cast(v.content as char) as content,
+               v.version_status,
+               date_format(v.retention_until, '%Y-%m-%d %H:%i:%s') as retention_until,
+               date_format(v.create_time, '%Y-%m-%d %H:%i:%s') as create_time
+        from ry_rental.ry_rental_knowledge_version v
+        where v.article_id = #{articleId} and v.is_delete = 0
+          and exists (
+              select 1 from ry_rental.ry_rental_knowledge_article a
+              where a.article_id = v.article_id and a.is_delete = 0
+                and ((a.member_id = #{memberId} and a.source_type = 2)
+                  or (a.member_id is null and a.source_type = 1 and a.article_status = 1))
+                and (a.member_id is null or a.audience_type = 1 or a.create_by = #{merchantUserId}
+                  or exists (select 1 from ry_rental.ry_rental_knowledge_article_role ar
+                             inner join ry_rental.ry_rental_merchant_user_role ur
+                               on ur.tenant_id = ar.tenant_id and ur.member_id = ar.member_id
+                              and ur.role_id = ar.role_id and ur.merchant_user_id = #{merchantUserId}
+                              and ur.is_delete = 0
+                             where ar.article_id = a.article_id and ar.tenant_id = #{tenantId}
+                               and ar.member_id = #{memberId} and ar.is_delete = 0)
+                  or exists (select 1 from ry_rental.ry_rental_merchant_user_role ur
+                             inner join ry_rental.ry_rental_merchant_role r
+                               on r.tenant_id = ur.tenant_id and r.member_id = ur.member_id
+                              and r.role_id = ur.role_id and r.role_key = 'merchant_admin'
+                              and r.status = 0 and r.is_delete = 0
+                             where ur.tenant_id = #{tenantId} and ur.member_id = #{memberId}
+                               and ur.merchant_user_id = #{merchantUserId} and ur.is_delete = 0))
+          )
+        order by v.version_no desc, v.version_id desc
+    </select>
+
+    <select id="selectVersionAttachments" resultType="com.ruoyi.merchant.model.MerchantKnowledgeAttachmentVO">
+        select attachment_id, attachment_name, file_url, file_type, file_size, sort_no
+        from ry_rental.ry_rental_knowledge_version_attachment
+        where version_id = #{versionId} and is_delete = 0
+        order by sort_no asc, attachment_id asc
+    </select>
+
+    <select id="selectArticleRoleIds" resultType="long">
+        select role_id
+        from ry_rental.ry_rental_knowledge_article_role
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and article_id = #{articleId} and is_delete = 0
+        order by role_id asc
+    </select>
+
+    <insert id="insertArticle">
+        insert into ry_rental.ry_rental_knowledge_article
+            (member_id, category_id, article_title, source_type, audience_type, article_status,
+             current_version_no, pinned, create_by, create_time, update_by, update_time, is_delete)
+        values (#{memberId}, #{categoryId}, #{title}, 2, #{audienceType}, 0, 1, coalesce(#{pinned}, 0),
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectLastInsertId" resultType="long">select last_insert_id()</select>
+
+    <insert id="insertVersion">
+        insert into ry_rental.ry_rental_knowledge_version
+            (article_id, version_no, content, version_status, retention_until,
+             create_by, create_time, update_by, update_time, is_delete)
+        values (#{articleId}, #{versionNo}, #{content}, #{versionStatus}, date_add(now(), interval 3 year),
+                #{operator}, now(), #{operator}, now(), 0)
+    </insert>
+
+    <select id="selectVersionId" resultType="long">
+        select version_id
+        from ry_rental.ry_rental_knowledge_version
+        where article_id = #{articleId} and version_no = #{versionNo} and is_delete = 0
+        order by version_id desc
+        limit 1
+    </select>
+
+    <insert id="insertVersionAttachments">
+        insert into ry_rental.ry_rental_knowledge_version_attachment
+            (version_id, attachment_name, file_url, file_type, file_size, sort_no,
+             create_by, create_time, update_by, update_time, is_delete)
+        values
+        <foreach collection="attachments" item="attachment" index="index" separator=",">
+            (#{versionId}, #{attachment.attachmentName}, #{attachment.fileUrl}, #{attachment.fileType},
+             #{attachment.fileSize}, #{index}, #{operator}, now(), #{operator}, now(), 0)
+        </foreach>
+        on duplicate key update is_delete = 0, update_by = #{operator}, update_time = now()
+    </insert>
+
+    <update id="deleteArticleRoles">
+        update ry_rental.ry_rental_knowledge_article_role
+        set is_delete = 1, remove_by = #{operator}, update_by = #{operator}, update_time = now()
+        where tenant_id = #{tenantId} and member_id = #{memberId}
+          and article_id = #{articleId} and is_delete = 0
+    </update>
+
+    <insert id="insertArticleRoles">
+        insert into ry_rental.ry_rental_knowledge_article_role
+            (article_id, tenant_id, member_id, role_id, create_by, create_time,
+             update_by, update_time, is_delete)
+        values
+        <foreach collection="roleIds" item="roleId" separator=",">
+            (#{articleId}, #{tenantId}, #{memberId}, #{roleId}, #{operator}, now(), #{operator}, now(), 0)
+        </foreach>
+        on duplicate key update is_delete = 0, update_by = #{operator}, update_time = now()
+    </insert>
+
+    <update id="updateArticle">
+        update ry_rental.ry_rental_knowledge_article
+        set category_id = #{categoryId}, article_title = #{title}, audience_type = #{audienceType}, article_status = 0,
+            pinned = coalesce(#{pinned}, 0), current_version_no = #{versionNo},
+            update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and member_id = #{memberId}
+          and source_type = 2 and is_delete = 0
+    </update>
+
+    <update id="updateArticleStatus">
+        update ry_rental.ry_rental_knowledge_article
+        set article_status = #{toStatus}, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and member_id = #{memberId}
+          and source_type = 2 and article_status = #{fromStatus} and is_delete = 0
+    </update>
+
+    <update id="updateVersionStatus">
+        update ry_rental.ry_rental_knowledge_version v
+        inner join ry_rental.ry_rental_knowledge_article a on a.article_id = v.article_id
+        set v.version_status = #{versionStatus}, v.update_by = #{operator}, v.update_time = now()
+        where v.article_id = #{articleId} and a.member_id = #{memberId}
+          and a.source_type = 2 and v.version_no = a.current_version_no
+          and v.is_delete = 0 and a.is_delete = 0
+    </update>
+
+    <update id="deleteArticle">
+        update ry_rental.ry_rental_knowledge_article
+        set is_delete = 1, remove_by = #{operator}, update_by = #{operator}, update_time = now()
+        where article_id = #{articleId} and member_id = #{memberId}
+          and source_type = 2 and is_delete = 0
+    </update>
+
+    <insert id="insertReadRecord">
+        insert into ry_rental.ry_rental_knowledge_read_record
+            (article_id, reader_user_id, read_time, is_delete)
+        values (#{articleId}, #{readerUserId}, now(), 0)
+        on duplicate key update read_time = now(), is_delete = 0
+    </insert>
+</mapper>
